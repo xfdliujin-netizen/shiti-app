@@ -1,0 +1,7 @@
+name = "shiti-ocr-proxy"
+main = "worker.mjs"
+compatibility_date = "2026-11-13"
+
+[vars]
+ALLOWED_ORIGIN = "https://xfdliujin-netizen.github.io"
+# BAIDU_API_KEY / BAIDU_SECRET_KEY / OCR_PROXY_TOKEN 请通过 Secrets 配置。
