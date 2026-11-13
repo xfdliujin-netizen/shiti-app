@@ -1,11 +1,11 @@
 {
   "name": "shiti-notebook",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "private": true,
   "scripts": {
     "start": "node server.cjs",
     "check": "node --check app.js && node --check paper.js && node --check crop.js && node --check baidu.js && node --check proxy/worker.mjs && node --check server.cjs",
-    "test": "node check.cjs && node paper-check.cjs && node crop-check.cjs && node baidu-check.cjs"
+    "test": "node check.cjs && node paper-check.cjs && node crop-check.cjs && node baidu-check.cjs && node ocr-connection-check.cjs"
   },
   "type": "module"
 }

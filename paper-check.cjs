@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const controls={'#subject':{value:'语文'},'#source':{value:'课堂练习'},'#mistake':{value:''},'#paper-layout':{value:'2'},'#paper-progress':{},'#paper-area':{scrollIntoView(){}}};
-const c={console,assert,TextEncoder,TextDecoder,AbortSignal,crypto:globalThis.crypto,setTimeout,clearTimeout,confirm:()=>true,location:{hash:'#capture'},localStorage:{getItem:()=>null},sessionStorage:{getItem:()=> 'test-key'},window:{addEventListener(){}},document:{querySelector:s=>controls[s]||null}};vm.createContext(c);
+const c={console,assert,TextEncoder,TextDecoder,AbortController,URL,AbortSignal,crypto:globalThis.crypto,setTimeout,clearTimeout,confirm:()=>true,location:{hash:'#capture'},localStorage:{getItem:()=>null},sessionStorage:{getItem:()=> 'test-key'},window:{addEventListener(){}},document:{querySelector:s=>controls[s]||null}};vm.createContext(c);
 vm.runInContext(fs.readFileSync(__dirname+'/crop.js','utf8'),c);vm.runInContext(fs.readFileSync(__dirname+'/paper.js','utf8'),c);vm.runInContext(fs.readFileSync(__dirname+'/baidu.js','utf8'),c);vm.runInContext(fs.readFileSync(__dirname+'/app.js','utf8').replace("window.addEventListener('hashchange',render);boot();",''),c);
 vm.runInContext(`
 (async()=>{
