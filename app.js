@@ -385,11 +385,17 @@ function bind(tab) {
 function openQuestion(id) {
   const q = data.questions.find(q => q.id === id);
   if (!q) return;
+  const quickList = ['语文', '数学', '英语'];
+  const extraSubjects = subjects.filter(s => !quickList.includes(s));
   $('#detail').innerHTML = `
     <div class="card-head">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <select id="detail-subject" aria-label="更改学科" style="width:auto;padding:5px 10px;border-radius:8px;font-size:14px;font-weight:700;color:var(--primary);background:var(--primary-soft);border:none">${opts(q.subject)}</select>
-        <span style="font-size:14px;color:var(--muted);font-weight:600">#${esc(q.number)}</span>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        ${quickList.map(s => `<button type="button" class="chip ${q.subject === s ? 'active' : ''}" data-detail-subj="${s}" style="padding:4px 12px;font-size:13px">${s}</button>`).join('')}
+        <select id="detail-subject" aria-label="其他学科" style="width:auto;min-width:76px;padding:4px 10px;border-radius:99px;font-size:13px;font-weight:600;color:var(--text);background:var(--surface-sub)">
+          <option value="" ${quickList.includes(q.subject) ? 'selected' : ''}>更多学科…</option>
+          ${extraSubjects.map(s => `<option value="${s}" ${q.subject === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
+        <span style="font-size:13px;color:var(--muted);font-weight:600;margin-left:2px">#${esc(q.number)}</span>
       </div>
       <button class="secondary" id="close-detail" style="padding:6px 14px;font-size:13px">关闭</button>
     </div>
@@ -404,18 +410,30 @@ function openQuestion(id) {
     </div>`;
   $('#detail').showModal();
   $('#close-detail').onclick = () => $('#detail').close();
-  $('#detail-subject').onchange = e => run(e.target, async () => {
-    const nextSubject = e.target.value;
-    await persist({ ...data, questions: data.questions.map(x => x.id === id ? { ...x, subject: nextSubject, updated: stamp() } : x) });
-    render();
-    toast(`✓ 已将学科改为「${nextSubject}」`);
+
+  const changeDetailSubject = async (nextSubject) => {
+    if (!nextSubject || nextSubject === q.subject || busy) return;
+    busy = true;
+    try {
+      await persist({ ...data, questions: data.questions.map(x => x.id === id ? { ...x, subject: nextSubject, updated: stamp() } : x) });
+      render();
+      openQuestion(id);
+      toast(`✓ 已将学科改为「${nextSubject}」`);
+    } finally {
+      busy = false;
+    }
+  };
+
+  document.querySelectorAll('[data-detail-subj]').forEach(btn => {
+    btn.onclick = () => changeDetailSubject(btn.dataset.detailSubj);
   });
+  $('#detail-subject').onchange = e => changeDetailSubject(e.target.value);
+
   $('#master').onclick = e => run(e.target, async () => { await persist({ ...data, questions: data.questions.map(x => x.id === id ? { ...x, mastered: !x.mastered, updated: stamp() } : x) }); $('#detail').close(); render(); });
   $('#edit-q').onclick = () => { editingId = id; draft = { ...q }; $('#detail').close(); location.hash = 'capture'; render(); $('#draft-area').scrollIntoView(); };
   $('#practice-q').onclick = () => { selectedPracticeId = id; $('#detail').close(); location.hash = 'practice'; render(); $('#practice-source').value = id; };
   $('#delete-q').onclick = e => { if (!confirm('删除这道错题？删除操作也会参与云端同步。')) return; run(e.target, async () => { await persist({ ...data, questions: data.questions.filter(x => x.id !== id), deleted: { ...data.deleted, [id]: stamp() } }); $('#detail').close(); render(); }); };
 }
-
 function bindPractice() {
   $('#practice-source').onchange = e => { selectedPracticeId = e.target.value; };
   $('#generate').onclick = e => run(e.target, async () => {
