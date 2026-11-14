@@ -21,15 +21,27 @@ let data = { version: 1, questions: [], practices: [], deleted: {} },
     practice = null,
     editingId = null,
     selectedPracticeId = '',
+    showSubjectConfig = false,
     currentSubject = cfg.lastSubject || '语文',
     currentSource = '',
     currentMistake = '';
+
+function getQuickSubjects() {
+  if (Array.isArray(cfg.quickSubjects) && cfg.quickSubjects.length) {
+    return cfg.quickSubjects.filter(s => subjects.includes(s));
+  }
+  return ['语文', '数学', '英语'];
+}
 
 function readConfig() {
   try {
     const value = JSON.parse(localStorage.getItem('shiti-config') || '{}');
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   } catch { return {}; }
+}
+
+function saveLocalConfig() {
+  try { localStorage.setItem('shiti-config', JSON.stringify(cfg)); } catch {}
 }
 
 function getStoredKey(k) {
@@ -86,9 +98,10 @@ function heading(k, title, sub, extra = '') {
 
 function render() {
   const tab = current();
-  $('#nav').innerHTML = tabs.map((t, i) => `<a href="#${t[0]}" class="${tab === t[0] ? 'active' : ''}" ${tab === t[0] ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[i]}</svg>${t[1]}</a>`).join('');
+  $('#nav').innerHTML = tabs.map((t, i) => `<a href="#${t[0]}" class="${tab === t[0] ? 'active' : ''}" ${tab === t[0] ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${paths[i]}</svg><span>${t[1]}</span></a>`).join('');
   if ($('#breadcrumb')) $('#breadcrumb').textContent = '我的学习空间 / ' + tabs.find(t => t[0] === tab)[1];
-  $('#main').innerHTML = ({ capture, notebook, practice: practicePage, settings })[tab]();
+  const mobileBar = `<div class="mobile-topbar"><a class="brand" href="#capture"><span class="logo">拾</span><span class="brand-name">拾题</span></a><span style="font-size:13px;color:var(--muted);font-weight:600">${tabs.find(t => t[0] === tab)[1]}</span></div>`;
+  $('#main').innerHTML = mobileBar + ({ capture, notebook, practice: practicePage, settings })[tab]();
   bind(tab);
 }
 
@@ -103,7 +116,8 @@ function cards(qs) {
 }
 
 function capture() {
-  const quickSubjects = ['语文', '数学', '英语'];
+  const quickSubjects = getQuickSubjects();
+  const displaySubjects = quickSubjects.includes(currentSubject) ? quickSubjects : [...quickSubjects, currentSubject];
   return `<div class="top-bar-summary">${stats()}</div>
     <section class="card">
       <div class="card-head">
@@ -113,9 +127,22 @@ function capture() {
       
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
         <span style="font-size:14px;font-weight:600;color:var(--muted)">科目：</span>
-        ${quickSubjects.map(s => `<button type="button" class="chip ${currentSubject === s ? 'active' : ''}" data-subj="${s}">${s}</button>`).join('')}
-        <select id="subject" aria-label="所属科目" style="width:auto;padding:6px 12px;border-radius:99px;font-size:14px">${opts(currentSubject)}</select>
+        ${displaySubjects.map(s => `<button type="button" class="chip ${currentSubject === s ? 'active' : ''}" data-subj="${s}">${s}</button>`).join('')}
+        <button type="button" class="chip-gear" id="toggle-subj-cfg" title="自定义常用科目">⚙️ 设置</button>
+        <select id="subject" hidden>${opts(currentSubject)}</select>
       </div>
+
+      ${showSubjectConfig ? `
+        <div class="subject-config-panel">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;font-weight:600">勾选录题界面显示的常用科目：</span>
+            <button type="button" class="text-button" id="close-subj-cfg" style="font-size:13px">完成</button>
+          </div>
+          <div class="subject-config-grid">
+            ${subjects.map(s => `<label class="subject-check"><input type="checkbox" data-quick-subj="${s}" ${quickSubjects.includes(s) ? 'checked' : ''}><span>${s}</span></label>`).join('')}
+          </div>
+        </div>
+      ` : ''}
 
       <div class="segmented">
         <button data-mode="image" class="${mode === 'image' ? 'active' : ''}">▧ 拍照 / 选图识别</button>
@@ -136,7 +163,7 @@ function capture() {
       <div id="paper-progress" class="result-note" role="status" style="margin-top:10px;font-weight:600;${paperProgress ? '' : 'display:none'}">${esc(paperProgress)}</div>
 
       <div class="actions" style="margin-top:14px">
-        <button class="primary" id="analyze" style="flex:2;padding:13px 20px;font-size:16px">✧ 识别框内文字（百度 OCR）</button>
+        <button class="primary" id="analyze">✧ 识别框内文字</button>
         <button class="secondary" id="manual">手动填表</button>
       </div>
 
@@ -163,7 +190,22 @@ function capture() {
 }
 
 function draftForm() {
-  return `<section class="card"><div class="card-head"><h2>确认整理结果</h2><span class="pill">可编辑</span></div>${['text', 'answer', 'analysis', 'reminder'].map((k, i) => `<label class="field"><span>${['题干', '正确答案', '解题步骤', '易错提醒'][i]}</span><textarea id="draft-${k}">${esc(draft[k])}</textarea></label>`).join('')}${field('知识点标签（逗号分隔）', 'draft-tags', draft.tags.join('，'))}<button class="primary wide" id="save-draft">确认，收录到错题本</button></section>`;
+  return `<section class="card" style="border:1.5px solid rgba(0,122,255,0.25)">
+    <div class="card-head">
+      <h2>${editingId ? '编辑错题内容' : '手动填表整理'}</h2>
+      <button type="button" class="secondary" id="cancel-draft-top" style="padding:6px 14px;font-size:13px">取消</button>
+    </div>
+    <div class="form-row">
+      <label class="field"><span>所属学科</span><select id="draft-subject">${opts(draft.subject || currentSubject)}</select></label>
+      ${field('题目来源（选填）', 'draft-source', draft.source || '')}
+    </div>
+    ${['text', 'mistake', 'answer', 'analysis', 'reminder'].map((k, i) => `<label class="field"><span>${['题干', '我的错误作答 / 困惑（选填）', '正确答案', '解题步骤', '易错提醒'][i]}</span><textarea id="draft-${k}">${esc(draft[k])}</textarea></label>`).join('')}
+    ${field('知识点标签（逗号分隔）', 'draft-tags', (draft.tags || []).join('，'))}
+    <div class="actions" style="margin-top:16px">
+      <button class="primary" id="save-draft" style="flex:2">✓ 确认，保存到错题本</button>
+      <button type="button" class="secondary" id="cancel-draft" style="flex:1">取消</button>
+    </div>
+  </section>`;
 }
 
 function notebook() {
@@ -246,15 +288,33 @@ function bind(tab) {
     document.querySelectorAll('[data-subj]').forEach(b => b.onclick = () => {
       currentSubject = b.dataset.subj;
       cfg.lastSubject = currentSubject;
-      try { localStorage.setItem('shiti-config', JSON.stringify(cfg)); } catch {}
+      saveLocalConfig();
       render();
     });
-    if ($('#subject')) $('#subject').onchange = e => {
-      currentSubject = e.target.value;
-      cfg.lastSubject = currentSubject;
-      try { localStorage.setItem('shiti-config', JSON.stringify(cfg)); } catch {}
-      render();
-    };
+    if ($('#toggle-subj-cfg')) $('#toggle-subj-cfg').onclick = () => { showSubjectConfig = !showSubjectConfig; render(); };
+    if ($('#close-subj-cfg')) $('#close-subj-cfg').onclick = () => { showSubjectConfig = false; render(); };
+    document.querySelectorAll('[data-quick-subj]').forEach(cb => {
+      cb.onchange = () => {
+        const s = cb.dataset.quickSubj;
+        let list = getQuickSubjects();
+        if (cb.checked) {
+          if (!list.includes(s)) list = [...list, s];
+        } else {
+          if (list.length <= 1) {
+            cb.checked = true;
+            return toast('至少保留一个常用科目');
+          }
+          list = list.filter(x => x !== s);
+        }
+        cfg.quickSubjects = list;
+        if (!list.includes(currentSubject)) {
+          currentSubject = list[0];
+          cfg.lastSubject = currentSubject;
+        }
+        saveLocalConfig();
+        render();
+      };
+    });
     if ($('#source')) $('#source').oninput = e => { currentSource = e.target.value; };
     if ($('#mistake')) $('#mistake').oninput = e => { currentMistake = e.target.value; };
     if ($('#photo')) {
@@ -265,13 +325,24 @@ function bind(tab) {
     }
     $('#manual').onclick = () => {
       editingId = null;
-      draft = { subject: $('#subject').value, source: $('#source').value, mistake: $('#mistake').value, text: $('#question-text')?.value || '', answer: '', analysis: '', reminder: '', tags: [], image: mode === 'image' ? image : '' };
+      draft = { subject: currentSubject, source: $('#source')?.value || '', mistake: $('#mistake')?.value || '', text: $('#question-text')?.value || '', answer: '', analysis: '', reminder: '', tags: [], image: mode === 'image' ? image : '' };
       render();
       $('#draft-area').scrollIntoView({ behavior: 'smooth' });
     };
+    const cancelDraftHandler = () => {
+      draft = null;
+      editingId = null;
+      render();
+      toast('已取消编辑');
+    };
+    if ($('#cancel-draft')) $('#cancel-draft').onclick = cancelDraftHandler;
+    if ($('#cancel-draft-top')) $('#cancel-draft-top').onclick = cancelDraftHandler;
+
     if ($('#save-draft')) $('#save-draft').onclick = e => run(e.target, async () => {
       const q = { ...draft };
-      for (const k of ['text', 'answer', 'analysis', 'reminder']) q[k] = $('#draft-' + k).value.trim();
+      q.subject = $('#draft-subject').value;
+      q.source = $('#draft-source').value.trim();
+      for (const k of ['text', 'mistake', 'answer', 'analysis', 'reminder']) q[k] = $('#draft-' + k).value.trim();
       if (!q.text) throw Error('请补全题干');
       q.tags = $('#draft-tags').value.split(/[,，]/).map(t => t.trim()).filter(Boolean);
       q.id = uid();
@@ -285,10 +356,13 @@ function bind(tab) {
         q.created = original.created;
         await persist({ ...data, questions: data.questions.map(x => x.id === editingId ? { ...x, ...q } : x) });
         editingId = null;
-      } else await persist({ ...data, questions: [...data.questions, q] });
+        toast('✓ 错题修改已保存');
+      } else {
+        await persist({ ...data, questions: [...data.questions, q] });
+        toast('✓ 已收录到错题本');
+      }
       draft = null;
       image = '';
-      toast('✓ 已收录到错题本');
       render();
     });
   }
@@ -311,9 +385,31 @@ function bind(tab) {
 function openQuestion(id) {
   const q = data.questions.find(q => q.id === id);
   if (!q) return;
-  $('#detail').innerHTML = `<div class="card-head"><h2>${esc(q.subject)} · #${esc(q.number)}</h2><button class="secondary" id="close-detail">关闭</button></div><p class="prose">${esc(q.text)}</p>${q.image ? `<img src="${q.image}" alt="原题图片" style="max-width:100%;max-height:320px;object-fit:contain">` : ''}${[['来源', q.source], ['百度 OCR 原始转录', q.ocrProvider === 'baidu' ? q.ocrOriginalText : ''], ['我的答案 / 困惑', q.mistake], ['正确答案', q.answer], ['解题步骤', q.analysis], ['易错提醒', q.reminder], ['知识点', q.tags.join(' · ')]].filter(x => x[1]).map(x => `<div class="analysis-block"><h3>${x[0]}</h3><div class="prose">${esc(x[1])}</div></div>`).join('')}<div class="actions"><button class="primary" id="master">${q.mastered ? '重新巩固' : '标记已掌握'}</button><button class="secondary" id="edit-q">编辑</button><button class="secondary" id="practice-q">举一反三</button><button class="secondary danger" id="delete-q">删除</button></div>`;
+  $('#detail').innerHTML = `
+    <div class="card-head">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <select id="detail-subject" aria-label="更改学科" style="width:auto;padding:5px 10px;border-radius:8px;font-size:14px;font-weight:700;color:var(--primary);background:var(--primary-soft);border:none">${opts(q.subject)}</select>
+        <span style="font-size:14px;color:var(--muted);font-weight:600">#${esc(q.number)}</span>
+      </div>
+      <button class="secondary" id="close-detail" style="padding:6px 14px;font-size:13px">关闭</button>
+    </div>
+    <p class="prose">${esc(q.text)}</p>
+    ${q.image ? `<img src="${q.image}" alt="原题图片" style="max-width:100%;max-height:320px;object-fit:contain;margin-top:10px;border-radius:10px">` : ''}
+    ${[['来源', q.source], ['百度 OCR 原始转录', q.ocrProvider === 'baidu' ? q.ocrOriginalText : ''], ['我的答案 / 困惑', q.mistake], ['正确答案', q.answer], ['解题步骤', q.analysis], ['易错提醒', q.reminder], ['知识点', q.tags.join(' · ')]].filter(x => x[1]).map(x => `<div class="analysis-block"><h3>${x[0]}</h3><div class="prose">${esc(x[1])}</div></div>`).join('')}
+    <div class="actions">
+      <button class="primary" id="master">${q.mastered ? '重新巩固' : '标记已掌握'}</button>
+      <button class="secondary" id="edit-q">编辑</button>
+      <button class="secondary" id="practice-q">举一反三</button>
+      <button class="secondary danger" id="delete-q">删除</button>
+    </div>`;
   $('#detail').showModal();
   $('#close-detail').onclick = () => $('#detail').close();
+  $('#detail-subject').onchange = e => run(e.target, async () => {
+    const nextSubject = e.target.value;
+    await persist({ ...data, questions: data.questions.map(x => x.id === id ? { ...x, subject: nextSubject, updated: stamp() } : x) });
+    render();
+    toast(`✓ 已将学科改为「${nextSubject}」`);
+  });
   $('#master').onclick = e => run(e.target, async () => { await persist({ ...data, questions: data.questions.map(x => x.id === id ? { ...x, mastered: !x.mastered, updated: stamp() } : x) }); $('#detail').close(); render(); });
   $('#edit-q').onclick = () => { editingId = id; draft = { ...q }; $('#detail').close(); location.hash = 'capture'; render(); $('#draft-area').scrollIntoView(); };
   $('#practice-q').onclick = () => { selectedPracticeId = id; $('#detail').close(); location.hash = 'practice'; render(); $('#practice-source').value = id; };
