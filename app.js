@@ -1,5 +1,5 @@
 const $ = s => document.querySelector(s);
-const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '\x26amp;', '<': '\x26lt;', '>': '\x26gt;', '"': '\x26quot;', "'": '\x26#39;' }[c]));
 const subjects = ['语文', '数学', '英语', '物理', '化学', '生物', '历史', '地理', '政治', '其他'];
 const paths = [
   '<path d="M12 5v14M5 12h14"/>',
@@ -60,7 +60,7 @@ async function persist(next = data) {
   tx.objectStore('data').put(next, 'notebook');
   await new Promise((ok, no) => { tx.oncomplete = ok; tx.onerror = () => no(tx.error); tx.onabort = () => no(tx.error); });
   data = next;
-  $('#save-status').textContent = '已保存到此设备';
+  if ($('#save-status')) $('#save-status').textContent = '已保存到本机';
 }
 
 function toast(s) {
@@ -81,93 +81,93 @@ function field(label, id, value = '', type = 'text', placeholder = '') {
   return `<label class="field"><span>${label}</span><input id="${id}" type="${type}" value="${esc(value)}" placeholder="${placeholder}"></label>`;
 }
 function heading(k, title, sub, extra = '') {
-  return `<div class="page-head"><div><div class="eyebrow">${k}</div><h1>${title}</h1><p class="subtitle">${sub}</p></div>${extra}</div>`;
+  return `<div class="page-head"><div><h1>${title}</h1><p class="subtitle">${sub}</p></div>${extra}</div>`;
 }
 
 function render() {
   const tab = current();
-  $('#nav').innerHTML = tabs.map((t, i) => `<a href="#${t[0]}" class="${tab === t[0] ? 'active' : ''}" ${tab === t[0] ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${paths[i]}</svg>${t[1]}</a>`).join('');
-  $('#breadcrumb').textContent = '我的学习空间 / ' + tabs.find(t => t[0] === tab)[1];
+  $('#nav').innerHTML = tabs.map((t, i) => `<a href="#${t[0]}" class="${tab === t[0] ? 'active' : ''}" ${tab === t[0] ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[i]}</svg>${t[1]}</a>`).join('');
+  if ($('#breadcrumb')) $('#breadcrumb').textContent = '我的学习空间 / ' + tabs.find(t => t[0] === tab)[1];
   $('#main').innerHTML = ({ capture, notebook, practice: practicePage, settings })[tab]();
   bind(tab);
 }
 
 function stats() {
-  return `<div class="stats">${[['▤', '累计收录', data.questions.length, '题'], ['↗', '待巩固', data.questions.filter(q => !q.mastered).length, '题'], ['✓', '已掌握', data.questions.filter(q => q.mastered).length, '题']].map(x => `<div class="stat"><div class="stat-icon">${x[0]}</div><div><small>${x[1]}</small><strong>${x[2]}<span>${x[3]}</span></strong></div></div>`).join('')}</div>`;
+  return `<div class="stats">${[['▤', '累计', data.questions.length], ['↗', '待巩固', data.questions.filter(q => !q.mastered).length], ['✓', '已掌握', data.questions.filter(q => q.mastered).length]].map(x => `<div class="stat"><span class="stat-icon">${x[0]}</span><small>${x[1]}</small><strong>${x[2]}</strong></div>`).join('')}</div>`;
 }
 
 function cards(qs) {
   return qs.length
     ? qs.map(q => `<button class="question" data-open="${esc(q.id)}"><div class="q-meta"><span class="subject">${esc(q.subject)}</span><span>#${esc(q.number)}</span><span>${date(q.created)}</span>${q.mastered ? '<span class="mastered">✓ 已掌握</span>' : ''}</div><h3>${esc(q.text).slice(0, 220)}</h3><div class="tags">${q.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div></button>`).join('')
-    : '<div class="card empty"><b>让进步，从第一道错题开始</b>拍一张照片，或输入题目，拾起遗漏的知识点。</div>';
+    : '<div class="card empty"><b>还没有错题记录</b>拍一张照片，或输入题目，拾起遗漏的知识点。</div>';
 }
 
 function capture() {
   const quickSubjects = ['语文', '数学', '英语'];
-  return heading('CAPTURE & UNDERSTAND', '把不会的，慢慢变会。', '拍下错题 → 框选识别 → 校对收录。', `<span class="date">${new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })}</span>`)
-    + stats()
-    + `<div class="capture-grid"><div>
-        <section class="card">
-          <div class="card-head"><h2>录入新错题</h2><span class="pill">${usesBaidu() ? '百度高精度 OCR' : '✧ DeepSeek AI'}</span></div>
-          
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-            <span style="font-size:13px;font-weight:600;opacity:.75">科目：</span>
-            ${quickSubjects.map(s => `<button type="button" class="chip ${currentSubject === s ? 'active' : ''}" data-subj="${s}">${s}</button>`).join('')}
-            <select id="subject" aria-label="所属科目" style="width:auto;padding:6px 10px;border-radius:99px;font-size:13px">${opts(currentSubject)}</select>
-          </div>
-
-          <div class="segmented">
-            <button data-mode="image" class="${mode === 'image' ? 'active' : ''}">▧ 拍照 / 选图</button>
-            <button data-mode="text" class="${mode === 'text' ? 'active' : ''}">☷ 文字录入</button>
-          </div>
-
-          <div id="capture-input">
-            ${mode === 'image'
-              ? `<label class="upload" id="drop" style="${image ? 'padding:10px' : ''}">
-                  <input id="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
-                  ${image
-                    ? `<div style="display:flex;align-items:center;justify-content:space-between;width:100%"><span>✓ 已载入试卷图片</span><small style="text-decoration:underline">点击更换图片</small></div>`
-                    : '<span class="upload-icon">↥</span><b>点击拍照或上传试卷图片</b><small>支持手机拍照原图（自动压缩优化）· JPG / PNG / WebP</small>'}
-                </label>${image ? cropView() : ''}`
-              : '<textarea id="question-text" class="tall" placeholder="在这里粘贴或输入完整题目，包含题干和选项……"></textarea>'}
-          </div>
-
-          <div id="paper-progress" class="result-note" role="status" style="margin-top:10px;font-weight:600">${esc(paperProgress)}</div>
-
-          <div class="actions" style="margin-top:10px">
-            <button class="primary" id="analyze" style="flex:2">✧ 识别框内文字（百度 OCR）</button>
-            <button class="secondary" id="manual">直接手动填表</button>
-          </div>
-
-          <details style="margin-top:12px">
-            <summary style="cursor:pointer;font-size:13px;opacity:.8">➕ 补充来源、我的错因或切换识别模式（选填）</summary>
-            <div style="padding-top:10px;display:grid;gap:10px">
-              ${field('来源（选填）', 'source', currentSource, 'text', '例如：期中考试 · 第 4 题')}
-              <label class="field"><span>我的答案 / 困惑（选填）</span><textarea id="mistake" placeholder="记下孩子的错误写法或卡点，AI 诊断会更有针对性。" style="min-height:65px">${esc(currentMistake)}</textarea></label>
-              <label class="field"><span>识别范围</span><select id="recognition-scope"><option value="crop" ${recognitionScope === 'crop' ? 'selected' : ''}>取景框内 · 推荐省量</option><option value="full" ${recognitionScope === 'full' ? 'selected' : ''}>整张试卷 · 多次调用</option></select></label>
-              <label class="field"><span>试卷排版（整卷模式使用）</span><select id="paper-layout"><option value="2" ${paperLayout === '2' ? 'selected' : ''}>双页 / 双栏 · 左右分别识别</option><option value="1" ${paperLayout === '1' ? 'selected' : ''}>单页 / 单栏</option></select></label>
-              <p class="notice" id="scope-note">默认仅识别框内题目。</p>
-              <p class="hint" id="token-usage">${usageText()}</p>
-            </div>
-          </details>
-        </section>
-        <div id="paper-area">${paperView()}</div>
-        <div id="draft-area">${draft ? draftForm() : ''}</div>
+  return `<div class="top-bar-summary">${stats()}</div>
+    <section class="card">
+      <div class="card-head">
+        <h2>录入新错题</h2>
+        <span class="pill">${usesBaidu() ? '百度高精度 OCR' : '✧ DeepSeek AI'}</span>
       </div>
-      <div class="guide">
-        <section class="card"><h3>三步顺手录题</h3>${[['01', '拍图框选', '上传照片后直接拖动四角框住错题（已自动压缩，手机秒传）。'], ['02', '原文识别', '百度高精度 OCR 提取文字，保留错别字与手写痕迹。'], ['03', 'AI 拆解收录', '一键调用 DeepSeek 剖析错因并归档到错题本。']].map(s => `<div class="step"><span class="step-number">${s[0]}</span><div><b>${s[1]}</b><p>${s[2]}</p></div></div>`).join('')}</section>
+      
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <span style="font-size:14px;font-weight:600;color:var(--muted)">科目：</span>
+        ${quickSubjects.map(s => `<button type="button" class="chip ${currentSubject === s ? 'active' : ''}" data-subj="${s}">${s}</button>`).join('')}
+        <select id="subject" aria-label="所属科目" style="width:auto;padding:6px 12px;border-radius:99px;font-size:14px">${opts(currentSubject)}</select>
       </div>
-    </div>
-    <div class="section-title"><h2>最近收录</h2><a class="text-button" href="#notebook">查看全部 →</a></div>
+
+      <div class="segmented">
+        <button data-mode="image" class="${mode === 'image' ? 'active' : ''}">▧ 拍照 / 选图识别</button>
+        <button data-mode="text" class="${mode === 'text' ? 'active' : ''}">☷ 直接输入文字</button>
+      </div>
+
+      <div id="capture-input">
+        ${mode === 'image'
+          ? `<label class="upload" id="drop" style="${image ? 'padding:10px 14px;flex-direction:row;justify-content:space-between' : ''}">
+              <input id="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+              ${image
+                ? `<span>✓ 已载入试卷图片（拖动蓝框选定题目）</span><small style="color:var(--primary);font-weight:600">重新选图</small>`
+                : '<span class="upload-icon">↥</span><b>点击拍照或选择试卷图片</b><small>支持手机原图自动压缩 · 框选后秒级识别</small>'}
+            </label>${image ? cropView() : ''}`
+          : '<textarea id="question-text" class="tall" placeholder="在这里粘贴或输入完整题目，包含题干和选项……"></textarea>'}
+      </div>
+
+      <div id="paper-progress" class="result-note" role="status" style="margin-top:10px;font-weight:600;${paperProgress ? '' : 'display:none'}">${esc(paperProgress)}</div>
+
+      <div class="actions" style="margin-top:14px">
+        <button class="primary" id="analyze" style="flex:2;padding:13px 20px;font-size:16px">✧ 识别框内文字（百度 OCR）</button>
+        <button class="secondary" id="manual">手动填表</button>
+      </div>
+
+      <details style="margin-top:12px">
+        <summary style="cursor:pointer;font-size:13px;color:var(--muted)">➕ 补充试卷来源、我的错因或切换整卷模式（选填）</summary>
+        <div style="padding-top:10px">
+          <div class="form-row">
+            ${field('来源（选填）', 'source', currentSource, 'text', '例如：单元测验 · 第 4 题')}
+            <label class="field"><span>识别范围</span><select id="recognition-scope"><option value="crop" ${recognitionScope === 'crop' ? 'selected' : ''}>取景框内 · 单题识别</option><option value="full" ${recognitionScope === 'full' ? 'selected' : ''}>整张试卷 · 批量扫描</option></select></label>
+          </div>
+          <label class="field"><span>我的答案 / 困惑（选填）</span><textarea id="mistake" placeholder="记下孩子的错误答案或卡点，AI 解析会更有针对性。" style="min-height:60px">${esc(currentMistake)}</textarea></label>
+          <label class="field"><span>试卷排版</span><select id="paper-layout"><option value="2" ${paperLayout === '2' ? 'selected' : ''}>双栏试卷</option><option value="1" ${paperLayout === '1' ? 'selected' : ''}>单栏试卷</option></select></label>
+          <p class="notice" id="scope-note" hidden></p>
+          <p class="hint" id="token-usage">${usageText()}</p>
+        </div>
+      </details>
+    </section>
+
+    <div id="paper-area">${paperView()}</div>
+    <div id="draft-area">${draft ? draftForm() : ''}</div>
+
+    <div class="section-title"><h2>最近收录</h2><a class="text-button" href="#notebook">查看全部 (${data.questions.length}) →</a></div>
     ${cards([...data.questions].sort((a, b) => b.created.localeCompare(a.created)).slice(0, 3))}`;
 }
 
 function draftForm() {
-  return `<section class="card"><div class="card-head"><h2>确认整理结果</h2><span class="pill">可编辑</span></div><p class="result-note">请校对题干、公式和答案。</p>${['text', 'answer', 'analysis', 'reminder'].map((k, i) => `<label class="field"><span>${['题干', '正确答案', '解题步骤', '易错提醒'][i]}</span><textarea id="draft-${k}">${esc(draft[k])}</textarea></label>`).join('')}${field('知识点标签（逗号分隔）', 'draft-tags', draft.tags.join('，'))}<button class="primary wide" id="save-draft">确认，收录到错题本</button></section>`;
+  return `<section class="card"><div class="card-head"><h2>确认整理结果</h2><span class="pill">可编辑</span></div>${['text', 'answer', 'analysis', 'reminder'].map((k, i) => `<label class="field"><span>${['题干', '正确答案', '解题步骤', '易错提醒'][i]}</span><textarea id="draft-${k}">${esc(draft[k])}</textarea></label>`).join('')}${field('知识点标签（逗号分隔）', 'draft-tags', draft.tags.join('，'))}<button class="primary wide" id="save-draft">确认，收录到错题本</button></section>`;
 }
 
 function notebook() {
-  return heading('MY NOTEBOOK', '每一道题，都算数。', '按科目整理，按知识点回顾。', `<button class="secondary" id="sample">体验示例题</button>`) + stats() + `<input class="search" id="search" aria-label="搜索错题" placeholder="⌕ 搜索题干、编号、知识点…" value="${esc(query)}"><div class="filters">${['全部', ...subjects, '待巩固', '已掌握'].map(s => `<button class="chip ${filter === s ? 'active' : ''}" data-filter="${s}">${s}</button>`).join('')}</div><div id="question-list">${filtered()}</div>`;
+  return heading('MY NOTEBOOK', '错题本', '按科目整理，按知识点回顾。', `<button class="secondary" id="sample">体验示例题</button>`) + stats() + `<input class="search" id="search" aria-label="搜索错题" placeholder="⌕ 搜索题干、编号、知识点…" value="${esc(query)}"><div class="filters">${['全部', ...subjects, '待巩固', '已掌握'].map(s => `<button class="chip ${filter === s ? 'active' : ''}" data-filter="${s}">${s}</button>`).join('')}</div><div id="question-list">${filtered()}</div>`;
 }
 
 function filtered() {
@@ -175,15 +175,15 @@ function filtered() {
 }
 
 function practicePage() {
-  return heading('TRANSFER & GROW', '做会一道，学会一类。', '从你的错题出发，用新的问题检验理解。') + `<section class="card"><div class="card-head"><h2>开始举一反三</h2><span class="pill">✧ AI 变式练习</span></div><label class="field"><span>选择一道错题</span><select id="practice-source"><option value="">请选择</option>${data.questions.map(q => `<option value="${esc(q.id)}" ${q.id === selectedPracticeId ? 'selected' : ''}>#${esc(q.number)} · ${esc(q.subject)} · ${esc(q.text.slice(0, 55))}</option>`).join('')}</select></label><div class="form-row"><label class="field"><span>练习难度</span><select id="difficulty"><option>基础巩固</option><option>同等难度</option><option>进阶挑战</option></select></label><label class="field"><span>生成数量</span><select id="count"><option value="1">1 题</option><option value="3">3 题</option></select></label></div><button class="primary" id="generate">✧ 生成变式练习</button></section><div id="exercise">${practice ? exercise() : ''}</div><div class="section-title"><h2>练习记录</h2><span class="text-button">${data.practices.length} 次练习</span></div>${data.practices.slice().reverse().slice(0, 20).map(p => `<div class="card"><div class="q-meta"><span>${date(p.created)}</span><span>原题 #${esc(p.number)}</span><span>${esc(p.rating)}</span></div><p class="prose">${esc(p.text)}</p><details><summary>查看作答与解析</summary><p class="prose">我的作答：${esc(p.response)}\n\n答案：${esc(p.answer)}\n\n解析：${esc(p.analysis)}</p></details></div>`).join('') || '<div class="empty">练习后，你的作答和自评会保存在这里。</div>'}`;
+  return heading('TRANSFER & GROW', '变式练习', '从错题出发，举一反三检验掌握情况。') + `<section class="card"><div class="card-head"><h2>开始举一反三</h2><span class="pill">✧ AI 变式练习</span></div><label class="field"><span>选择一道错题</span><select id="practice-source"><option value="">请选择</option>${data.questions.map(q => `<option value="${esc(q.id)}" ${q.id === selectedPracticeId ? 'selected' : ''}>#${esc(q.number)} · ${esc(q.subject)} · ${esc(q.text.slice(0, 55))}</option>`).join('')}</select></label><div class="form-row"><label class="field"><span>练习难度</span><select id="difficulty"><option>基础巩固</option><option>同等难度</option><option>进阶挑战</option></select></label><label class="field"><span>生成数量</span><select id="count"><option value="1">1 题</option><option value="3">3 题</option></select></label></div><button class="primary" id="generate">✧ 生成变式练习</button></section><div id="exercise">${practice ? exercise() : ''}</div><div class="section-title"><h2>练习记录</h2><span class="text-button">${data.practices.length} 次练习</span></div>${data.practices.slice().reverse().slice(0, 20).map(p => `<div class="card"><div class="q-meta"><span>${date(p.created)}</span><span>原题 #${esc(p.number)}</span><span>${esc(p.rating)}</span></div><p class="prose">${esc(p.text)}</p><details><summary>查看作答与解析</summary><p class="prose">我的作答：${esc(p.response)}\n\n答案：${esc(p.answer)}\n\n解析：${esc(p.analysis)}</p></details></div>`).join('') || '<div class="empty">练习后，你的作答和自评会保存在这里。</div>'}`;
 }
 
 function exercise() {
-  return practice.items.map((p, i) => `<section class="card practice-card"><div class="q-meta">变式 ${i + 1} / ${practice.items.length} · ${esc(practice.difficulty)}</div><p class="prose">${esc(p.text)}</p><textarea id="response-${i}" placeholder="先独立思考，在这里写下你的答案……">${esc(p.response || '')}</textarea><div class="actions"><button class="secondary" data-reveal="${i}">查看答案与解析</button></div><div class="analysis-block hidden" id="solution-${i}"><h3>答案与解析</h3><p class="prose">${esc(p.answer)}\n\n${esc(p.analysis)}</p><div class="actions">${['还需巩固', '基本理解', '已经掌握'].map(r => `<button class="secondary" data-rate="${i}" data-rating="${r}" ${p.saved ? 'disabled' : ''}>${r}</button>`).join('')}</div></div></section>`).join('');
+  return practice.items.map((p, i) => `<section class="card practice-card"><div class="q-meta">变式 ${i + 1} / ${practice.items.length} · ${esc(practice.difficulty)}</div><p class="prose">${esc(p.text)}</p><textarea id="response-${i}" placeholder="先独立思考，在这里写下答案……">${esc(p.response || '')}</textarea><div class="actions"><button class="secondary" data-reveal="${i}">查看答案与解析</button></div><div class="analysis-block hidden" id="solution-${i}"><h3>答案与解析</h3><p class="prose">${esc(p.answer)}\n\n${esc(p.analysis)}</p><div class="actions">${['还需巩固', '基本理解', '已经掌握'].map(r => `<button class="secondary" data-rate="${i}" data-rating="${r}" ${p.saved ? 'disabled' : ''}>${r}</button>`).join('')}</div></div></section>`).join('');
 }
 
 function settings() {
-  return heading('YOUR PREFERENCES', '你的学习，你来定义。', '连接 AI 和私有仓库，密钥已支持本机持久化保存，无需每次重填。') + `<div class="settings-grid"><div>${baiduSettings()}<section class="card"><div class="card-head"><h2>DeepSeek 文字分析与练习</h2><span class="pill">自带 API Key</span></div>${field('API 地址（或兼容的代理地址）', 'endpoint', cfg.endpoint || 'https://api.deepseek.com')}${field('模型名称', 'model', cfg.model || 'deepseek-chat')}${field('API Key（保存在当前设备浏览器）', 'api-key', getStoredKey('shiti-key'), 'password', 'sk-…')}<p class="notice">默认仅将校对后的题目文字发给 DeepSeek，图片 OCR 由百度处理。</p><button class="primary" id="save-settings">保存设置</button></section><section class="card"><h2>数据备份</h2><p class="subtitle" style="margin:15px 0">题库保存在此浏览器的 IndexedDB，不包含密钥。</p><div class="actions"><button class="secondary" id="export">导出 JSON</button><button class="secondary" id="import">导入并合并</button><input type="file" id="import-file" accept="application/json,.json" hidden></div></section></div><section class="card"><div class="card-head"><h2>GitHub 私有仓库同步</h2><span class="pill">推荐</span></div>${field('仓库所有者', 'owner', cfg.owner)}${field('私有仓库名称', 'repo', cfg.repo)}${field('数据文件路径', 'path', cfg.path || 'shiti/notebook.json')}${field('分支', 'branch', cfg.branch || 'main')}${field('Fine-grained Token（保存在当前设备）', 'github-token', getStoredKey('shiti-gh'), 'password', 'github_pat_…')}<div class="actions"><button class="primary" id="sync">合并并同步</button><button class="secondary" id="save-github">保存配置</button></div></section></div>`;
+  return heading('YOUR PREFERENCES', '系统设置', '配置识别服务、AI 分析与数据同步（密钥均持久保存在当前设备）。') + `<div class="settings-grid"><div>${baiduSettings()}<section class="card"><div class="card-head"><h2>DeepSeek 文字分析与练习</h2><span class="pill">自带 API Key</span></div>${field('API 地址（或兼容的代理地址）', 'endpoint', cfg.endpoint || 'https://api.deepseek.com')}${field('模型名称', 'model', cfg.model || 'deepseek-chat')}${field('API Key（保存在当前设备浏览器）', 'api-key', getStoredKey('shiti-key'), 'password', 'sk-…')}<p class="notice">默认仅将校对后的题目文字发给 DeepSeek，图片 OCR 由百度处理。</p><button class="primary" id="save-settings">保存设置</button></section><section class="card"><h2>数据备份与迁移</h2><p class="subtitle" style="margin:10px 0">更换域名或设备时，可先导出 JSON 再导入合并。</p><div class="actions"><button class="secondary" id="export">导出 JSON</button><button class="secondary" id="import">导入并合并</button><input type="file" id="import-file" accept="application/json,.json" hidden></div></section></div><section class="card"><div class="card-head"><h2>GitHub 私有仓库同步</h2><span class="pill">可选云同步</span></div>${field('仓库所有者', 'owner', cfg.owner)}${field('私有仓库名称', 'repo', cfg.repo)}${field('数据文件路径', 'path', cfg.path || 'shiti/notebook.json')}${field('分支', 'branch', cfg.branch || 'main')}${field('Fine-grained Token（保存在当前设备）', 'github-token', getStoredKey('shiti-gh'), 'password', 'github_pat_…')}<div class="actions"><button class="primary" id="sync">合并并同步</button><button class="secondary" id="save-github">保存配置</button></div></section></div>`;
 }
 
 async function ai(prompt, img, options = {}) {
@@ -228,8 +228,8 @@ async function run(button, fn) {
 
 async function loadImage(f) {
   if (!f) return;
-  if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(f.type) || f.size > 15 * 1024 * 1024) {
-    return toast('请选择 15 MB 以内的 JPG、PNG、WebP 或 GIF');
+  if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(f.type) || f.size > 20 * 1024 * 1024) {
+    return toast('请选择 20 MB 以内的 JPG、PNG、WebP 或 GIF');
   }
   const reader = new FileReader();
   reader.onload = () => { image = reader.result; render(); };
@@ -409,7 +409,7 @@ function bindSettings() {
     saveConfig();
     await sync();
     toast('私有仓库已同步');
-    $('#save-status').textContent = '已同步到私有仓库';
+    if ($('#save-status')) $('#save-status').textContent = '已同步到私有仓库';
   });
 }
 

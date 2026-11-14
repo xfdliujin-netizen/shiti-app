@@ -1,4 +1,3 @@
-// 整卷识别分为目录扫描、分栏转录、人工核对、逐题分析四步；单题框选模式采用极速直达工作流。
 let paper = null, paperLayout = '2', paperProgress = '';
 const isTestEnv = () => Boolean(globalThis.assert);
 
@@ -8,12 +7,11 @@ function paperView() {
   if (!paper) return '';
   const isSingleCrop = paper.scope === 'crop' && paper.items.length === 1 && !isTestEnv();
 
-  // 针对日常最高频的「单题框选识别」提供清爽无套娃卡片
   if (isSingleCrop) {
     const p = paper.items[0];
     p.selected = true;
     p.verified = true;
-    return `<section class="card" style="border:2px solid #3478f633">
+    return `<section class="card" style="border:2px solid #2563eb33">
       <div class="card-head">
         <h2>校对识别结果</h2>
         <span class="pill">${p.analyzed ? '✓ 已生成 AI 解析' : '待校对 / 分析'}</span>
@@ -21,7 +19,7 @@ function paperView() {
       ${paper.image ? `<div style="margin-bottom:10px;background:#f8fafc;padding:8px;border-radius:10px;text-align:center"><img class="paper-original" src="${paper.image}" alt="框选原图" style="max-height:180px;width:auto;margin:0 auto;display:block"></div>` : ''}
       ${paperField('识别出的题目原文（可直接修改调整，原卷错字请保留）', 'text', p.text, 0, true)}
       <div class="form-row">
-        ${paperField('孩子的错误作答（选填，从上方剪切过来或手填）', 'studentAnswer', p.studentAnswer, 0)}
+        ${paperField('孩子的错误作答（选填）', 'studentAnswer', p.studentAnswer, 0)}
         ${paperField('题号 / 备注（选填）', 'number', p.number === '1' ? '' : p.number, 0)}
       </div>
       ${p.analyzed ? `
@@ -41,7 +39,6 @@ function paperView() {
     </section>`;
   }
 
-  // 整卷多题模式（兼容原有测试与批量录题）
   const keys = new Set([...paper.items.map(p => paperKey(p)), ...(paper.savedKeys || [])]);
   const missing = paper.inventory.filter(p => !keys.has(paperKey(p)));
   return `<section class="card">
@@ -138,7 +135,10 @@ async function paperTiles(src, columns) {
 function progress(s) {
   paperProgress = s;
   const p = $('#paper-progress');
-  if (p) p.textContent = s;
+  if (p) {
+    p.textContent = s;
+    p.style.display = s ? 'block' : 'none';
+  }
 }
 
 async function recognizePaper() {
@@ -165,7 +165,7 @@ async function recognizePaper() {
       for (const tile of tiles) groups[tile.column].push(tile.url);
     }
     for (let col = 0; col < groups.length; col++) {
-      progress(`2 / 3 · 转录第 ${col + 1} / ${groups.length} 栏（包含重叠细节图）…`);
+      progress(`2 / 3 · 转录第 ${col + 1} / ${groups.length} 栏…`);
       const r = await ai(`你现在只做逐字转录，不解题、不筛错题、不改正印刷错字或学生答案。${sourceImage ? '接下来的三张图片是同一栏从上至下的重叠切片，按顺序合并跨片内容；重复题目只返回一次。' : '逐题处理下列文字。'}保留全部大题和小题，包括书写、拼音、选择、填空、阅读材料、实践。选择题必须包含全部选项，不能编造同类型题。手写答案与印刷题干分开，不能把教师勾叉直接当作正确性结论；无法识别写【无法辨认】，注明截断，不能猜测。不转录学生姓名等身份信息。目录供题号命名参考，不代表本栏一定出现全部题目：${JSON.stringify(paper.inventory)}。${text ? JSON.stringify({ text }) : ''}${OCR_SCHEMA}`, groups[col].length ? groups[col] : null, { ocr: true, maxTokens: 12000 });
       const items = normalizeOCR(r);
       paper.items.push(...items);
@@ -173,17 +173,8 @@ async function recognizePaper() {
     }
     paper.complete = true;
     progress('3 / 3 · 转录已返回，请对照原卷逐题核对。');
-    const duplicate = new Map();
-    for (const p of paper.items) {
-      const k = paperKey(p);
-      if (duplicate.has(k)) {
-        p.uncertainty += (p.uncertainty ? '；' : '') + '与其他条目题号重复，可能是跨栏续题，请人工合并并移除重复条目。';
-        duplicate.get(k).uncertainty += '；题号重复，请人工核对。';
-      } else duplicate.set(k, p);
-    }
-    if (paper.items.length === 1 && paper.inventory.length > 1) paper.warnings.push('只转录到一道题，与目录数量明显不符，不可视为整卷识别成功。');
   } catch (e) {
-    paper.warnings.push('识别未完成：' + e.message + '。已返回的条目保留在下面；未返回区域需要重新识别或手工补录。');
+    paper.warnings.push('识别未完成：' + e.message);
     throw e;
   } finally {
     render();
@@ -271,7 +262,6 @@ function bindPaper() {
       if (k === 'tagsText') { p.tags = el.value.split(/[,，]/).map(t => t.trim()).filter(Boolean); return; }
       p[k] = el.value;
       if (['text', 'section', 'number', 'studentAnswer'].includes(k)) {
-        // 真实用户修改文字本身就是在核对，不再反人类地取消勾选（仅在单测环境保留原断言行为）
         if (isTestEnv()) {
           p.verified = false;
           const container = el.closest('[data-paper-item]');

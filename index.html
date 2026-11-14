@@ -1,2 +1,41 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f5f5f7"><title>拾题 · 把错题变成收获</title><link rel="stylesheet" href="style.css?v=4"></head><body><div class="shell"><aside><a class="brand" href="#capture"><span class="logo">拾</span>拾题<span class="brand-sub">SHITI</span></a><div class="nav-label">你的学习空间</div><nav id="nav"></nav><div class="aside-bottom"><span class="dot"></span> 本地优先，安心积累<small>每一道错题，都是进步的起点。</small></div></aside><div class="workspace"><header><span id="breadcrumb">我的学习空间 / 录题</span><span class="local-status">◉ <span id="save-status">数据保存在此设备</span></span></header><main id="main"><section class="card"><h2>正在打开拾题…</h2><p class="subtitle">若长时间停留在这里，请确认 index.html、app.js 和 style.css 在同一文件夹，或运行 node server.cjs 后访问 http://127.0.0.1:4173。</p></section><noscript>请启用浏览器 JavaScript 后重新打开。</noscript></main><footer>拾题 SHITI <span>把每一次「不会」，变成下一次「我会」。</span></footer></div></div><div id="toast" role="status"></div><dialog id="detail"></dialog><script defer src="crop.js?v=4"></script><script defer src="paper.js?v=4"></script><script defer src="baidu.js?v=4"></script><script defer src="app.js?v=4" onerror="document.getElementById('main').textContent='应用脚本加载失败。请先解压完整压缩包，并确保 app.js 与 index.html 位于同一文件夹。'"></script></body></html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f4f6f9">
+  <title>拾题 · 错题整理工作台</title>
+  <link rel="stylesheet" href="style.css?v=12">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#capture">
+        <span class="logo">拾</span>
+        <span class="brand-name">拾题</span>
+      </a>
+      <nav id="nav" class="main-nav"></nav>
+      <div class="status-pill">
+        <span class="dot"></span>
+        <span id="save-status">已就绪</span>
+        <span id="breadcrumb" hidden></span>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="container">
+    <section class="card">
+      <h2>正在打开拾题…</h2>
+      <p class="subtitle">若长时间停留在这里，请确认 index.html、app.js 和 style.css 在同一文件夹。</p>
+    </section>
+  </main>
+
+  <div id="toast" role="status"></div>
+  <dialog id="detail"></dialog>
+
+  <script defer src="crop.js?v=12"></script>
+  <script defer src="paper.js?v=12"></script>
+  <script defer src="baidu.js?v=12"></script>
+  <script defer src="app.js?v=12"></script>
+</body>
+</html>
