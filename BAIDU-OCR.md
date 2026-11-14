@@ -98,9 +98,3 @@ node -e "console.log(require('node:crypto').randomBytes(24).toString('hex'))"
 当前为本地逻辑和模拟上游响应验证，尚未使用你的百度 / DeepSeek 凭据完成真实识别精度和额度验收。
 
 参考：[百度高精度 OCR API](https://aca.bce.baidu.com/doc/OCR/s/1k3h7y3db) · [百度免费测试资源](https://ai.baidu.com/ai-doc/OCR/fk3h7xu7h) · [Cloudflare Worker Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
-
-## 手机连接排查
-
-录题页和 OCR 设置页新增“检测 OCR 连接（不耗识别次数）”。检测先用不含口令的 GET 判断可读取性；失败时用不含口令的 no-cors GET 辅助区分网络不可达和跨域拦截。可读取后才发送带访问口令的无图片诊断 POST；当前代理会在缺少图片校验处返回，不请求百度鉴权或识别。检测结果不显示密钥或口令，也不代表百度 AK/SK 和额度已通过实际识别验证。
-
-只需更新网页，无需替换 Worker。请求超时使用 AbortController 兼容实现，旧浏览器不再依赖 AbortSignal.timeout。识别失败会结束“识别中”提示，保留已录题目。网络错误的具体 DNS、TLS、代理规则原因仍需结合手机检测结果确认。

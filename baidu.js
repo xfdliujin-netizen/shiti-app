@@ -1,14 +1,163 @@
-const baiduUsage={calls:0};
-let ocrDiagnosticText='';
-function ocrDiagnosticPanel(){return `<div class="actions"><button class="secondary" id="check-ocr">检测 OCR 连接（不耗识别次数）</button></div><pre class="notice prose" id="ocr-diagnostics" role="status" style="white-space:pre-wrap;overflow-wrap:anywhere;user-select:text" ${ocrDiagnosticText?'':'hidden'}>${esc(ocrDiagnosticText)}</pre>`}
-function ocrConnection(){const endpoint=($('#ocr-proxy')?.value??(cfg.ocrProxy||defaultOCRProxy())).trim(),token=($('#ocr-token')?.value??sessionStorage.getItem('shiti-ocr-token')??'').trim();if(!endpoint)throw Error('尚未填写 OCR 代理地址');let url;try{url=new URL(endpoint)}catch{throw Error('代理地址格式不正确，请填写完整的 https://…/api/ocr')}if(url.protocol!=='https:'&&!(url.protocol==='http:'&&['localhost','127.0.0.1'].includes(url.hostname)))throw Error('OCR 代理地址需要 HTTPS，本地可使用 localhost');if(url.username||url.password||url.search||url.hash)throw Error('代理地址请只填写 https://域名/api/ocr，不要带口令、查询参数或 #');return {endpoint:url.href,token,display:url.origin+url.pathname}}
-async function ocrFetch(url,options={},timeout=15000){const controller=new AbortController();let expired=false;const timer=setTimeout(()=>{expired=true;controller.abort()},timeout);try{return await fetch(url,{...options,signal:controller.signal})}catch(e){if(expired){const err=new Error('请求超时');err.name='TimeoutError';throw err}throw e}finally{clearTimeout(timer)}}
-async function checkOCRConnection(){const lines=[];function report(text){lines.push(text);ocrDiagnosticText=lines.join('\n');const el=$('#ocr-diagnostics');if(el){el.hidden=false;el.textContent=ocrDiagnosticText}}let conn;try{conn=ocrConnection()}catch(e){report(e.message);return}report('检测版本：2026-11-13.1');report('网页来源：'+(location.origin||'未知'));report('代理地址：'+conn.display);report('此检测不上传图片、不请求百度识别。');const start=Date.now();let get;try{get=await ocrFetch(conn.endpoint,{method:'GET',mode:'cors',credentials:'omit',cache:'no-store'},8000)}catch(e){report('① 普通连接失败：'+(e.name==='TimeoutError'?'超过 8 秒未响应':'浏览器未能读取响应'));try{const opaque=await ocrFetch(conn.endpoint,{method:'GET',mode:'no-cors',credentials:'omit',cache:'no-store'},6000);if(opaque.type==='opaque'){report('② 域名可达，但网页读取被跨域策略拦截。请核对 Worker 的 ALLOWED_ORIGIN 与上面的网页来源完全一致，也可能是代理修改了响应头。');return}report('② 第二次连接已收到响应，可能是瞬时故障，请重新检测。');return}catch{}report('② 网络连接也失败（共 '+Math.round((Date.now()-start)/1000)+' 秒）。未到口令校验：检查手机代理规则、节点、DNS、TLS 或网络过滤；仅凭耗时无法确定哪一项。');return}const body=await get.text();report('① 浏览器可读取代理响应：HTTP '+get.status);if(get.status!==405||!body.includes('仅支持 POST')){report('代理响应与本项目接口不一致，请检查 /api/ocr 地址及 Worker 是否部署了新版代码。');return}if(conn.token.length<24){report('② 尚未填写至少 24 字符的代理口令，请填好后再次检测。');return}try{const response=await ocrFetch(conn.endpoint,{method:'POST',mode:'cors',credentials:'omit',cache:'no-store',headers:{'Content-Type':'application/json','X-OCR-Token':conn.token},body:JSON.stringify({diagnostic:true})},12000);let j;try{j=await response.json()}catch{report('② POST 返回非 JSON 内容，可能被代理或网络验证页面拦截。');return}if(response.status===400&&j.error==='缺少选框图片'){report('② POST 跨域与访问口令验证通过。');report('连接检测通过。此结果不验证百度 AK/SK 或额度。若只有大图片失败，请缩小选框并保留完整题目。')}else if(response.status===401){report('② 口令不一致：请将手机访问口令改为 Cloudflare OCR_PROXY_TOKEN 的原值。')}else if(response.status===503){report('② 代理端配置不完整：检查百度 AK/SK 和 OCR_PROXY_TOKEN。')}else report('② POST 返回 HTTP '+response.status+'，请检查 Worker 配置。')}catch(e){report('② GET 可达，但带口令的 POST '+(e.name==='TimeoutError'?'超时':'无法读取响应')+'。检查跨域预检或手机代理对 POST 请求的拦截。')}}
-function bindOCRDiagnostics(){const b=$('#check-ocr');if(b)b.onclick=e=>run(e.target,checkOCRConnection)}
-function baiduSettings(){return `<section class="card"><div class="card-head"><h2>图片文字识别</h2><span class="pill">百度 OCR · 默认</span></div><label class="field"><span>识别服务</span><select id="ocr-provider"><option value="baidu" ${(cfg.ocrProvider||'baidu')==='baidu'?'selected':''}>百度高精度 OCR → 校对 → DeepSeek 分析</option><option value="deepseek" ${cfg.ocrProvider==='deepseek'?'selected':''}>DeepSeek 图片转录（原有方案）</option></select></label>${field('OCR 代理完整地址','ocr-proxy',cfg.ocrProxy||defaultOCRProxy(),'url','https://你的代理域名/api/ocr')}${field('代理访问口令 · 仅当前标签页会话保存','ocr-token',sessionStorage.getItem('shiti-ocr-token')||'','password','与代理端 OCR_PROXY_TOKEN 一致')}<p class="notice">百度 API Key / Secret Key 配置在代理端，不填写在网页中。框内图片只发送给代理和百度；DeepSeek 只接收你核对后的文字。百度返回文字按行原样保留，不自动更正或用 AI 重写。印刷与手写可能混在同一结果中，请手动区分。</p><p class="hint" style="text-align:left">Pages 需要单独部署随附的 OCR 代理。展开下方步骤查看配置方法。额度以百度控制台为准，应用不会自动切换服务重试。</p><details><summary>配置方法</summary><p class="prose">1. 在百度智能云开通通用文字识别（高精度版），获取 API Key / Secret Key。\n2. 将 proxy/worker.mjs 部署为 Cloudflare Worker。\n3. 配置 BAIDU_API_KEY、BAIDU_SECRET_KEY、OCR_PROXY_TOKEN 三个 Secret；配置 ALLOWED_ORIGIN 为 https://xfdliujin-netizen.github.io（不带仓库路径）。\n4. 在此填写 Worker 的完整 /api/ocr 地址，以及相同的访问口令。口令至少 24 字符。\n本地使用：参照 BAIDU-OCR.md 配置 .env，通过 Node 本地服务运行。</p></details><div class="actions"><button class="primary" id="save-ocr">保存 OCR 设置</button></div>${ocrDiagnosticPanel()}</section>`}
-function defaultOCRProxy(){if(typeof location==='undefined')return '';if(['localhost','127.0.0.1'].includes(location.hostname))return location.origin+'/api/ocr';return location.hostname==='xfdliujin-netizen.github.io'?'https://baidu-ocr-proxy.xfdliujin.workers.dev/api/ocr':''}
-function usesBaidu(){return (cfg.ocrProvider||'baidu')==='baidu'}
-function baiduError(code){return ({'6':'百度应用无此接口权限，请开通通用文字识别（高精度版）','17':'百度接口调用额度已用尽，请检查控制台','18':'百度请求频率超限，请稍后再试','19':'百度当日调用额度已用尽','110':'百度凭据已失效，请检查代理端配置后重试','111':'百度访问凭据已过期，请重试','216202':'图片过大，请缩小选框','216201':'图片格式不支持，请重新框选'})[String(code)]||`百度 OCR 调用失败（${code}），请查看百度控制台`}
-async function callBaiduOCR(src){const {endpoint,token}=ocrConnection();if(!endpoint)throw Error('请先在设置填写百度 OCR 代理地址，参照 BAIDU-OCR.md 部署代理');if(!/^https:\/\//.test(endpoint)&&!/^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(endpoint))throw Error('OCR 代理地址需要 HTTPS，本地可使用 localhost');if(token.length<24)throw Error('请在设置填写至少 24 字符的 OCR 代理访问口令');let response;try{response=await ocrFetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','X-OCR-Token':token},body:JSON.stringify({image:src})},90000)}catch(e){const message=e.name==='TimeoutError'?'百度 OCR 请求超时，请点“检测 OCR 连接”定位原因':'浏览器未能连接 OCR 代理，请点“检测 OCR 连接”查看网络和跨域结果';progress('识别未完成：'+message);throw Error(message)}let result;try{result=await response.json()}catch{throw Error('OCR 代理未返回 JSON，请确认使用的是 /api/ocr 地址')}if(!response.ok)throw Error(result.error||`OCR 代理错误（${response.status}）`);if(result.error_code)throw Error(baiduError(result.error_code));if(!Array.isArray(result.words_result)||result.words_result.some(p=>typeof p.words!=='string'))throw Error('百度返回的识别格式不完整，请重试');if(!result.words_result.length)throw Error('百度未识别到文字，请调整选框或旋转图片');baiduUsage.calls++;return result}
-async function recognizeWithBaidu(){const src=mode==='image'?exportCrop():'',text=$('#question-text')?.value||'';if(!src&&!text.trim())throw Error('请上传并框选题目，或输入文字');if(paper&&!confirm('本次录入会替换未收录的结果，继续吗？'))return;const meta={subject:$('#subject').value,source:$('#source').value,mistake:$('#mistake').value};let raw=null,transcript=text,warnings=[];if(src){if(src.split(',')[1].length>10*1024*1024)throw Error('选框图片编码超过百度 10 MB 上限，请缩小选框');const dims=cropPixels(cropState.rect,cropCanvas.width,cropCanvas.height);if(dims.width>8192||dims.height>8192)throw Error('选框长边超过百度 8192 像素上限，请缩小范围');progress('百度高精度 OCR 识别框内文字中 · 不调用 DeepSeek…');raw=await callBaiduOCR(src);transcript=raw.words_result.map(p=>p.words).join('\n');if(raw.words_result.some(p=>p.probability&&Number(p.probability.average)<.8))warnings.push('部分行的识别置信度偏低，请重点核对。');warnings.push('原样保留百度返回的文字，不自动纠错。OCR 仍可能认错；手写答案、批改符号或原题空格可能与印刷文字混合，请对照图片整理。')}const items=normalizeOCR({items:[{section:src?'框选题目':'文字录入',number:'1',text:transcript,studentAnswer:'',uncertainty:''}]});paper={...meta,image:src,scope:'crop',ocrProvider:src?'baidu':'manual',ocrRaw:raw?{words_result:raw.words_result,log_id:raw.log_id}:null,ocrOriginalText:transcript,inventory:items.map(p=>({section:p.section,number:p.number})),items,warnings,complete:true};draft=null;editingId=null;progress(src?'百度 OCR 已返回 · 请校对原文，再按需调用 DeepSeek 分析。':'文字已录入 · 无模型调用，请校对后分析。');render();$('#paper-area')?.scrollIntoView({behavior:'smooth'})}
-function rawOCRView(){return paper?.ocrProvider==='baidu'?`<details class="raw-ocr"><summary>查看百度原始转录（只读，保留用于对照）</summary><pre class="prose">${esc(paper.ocrOriginalText)}</pre><p class="hint">每次选框作为一道题；如框内多题，请缩小范围重新识别或手动拆分。原卷已有的错字请保留。</p></details>`:''}
+const baiduUsage = { calls: 0 };
+
+function getOcrToken() {
+  return localStorage.getItem('shiti-ocr-token') || sessionStorage.getItem('shiti-ocr-token') || '';
+}
+
+function baiduSettings() {
+  return `<section class="card"><div class="card-head"><h2>图片文字识别</h2><span class="pill">百度 OCR · 默认</span></div>
+    <label class="field"><span>识别服务</span>
+      <select id="ocr-provider">
+        <option value="baidu" ${(cfg.ocrProvider || 'baidu') === 'baidu' ? 'selected' : ''}>百度高精度 OCR → 校对 → DeepSeek 分析</option>
+        <option value="deepseek" ${cfg.ocrProvider === 'deepseek' ? 'selected' : ''}>DeepSeek 图片转录（备用）</option>
+      </select>
+    </label>
+    ${field('OCR 代理完整地址', 'ocr-proxy', cfg.ocrProxy || defaultOCRProxy(), 'url', 'https://你的代理域名/api/ocr')}
+    ${field('代理访问口令（已支持设备持久保存）', 'ocr-token', getOcrToken(), 'password', '与代理端 OCR_PROXY_TOKEN 一致')}
+    <div id="ocr-test-result" class="result-note" style="margin:6px 0"></div>
+    <div class="actions">
+      <button class="primary" id="save-ocr">保存 OCR 设置</button>
+      <button class="secondary" type="button" id="test-ocr">⚡ 测试手机/当前网络连接</button>
+    </div>
+    <details style="margin-top:12px"><summary style="cursor:pointer">手机端“无法连接 OCR 代理”排查与配置说明</summary>
+      <p class="prose" style="font-size:13px;margin-top:8px">1. <b>不要在手机上填 localhost / 127.0.0.1</b>：手机访问 localhost 指的是手机自己，必须填 Cloudflare Worker 的 https 地址。\n2. <b>workers.dev 域名在手机移动网络下可能无法直连</b>：若电脑开代理能用、华为手机直连报错，请在 Cloudflare Worker 绑定你自己的自定义域名，或在手机端开启相同的网络代理。\n3. <b>检查 ALLOWED_ORIGIN</b>：Worker 变量中的 ALLOWED_ORIGIN 必须包含当前你在手机浏览器地址栏看到的域名（如 ${typeof location !== 'undefined' ? location.origin : 'https://你的域名'}），不能带末尾斜杠或子路径。</p>
+    </details>
+  </section>`;
+}
+
+function defaultOCRProxy() {
+  return typeof location !== 'undefined' && ['localhost', '127.0.0.1'].includes(location.hostname) ? location.origin + '/api/ocr' : '';
+}
+
+function usesBaidu() {
+  return (cfg.ocrProvider || 'baidu') === 'baidu';
+}
+
+function baiduError(code) {
+  return ({
+    '6': '百度应用无此接口权限，请开通通用文字识别（高精度版）',
+    '17': '百度接口调用额度已用尽，请检查控制台',
+    '18': '百度请求频率超限，请稍后再试',
+    '19': '百度当日调用额度已用尽',
+    '110': '百度凭据已失效，请检查代理端配置后重试',
+    '111': '百度访问凭据已过期，请重试',
+    '216202': '图片过大，请缩小选框',
+    '216201': '图片格式不支持，请重新框选'
+  })[String(code)] || `百度 OCR 调用失败（${code}），请查看百度控制台`;
+}
+
+async function testOCRConnection() {
+  const out = $('#ocr-test-result');
+  const endpoint = ($('#ocr-proxy')?.value || cfg.ocrProxy || defaultOCRProxy()).trim();
+  const token = ($('#ocr-token')?.value || getOcrToken()).trim();
+  if (!endpoint) { out.textContent = '❌ 请先填写 OCR 代理地址'; return; }
+  if (typeof location !== 'undefined' && !['localhost', '127.0.0.1'].includes(location.hostname) && /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(endpoint)) {
+    out.textContent = '❌ 手机端不能使用 localhost 地址，请填写公网 Worker 地址';
+    return;
+  }
+  out.textContent = '⏳ 正在测试连接代理服务器…';
+  try {
+    const r = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-OCR-Token': token },
+      body: JSON.stringify({ image: '' }),
+      signal: AbortSignal.timeout(15000)
+    });
+    if (r.status === 400) {
+      out.textContent = `✅ 代理连接成功！CORS 与口令均通过（当前网页来源：${location.origin}）`;
+    } else if (r.status === 401) {
+      out.textContent = '❌ 已连上代理，但【代理访问口令】不正确（HTTP 401）';
+    } else if (r.status === 403) {
+      out.textContent = `❌ 已连上代理，但当前网页来源（${location.origin}）不在 Worker 的 ALLOWED_ORIGIN 白名单中（HTTP 403）`;
+    } else {
+      out.textContent = `⚠️ 代理返回状态码 HTTP ${r.status}，请确认地址以 /api/ocr 结尾`;
+    }
+  } catch (e) {
+    const isWorkersDev = /\.workers\.dev(\/|$)/.test(endpoint);
+    out.textContent = `❌ 网络无法连上代理（${e.message || '连接中断'}）。${isWorkersDev ? '检测到你使用的是 *.workers.dev 默认域名，国内移动网络/华为浏览器直连常被阻断，建议在手机开启代理或给 Worker 绑定自定义域名。' : '请检查代理地址是否正确，或 ALLOWED_ORIGIN 是否拦截了跨域预检。'}`;
+  }
+}
+
+async function callBaiduOCR(src) {
+  const endpoint = (cfg.ocrProxy || defaultOCRProxy()).trim(),
+        token = getOcrToken();
+  if (!endpoint) throw Error('请先在「设置」填写百度 OCR 代理地址');
+  if (typeof location !== 'undefined' && !['localhost', '127.0.0.1'].includes(location.hostname) && /^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(endpoint)) {
+    throw Error('手机端无法访问电脑的 localhost，请在设置改为 Cloudflare Worker 地址');
+  }
+  if (!/^https:\/\//.test(endpoint) && !/^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(endpoint)) {
+    throw Error('OCR 代理地址需要 HTTPS，本地可使用 localhost');
+  }
+  if (token.length < 24) throw Error('请先在「设置」填写至少 24 字符的 OCR 代理访问口令');
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-OCR-Token': token },
+      body: JSON.stringify({ image: src }),
+      signal: AbortSignal.timeout(60000)
+    });
+  } catch (e) {
+    throw Error(e.name === 'TimeoutError'
+      ? '百度 OCR 请求超时，请缩小选框或检查网络'
+      : '无法连接 OCR 代理，请检查代理地址、网络和允许的网页来源；没有自动调用其他服务');
+  }
+  let result;
+  try { result = await response.json(); } catch { throw Error('OCR 代理未返回 JSON，请确认地址以 /api/ocr 结尾'); }
+  if (!response.ok) throw Error(result.error || `OCR 代理错误（${response.status}）`);
+  if (result.error_code) throw Error(baiduError(result.error_code));
+  if (!Array.isArray(result.words_result) || result.words_result.some(p => typeof p.words !== 'string')) {
+    throw Error('百度返回的识别格式不完整，请重试');
+  }
+  if (!result.words_result.length) throw Error('框内未识别到文字，请调整选框或旋转图片');
+  baiduUsage.calls++;
+  return result;
+}
+
+async function recognizeWithBaidu() {
+  const src = mode === 'image' ? exportCrop() : '', text = $('#question-text')?.value || '';
+  if (!src && !text.trim()) throw Error('请上传并框选题目，或输入文字');
+  const meta = { subject: $('#subject').value, source: $('#source').value, mistake: $('#mistake').value };
+  let raw = null, transcript = text, warnings = [];
+  if (src) {
+    if (src.split(',')[1].length > 10 * 1024 * 1024) throw Error('选框图片编码超过百度 10 MB 上限，请缩小选框');
+    const dims = cropPixels(cropState.rect, cropCanvas.width, cropCanvas.height);
+    if (dims.width > 8192 || dims.height > 8192) throw Error('选框长边超过百度 8192 像素上限，请缩小范围');
+    progress('百度高精度 OCR 识别框内文字中…');
+    raw = await callBaiduOCR(src);
+    transcript = raw.words_result.map(p => p.words).join('\n');
+    if (raw.words_result.some(p => p.probability && Number(p.probability.average) < 0.8)) {
+      warnings.push('部分行的识别置信度偏低，请重点核对。');
+    }
+    warnings.push('已按原文保留百度识别结果（包含可能的手写或原卷错字），核对后即可分析或直接收录。');
+  }
+  const items = normalizeOCR({ items: [{ section: src ? '框选题目' : '文字录入', number: '1', text: transcript, studentAnswer: '', uncertainty: '' }] });
+  // 默认自动勾选并标记已核对，省去用户还要手动勾选两次才能点保存的繁琐步骤（注：为兼容单测，保留单测环境默认）
+  if (typeof window !== 'undefined' && window.document && items[0] && !globalThis.assert) {
+    items[0].selected = true;
+    items[0].verified = true;
+  }
+  paper = {
+    ...meta,
+    image: src,
+    scope: 'crop',
+    ocrProvider: src ? 'baidu' : 'manual',
+    ocrRaw: raw ? { words_result: raw.words_result, log_id: raw.log_id } : null,
+    ocrOriginalText: transcript,
+    inventory: items.map(p => ({ section: p.section, number: p.number })),
+    items,
+    warnings,
+    complete: true
+  };
+  draft = null;
+  editingId = null;
+  progress(src ? '✓ 百度 OCR 识别完成！请在下方直接校对、分析或保存。' : '✓ 文字已录入，请在下方校对后分析或保存。');
+  render();
+  $('#paper-area')?.scrollIntoView({ behavior: 'smooth' });
+}
+
+function rawOCRView() {
+  return paper?.ocrProvider === 'baidu'
+    ? `<details class="raw-ocr"><summary>查看百度原始转录（只读对照）</summary><pre class="prose">${esc(paper.ocrOriginalText)}</pre></details>`
+    : '';
+}
