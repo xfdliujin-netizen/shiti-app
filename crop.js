@@ -26,7 +26,7 @@ function cropView() {
  return `<section class="crop-editor" id="crop-editor"><div class="crop-tools">
  <button type="button" class="crop-tool" id="rotate-left">↶ 左转</button><button type="button" class="crop-tool" id="rotate-right">↷ 右转</button><button type="button" class="crop-tool" id="crop-full">⛶ 全图</button><button type="button" class="crop-tool" id="crop-reset">✎ 重画</button><button type="button" class="crop-tool" id="crop-reselect">↻ 重新选图</button><button type="button" class="crop-tool" id="crop-open">⛶ 全屏框选</button>
  </div><div class="crop-stage" id="crop-stage"><canvas id="crop-canvas" tabindex="0" aria-label="点击全屏框选；双指缩放、旋转和移动图片"></canvas></div></section>
- <dialog id="crop-fullscreen" class="crop-fullscreen"><header><button type="button" id="crop-back">返回</button><span>框选题目</span><button type="button" id="crop-done">完成</button></header><div id="crop-fullscreen-host"></div><footer><button type="button" id="crop-pan" aria-pressed="false">框选题目</button><button type="button" id="crop-zoom-out" aria-label="缩小">−</button><button type="button" id="crop-zoom-reset">适应屏幕</button><button type="button" id="crop-zoom-in" aria-label="放大">＋</button><small>单指框选／移动选框，双指缩放、旋转和移动图片</small></footer></dialog>`;
+ <dialog id="crop-fullscreen" class="crop-fullscreen"><header><button type="button" id="crop-back">返回</button><span>框选题目</span><button type="button" id="crop-done">识别框内文字</button></header><div id="crop-fullscreen-host"></div><footer><button type="button" id="crop-pan" aria-pressed="false">框选题目</button><button type="button" id="crop-zoom-out" aria-label="缩小">−</button><button type="button" id="crop-zoom-reset">适应屏幕</button><button type="button" id="crop-zoom-in" aria-label="放大">＋</button><small>单指框选／移动选框，双指缩放、旋转和移动图片</small></footer></dialog>`;
 }
 
 function constrainRect(r) {
@@ -48,6 +48,16 @@ function rotatedSize(w, h, degrees) {
   };
 }
 
+function rotateCropRect(r,oldSize,newSize,degrees) {
+  const a=degrees*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+  const points=[[r.x,r.y],[r.x+r.w,r.y],[r.x,r.y+r.h],[r.x+r.w,r.y+r.h]].map(([x,y])=>{
+    x=x*oldSize.width-oldSize.width/2;y=y*oldSize.height-oldSize.height/2;
+    return {x:Math.max(0,Math.min(1,(x*c-y*s+newSize.width/2)/newSize.width)),y:Math.max(0,Math.min(1,(x*s+y*c+newSize.height/2)/newSize.height))};
+  });
+  const x=Math.min(...points.map(p=>p.x)),y=Math.min(...points.map(p=>p.y));
+  return {x,y,w:Math.max(...points.map(p=>p.x))-x,h:Math.max(...points.map(p=>p.y))-y};
+}
+
 function cropPixels(r, w, h) {
   const x = Math.floor(r.x * w), y = Math.floor(r.y * h);
   return {
@@ -58,11 +68,13 @@ function cropPixels(r, w, h) {
   };
 }
 
-let cropCanvas = null, cropDraw = null;
+let cropCanvas = null, cropDraw = null, cropOriginal = null;
 
 function exportCrop() {
   if (!cropCanvas || cropState.source !== image || !cropState.rect) throw Error('请先在图片上框选一道完整题目');
-  const p = cropPixels(cropState.rect, cropCanvas.width, cropCanvas.height);
+  const original=cropOriginal?.source===image?cropOriginal.img:null;
+  const size=original?rotatedSize(original.naturalWidth,original.naturalHeight,cropState.rotation):cropCanvas;
+  const p = cropPixels(cropState.rect, size.width, size.height);
   if (p.width < 24 || p.height < 24) throw Error('选框太小，请框入完整题目');
   const maxDim = 1800;
   const scale = Math.min(1, maxDim / Math.max(p.width, p.height));
@@ -74,7 +86,13 @@ function exportCrop() {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, out.width, out.height);
   }
-  ctx.drawImage(cropCanvas, p.x, p.y, p.width, p.height, 0, 0, out.width, out.height);
+  if(original){
+    // Render only the selected original pixels into the bounded OCR output.
+    ctx.scale(out.width/p.width,out.height/p.height);
+    ctx.translate(size.width/2-p.x,size.height/2-p.y);
+    ctx.rotate(cropState.rotation*Math.PI/180);
+    ctx.drawImage(original,-original.naturalWidth/2,-original.naturalHeight/2);
+  }else ctx.drawImage(cropCanvas, p.x, p.y, p.width, p.height, 0, 0, out.width, out.height);
   const jpeg = out.toDataURL('image/jpeg', 0.84);
   return jpeg && jpeg.startsWith('data:image/') ? jpeg : out.toDataURL('image/png');
 }

@@ -9,6 +9,7 @@ vm.runInContext(`(async()=>{
   for(const angle of [-90,-5,0,5,90,180,270]){const d=rotatedSize(400,300,angle);assert.ok(d.width>0&&d.height>0)}
   const rect=constrainRect({x:-1,y:.95,w:2,h:1});assert.ok(rect.x>=0&&rect.x+rect.w<=1&&rect.y+rect.h<=1);
   const pixels=cropPixels({x:.25,y:.5,w:.5,h:.25},400,300);assert.equal(pixels.x,100);assert.equal(pixels.y,150);assert.equal(pixels.width,200);assert.equal(pixels.height,75);
+  const turned=rotateCropRect({x:.1,y:.2,w:.3,h:.4},{width:400,height:300},{width:300,height:400},90);assert.ok(Math.abs(turned.x-.4)<1e-9);assert.ok(Math.abs(turned.y-.1)<1e-9);assert.ok(Math.abs(turned.w-.4)<1e-9);assert.ok(Math.abs(turned.h-.3)<1e-9);
   assert.throws(()=>exportCrop(),/框选/);image='ORIGINAL_FULL_IMAGE';cropState={source:image,rotation:90,rect:{x:.25,y:.5,w:.5,h:.25}};cropCanvas={width:400,height:300};
   const cropped=exportCrop();assert.equal(cropped,'data:image/png;base64,Q1JPUA==');
   assert.match(OCR_RULES,/错字/);assert.match(OCR_RULES,/不能猜字补全/);assert.match(OCR_RULES,/禁止按语义/);
