@@ -227,7 +227,6 @@ async function analyzeSelectedItems() {
     progress(`AI 正在拆解分析第 ${i + 1} / ${items.length} 题…`);
     try {
       const evidence=answerEvidence(p);
-      if(p.questionType==='single'&&p.choices?.length>1)throw Error('单选题只能选择一个选项');
       if(evidence.status==='confirmed'&&!evidence.answer)throw Error('已选择确认作答，请填写孩子实际作答；未作答或不确定请切换证据状态');
       if(evidence.status==='confirmed'&&p.questionType==='fill'&&Array.from({length:p.blankCount},(_,i)=>p.blankAnswers?.[i]).some(v=>!String(v||'').trim()))throw Error('请记录每个空的实际作答；孩子确实没写的空请填【未作答】，不确定则切换为无法确认');
       if(/加点|划线|画线|下划线|图中/.test(p.text) && !evidence.visualFeatures.trim()){p.showAnswerExtra=true;throw Error('此题依赖视觉信息，请展开补充加点字、划线范围或图示内容；无法确认时请暂不分析')}
@@ -358,10 +357,10 @@ function bindPaper() {
     const ta=document.querySelector('textarea.paper-textarea');if(!ta)return;
     const start=ta.selectionStart,end=ta.selectionEnd;if(start===end){toast('请先在原题文字中选中孩子实际写的答案；不要选印刷选项编号');return}
     const p=paper.items[0],answer=ta.value.slice(start,end);
-    if(p.questionType==='single'||p.questionType==='multiple'){
+    if(isChoiceType(p.questionType)){
       const choices=[...new Set(answer.toUpperCase().match(/[A-H]/g)||[])];
-      if(!choices.length||(p.questionType==='single'&&choices.length!==1)){toast('选中的作答不是有效选项；请直接点选，或调整题型');return}
-      p.choices=choices;p.optionCount=Math.max(p.optionCount||4,...choices.map(x=>x.charCodeAt(0)-64));
+      if(!choices.length){toast('选中的作答不是有效选项；请直接点选，或调整题型');return}
+      p.choices=choices;p.optionCount=Math.max(p.optionCount||5,...choices.map(x=>x.charCodeAt(0)-64));
     }else if(p.questionType==='fill'){
       const slot=p.blankAnswers.findIndex(v=>!String(v||'').trim());const pos=slot<0?p.blankAnswers.length:slot;
       p.blankAnswers[pos]=answer;p.blankCount=Math.max(p.blankCount||3,pos+1);

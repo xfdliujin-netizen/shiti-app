@@ -314,9 +314,9 @@ function capture() {
 
   return `${renderStageBanner()}
     <section class="card capture-card">
-      <div class="card-head">
+      <div class="card-head capture-head">
         <h2>录入新错题</h2>
-        <span class="pill">${hasBaidu ? '百度高精度 OCR' : '✧ DeepSeek AI'}</span>
+        <label class="capture-type"><span>题型</span><select id="capture-question-type">${questionTypeOptions(currentSubject,cfg.questionTypes?.[currentSubject]||'other')}</select></label>
       </div>
       
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
@@ -327,7 +327,6 @@ function capture() {
       </div>
 
       ${renderSubjectConfigModal()}
-      <label class="field"><span>题型</span><select id="capture-question-type">${questionTypeOptions(currentSubject,cfg.questionTypes?.[currentSubject]||'other')}</select></label>
 
       <div id="capture-input">
         ${mode === 'image'
