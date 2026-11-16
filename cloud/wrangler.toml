@@ -13,7 +13,7 @@ STORAGE_ENABLED = "false"
 [[d1_databases]]
 binding = "DB"
 database_name = "shiti-notebook"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "6001080c-5898-4ddc-a87c-302cd0434932"
 
 # Bind api.86518925.xyz only AFTER enabling Cloudflare Access on this hostname.
 # [[routes]]
