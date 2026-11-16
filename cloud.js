@@ -45,7 +45,7 @@ function cloudEntries(notebook) {
     // Existing application uses a shared tombstone namespace; preserve its semantics.
     for(const kind of ['question','practice'])result.set(kind+':'+id,{kind,id,payload:{updated},deleted:true});
   }
-  result.set('profile:student',{kind:'profile',id:'student',payload:{stage:cfg.stage||'primary',grade:getStudentProfile().grade,region:getStudentProfile().region},deleted:false});
+  result.set('profile:student',{kind:'profile',id:'student',payload:{stage:cfg.stage||'primary',grade:getStudentProfile().grade,region:getStudentProfile().region,teachingStyle:cfg.teachingStyle||'step',teachingFocus:cfg.teachingFocus||'understanding'},deleted:false});
   return result;
 }
 async function syncCloud() {
@@ -85,7 +85,7 @@ async function syncCloud() {
   }
   if(JSON.stringify(data)!==initial||JSON.stringify(cloudEntries(data).get('profile:student').payload)!==profileInitial)throw Error('同步期间本地内容发生变化，请重试');
   validate(next);await persist(next);
-  if(profile){cfg.stage=profile.stage;cfg.grade=profile.grade;cfg.region=profile.region;saveLocalConfig()}
+  if(profile){cfg.stage=profile.stage;cfg.grade=profile.grade;cfg.region=profile.region;cfg.teachingStyle=profile.teachingStyle||'step';cfg.teachingFocus=profile.teachingFocus||'understanding';saveLocalConfig()}
   await cloudSaveState(stateKey,state);
   // Persist progress per accepted record. Conflicts and interruptions never overwrite remote edits.
   for(const [key,entry] of pending) {

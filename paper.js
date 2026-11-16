@@ -391,9 +391,11 @@ function bindPaper() {
     if (!lb || !im || lb.open) return;
     im.src = (typeof paper !== 'undefined' && paper.image) ? paper.image : paperImg.src;
     lb.showModal();
+    lb.resetImageView?.();
   };
   if ($('#paper-lightbox-close')) $('#paper-lightbox-close').onclick = () => $('#paper-lightbox').close();
   if ($('#paper-lightbox')) $('#paper-lightbox').onclick = e => { if (e.target === $('#paper-lightbox')) $('#paper-lightbox').close(); };
+  if(typeof bindZoomImage==='function')bindZoomImage($('#paper-lightbox'),$('#paper-lightbox-img'));
 if ($('#paper-analyze-and-save')) $('#paper-analyze-and-save').onclick = e => run(e.target, async () => {
     const failures = await analyzeSelectedItems();
     if (failures) {

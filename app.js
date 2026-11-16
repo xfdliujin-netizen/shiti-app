@@ -65,6 +65,7 @@ let data = { version: 1, questions: [], practices: [], deleted: {} },
     image = '',
     draft = null,
     filter = '全部',
+    notebookStatus = 'all',
     aiFilter = '全部',
     query = '',
     busy = false,
@@ -73,7 +74,7 @@ let data = { version: 1, questions: [], practices: [], deleted: {} },
     practiceAiFilter = '全部',
     examSheet = null,
     examMode = 'original',
-    examSubject = '全部',
+    examSubject = '语文',
     examScope = 'unmastered',
     examCount = 5,
     examShowAnswers = false,
@@ -97,7 +98,9 @@ function getStudentProfile() {
 
 function getStudentPromptContext() {
   const p = getStudentProfile();
-  return `当前学生学情档案：【${p.stageName} · ${p.grade} · 地区/教材：${p.region}】。请严格匹配该学段、年级与对应地区教材考纲要求控制难度与解题方法（严禁使用超纲知识，如小学阶段严禁使用初高中方程组或函数定理）。`;
+  const style=({step:'按孩子能理解的步骤解释，每步说明为什么，语言简洁。',concise:'先给结论，再给最必要的推理，避免冗长重复。',guiding:'先提示思考方向，再给分步解答；练习题干不泄露答案。'})[cfg.teachingStyle]||'按孩子能理解的步骤解释，每步说明为什么，语言简洁。';
+  const focus=({understanding:'侧重概念理解和错因辨析。',transfer:'侧重同一知识点在不同情境中的迁移。',exam:'侧重审题、步骤规范和检查方法。'})[cfg.teachingFocus]||'侧重概念理解和错因辨析。';
+  return `当前学生学情档案：【${p.stageName} · ${p.grade} · 地区/教材：${p.region}】。请匹配该学段、年级控制难度与解题方法，严禁超纲。${style}${focus}未提供教材原文时，不得声称已核对某版本教材或精确考纲。出题应独立复算答案，条件充分，按题型保证答案明确；多选题允许多个正确选项。批改时区分原题、孩子作答、订正与参考答案；参考答案与推导冲突时指出待核对，证据不足不得给孩子判错因。`;
 }
 
 function injectCustomStyles() {
@@ -328,12 +331,7 @@ function capture() {
 
       <div id="capture-input">
         ${mode === 'image'
-          ? `<label class="upload" id="drop" style="${image ? 'padding:10px 14px;flex-direction:row;justify-content:space-between' : ''}">
-              <input id="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
-              ${image
-                ? `<span class="reselect-btn">↻ 重新选图</span>`
-                : '<span class="upload-icon">↥</span><b>点击拍照或选择试卷图片</b><small>支持手机原图自动压缩 · 框选后秒级识别</small>'}
-            </label>${cView}`
+          ? (image ? '<input id="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>'+cView : '<label class="upload" id="drop"><input id="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden><span class="upload-icon">↥</span><b>点击拍照或选择试卷图片</b><small>选图后全屏框选，支持双指缩放和旋转</small></label>')
           : '<textarea id="question-text" class="tall" placeholder="在这里粘贴或输入完整题目，包含题干和选项……"></textarea>'}
       </div>
 
@@ -397,10 +395,10 @@ function notebook() {
   const nbUnmastered = data.questions.filter(q => !q.mastered).length;
   const nbMastered = nbTotal - nbUnmastered;
   return renderStageBanner() +
-    `<div class="page-head notebook-head"><div><h1>错题本 <span class="notebook-stats"><span class="s-total">累计错题 <b>${nbTotal}</b></span><span class="sep"> · </span><span class="s-un">待巩固 <b>${nbUnmastered}</b></span><span class="sep"> · </span><span class="s-done">已掌握 <b>${nbMastered}</b></span></span></h1><p class="subtitle">按常用科目与 AI 诊断标签精准回顾。</p></div><div class="actions" style="margin:0"><button class="primary" id="goto-exam" style="padding:8px 14px;font-size:13px">📄 整理成试卷</button><button class="secondary" id="sample" style="padding:8px 14px;font-size:13px">体验示例题</button></div></div>` +
+    `<div class="page-head notebook-head"><div class="notebook-title"><h1>错题本</h1><button class="secondary" id="sample">体验示例题</button></div><div class="notebook-status" role="group" aria-label="掌握状态筛选">${[['all','累计错题',nbTotal],['unmastered','待巩固',nbUnmastered],['mastered','已掌握',nbMastered]].map(([value,label,count])=>`<button type="button" data-status="${value}" class="status-stat ${notebookStatus===value?'active':''}" aria-pressed="${notebookStatus===value}"><span>${label}</span><b>${count}</b></button>`).join('')}</div></div>` +
     `<input class="search" id="search" aria-label="搜索错题" placeholder="⌕ 搜索题干、编号、知识点、错因标签…" value="${esc(query)}">` +
     `<div class="filters" style="align-items:center">
-      ${['全部', ...displaySubjects, '待巩固', '已掌握'].map(s => `<button class="chip ${filter === s ? 'active' : ''}" data-filter="${s}">${s}</button>`).join('')}
+      ${['全部', ...displaySubjects].map(s => `<button class="chip ${filter === s ? 'active' : ''}" data-filter="${s}">${s}</button>`).join('')}
       <button type="button" class="chip-gear" id="toggle-subj-cfg" title="添加或管理显示的科目">⚙️ 科目</button>
     </div>` +
     renderSubjectConfigModal() +
@@ -415,7 +413,7 @@ function filtered() {
   return cards(
     data.questions
       .filter(q => {
-        const matchSubj = filter === '全部' || q.subject === filter || (filter === '待巩固' && !q.mastered) || (filter === '已掌握' && q.mastered);
+        const matchSubj = (filter === '全部' || q.subject === filter) && (notebookStatus==='all' || (notebookStatus==='mastered'?q.mastered:!q.mastered));
         const verdict = inferAiVerdict(q);
         const matchAi = aiFilter === '全部' || verdict === aiFilter;
         const matchQuery = [q.text, q.number, verdict, ...(q.tags || [])].join(' ').toLowerCase().includes(query.toLowerCase());
@@ -489,17 +487,16 @@ function practicePage() { return variantsPage();}
 
 function examPage() {
 const p = getStudentProfile();
-const examSubjList = ['全部',...getQuickSubjects()];
-if (!examSubjList.includes(examSubject)) examSubject = '全部';
+const examSubjList = [...new Set([...getQuickSubjects(),...data.questions.map(q=>q.subject).filter(Boolean)])];
+if (!examSubjList.includes(examSubject)) examSubject = examSubjList[0] || '语文';
 const countOptions = examMode === 'original'? [5, 10, 15, 20]: [3, 5, 8, 10];
 if (!countOptions.includes(examCount)) examCount = examMode === 'original'? 10: 5;
 
 return renderStageBanner() +
-heading('EXAM & REVIEW', '整理成试卷', '按待巩固优先级抽取原题重练，或让 AI 围绕薄弱点命制全新训练卷。') + `
+`<div class="page-head exam-page-head"><div><h1>整理成试卷</h1><p class="subtitle">让 AI 围绕薄弱点命制全新训练卷。</p></div><span class="pill exam-print-hint">支持打印 / 存 PDF</span></div>` + `
 <section class="card" id="exam-builder" style="border:1.5px solid rgba(0,122,255,0.2)">
 <div class="card-head">
 <h2>📄 整理成试卷（周测 / 考前巩固）</h2>
-<span class="pill">支持打印 / 存 PDF</span>
 </div>
 <div class="segmented" style="margin-bottom:12px">
 <button type="button" data-exam-mode="original" class="${examMode === 'original'? 'active': ''}">📋 整理错题成试卷（原题重练）</button>
@@ -524,7 +521,7 @@ ${countOptions.map(n => `<option value="${n}" ${examCount === n? 'selected': ''}
 </select>
 </label>
 </div>
-<p class="notice" style="margin-bottom:12px">${examMode === 'original'? '从错题本中按最近录入与待巩固优先级抽取原题，自动隐藏答案与批改痕迹，适合打印重做。': `基于错题本薄弱知识点，结合考纲批量命制全新变式考题。`}</p>
+<p class="notice" style="margin-bottom:12px">${examMode === 'original'? '从错题本中按最近录入与待巩固优先级抽取本科目原题，适合打印重做。': `基于本科目错题的薄弱知识点，结合学情档案命制全新变式考题。`}</p>
 <button class="primary" id="build-exam">📄 立即生成试卷</button>
 </section>
 
@@ -672,7 +669,7 @@ function settings() {
 
     <p class="settings-footnote">拾题 1.3.0 · 本地优先，离线题库始终保留在本机。</p>
 
-    ${settingsSheet('profile', '学情档案', 'AI 出题、解析与组卷都会严格按这个学段、年级和地区教材来，不用超纲解法。', `
+    ${settingsSheet('profile', '学情档案', '按学段、年级和教学偏好约束 AI 出题与解析。地区教材作为背景，具体内容仍需核对。', `
       <div class="sheet-section-label">学段</div>
       <div class="segmented three">
         ${Object.entries(stageConfig).map(([k, v]) => `<button type="button" data-stage-pick="${k}" class="${p.stage === k ? 'active' : ''}">${v.name}阶段</button>`).join('')}
@@ -692,6 +689,8 @@ function settings() {
         </label>
       </div>
       <p class="notice">当前生效策略：<strong>${esc(p.stageName)} · ${esc(p.grade)} · ${esc(p.region)}</strong>。</p>
+      <label class="field"><span>AI 讲解方式</span><select id="teaching-style">${[['step','分步讲清原因'],['concise','简洁直达要点'],['guiding','先提示，再讲解']].map(([v,t])=>`<option value="${v}" ${(cfg.teachingStyle||'step')===v?'selected':''}>${t}</option>`).join('')}</select></label>
+      <label class="field"><span>教学重点</span><select id="teaching-focus">${[['understanding','概念理解与错因辨析'],['transfer','举一反三与知识迁移'],['exam','审题、规范步骤与检查']].map(([v,t])=>`<option value="${v}" ${(cfg.teachingFocus||'understanding')===v?'selected':''}>${t}</option>`).join('')}</select></label>
       <div class="actions"><button class="primary" id="save-profile">✓ 保存学情档案</button></div>
     `)}
 
@@ -826,9 +825,9 @@ function bind(tab) {
     if ($('#mistake')) $('#mistake').oninput = e => { currentMistake = e.target.value; };
     if ($('#photo')) {
       $('#photo').onchange = e => loadImage(e.target.files[0]);
-      $('#drop').ondragover = e => { e.preventDefault(); $('#drop').classList.add('drag'); };
-      $('#drop').ondragleave = () => $('#drop').classList.remove('drag');
-      $('#drop').ondrop = e => { e.preventDefault(); loadImage(e.dataTransfer.files[0]); };
+      if ($('#drop')) $('#drop').ondragover = e => { e.preventDefault(); $('#drop').classList.add('drag'); };
+      if ($('#drop')) $('#drop').ondragleave = () => $('#drop').classList.remove('drag');
+      if ($('#drop')) $('#drop').ondrop = e => { e.preventDefault(); loadImage(e.dataTransfer.files[0]); };
     }
     if ($('#manual')) $('#manual').onclick = () => {
       editingId = null;
@@ -883,6 +882,7 @@ function bind(tab) {
   }
   if (tab === 'notebook') {
     $('#search').oninput = e => { query = e.target.value; $('#question-list').innerHTML = filtered(); bindOpen(); };
+    document.querySelectorAll('[data-status]').forEach(b=>b.onclick=()=>{notebookStatus=b.dataset.status;render()});
     document.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => { filter = b.dataset.filter; render(); });
     document.querySelectorAll('[data-ai-filter]').forEach(b => b.onclick = () => { aiFilter = b.dataset.aiFilter; render(); });
     if ($('#goto-exam')) $('#goto-exam').onclick = () => {
@@ -1036,16 +1036,12 @@ function bindPractice() {
   if ($('#exam-count')) $('#exam-count').onchange = e => { examCount = Number(e.target.value); };
 
   if ($('#build-exam')) $('#build-exam').onclick = e => run(e.target, async () => {
-    let pool = data.questions.filter(q => examSubject === '全部' || q.subject === examSubject);
-    if (examScope === 'unmastered') {
-      const unmastered = pool.filter(q => !q.mastered);
-      if (unmastered.length) pool = unmastered;
-    }
-    if (!pool.length) throw Error('当前筛选条件下没有可用的错题，请先录题或切换科目');
+    let pool = data.questions.filter(q => q.subject === examSubject && (examScope !== 'unmastered' || !q.mastered));
+    if (!pool.length) throw Error(examScope === 'unmastered' ? '本科目暂无待巩固错题，请切换科目或选择全部错题' : '本科目暂无可用错题，请先录题或切换科目');
 
     const sortedPool = [...pool].sort((a, b) => Number(a.mastered) - Number(b.mastered) || b.created.localeCompare(a.created));
     const chosen = sortedPool.slice(0, examCount);
-    const subjLabel = examSubject === '全部' ? '综合科目' : examSubject;
+    const subjLabel = examSubject;
     const prof = getStudentProfile();
 
     if (examMode === 'original') {
@@ -1069,13 +1065,13 @@ function bindPractice() {
       const seedCount = Math.min(chosen.length, examCount);
       const seeds = chosen.slice(0, seedCount);
       const promptSeeds = seeds.map((q, i) => `【母题${i + 1}（${q.subject} · 错因:${inferAiVerdict(q)}）】${q.text}（知识点：${(q.tags || []).join('，') || '课内巩固'}）`).join('\n');
-      const r = await ai(`请根据【${prof.stageName}${prof.grade} · ${prof.region}】考纲标准，基于以下 ${seedCount} 道学生错题命制一份共 ${examCount} 道题的扩展训练试卷（若母题不足 ${examCount} 道，请围绕薄弱知识点补充同类新题凑足 ${examCount} 题）。要求：题干完整清晰、不要照抄原题数字或选项、难度贴合${prof.grade}、答案唯一准确。返回严格 JSON：{"items":[{"subject":"学科","text":"完整题干（含选项）","answer":"标准答案","analysis":"分步解析"}]}。\n\n错题母题：\n${promptSeeds}`);
-      if (!Array.isArray(r.items) || !r.items.length) throw Error('AI 组卷返回为空，请重试');
+      const r = await ai(`请为【${prof.stageName}${prof.grade} · 地区教材背景：${prof.region}】学生命制【${subjLabel}】单科试卷，所有题目 subject 必须为“${subjLabel}”，不能混入其他科目。基于以下 ${seedCount} 道学生错题命制共 ${examCount} 道扩展训练题（若母题不足，请围绕本科目薄弱知识点补充同类新题）。要求：题干完整清晰、不要照抄原题数字或选项、难度贴合${prof.grade}、条件充分、答案准确。返回严格 JSON：{"items":[{"subject":"${subjLabel}","text":"完整题干（含选项）","answer":"标准答案","analysis":"分步解析"}]}。\n\n错题母题：\n${promptSeeds}`);
+      if (!Array.isArray(r.items) || r.items.length!==examCount || r.items.some(x=>!x.text||!x.answer||!x.analysis||(x.subject&&x.subject!==subjLabel))) throw Error('AI 返回的题量、科目或题目内容不符合要求，未采用此结果');
       examSheet = {
         title: `拾题 · ${prof.grade}${subjLabel} AI 变式扩展训练卷`,
         created: new Date().toLocaleDateString('zh-CN'),
         items: r.items.map(x => ({
-          subject: String(x.subject || (examSubject === '全部' ? '综合' : examSubject)),
+          subject: subjLabel,
           source: 'AI 扩展变式',
           text: String(x.text || ''),
           image: '',
@@ -1166,6 +1162,8 @@ function saveConfig() {
     stage: cfg.stage || 'primary',
     grade: $('#student-grade') ? $('#student-grade').value : (cfg.grade || '四年级'),
     region: $('#student-region') ? $('#student-region').value : (cfg.region || '江苏（苏教版 / 译林版 / 人教版）'),
+    teachingStyle:$('#teaching-style')?.value||cfg.teachingStyle||'step',
+    teachingFocus:$('#teaching-focus')?.value||cfg.teachingFocus||'understanding',
     endpoint: $('#endpoint') ? $('#endpoint').value.trim() : cfg.endpoint,
     model: $('#model') ? $('#model').value.trim() : cfg.model,
     owner: $('#owner') ? $('#owner').value.trim() : cfg.owner,
@@ -1235,7 +1233,7 @@ function bindSettings() {
     saveConfig();
     openSheet = null;
     render();
-    toast('✓ 学情档案已保存，AI 将按此年级与地区精准出题');
+    toast('✓ 学情档案已保存，后续 AI 分析与出题将使用这些偏好');
   };
 
   if ($('#save-settings')) $('#save-settings').onclick = () => { saveConfig(); closeSettingsSheet(); toast('✓ 配置与密钥已持久保存在此设备'); };
