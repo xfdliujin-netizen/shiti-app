@@ -17,7 +17,7 @@ function arrangeOCRLines(blocks) {
 }
 function answerEvidence(p) {
   const status=p.answerStatus||'unknown';
-  return {status,answer:status==='confirmed'?String(p.studentAnswer||'').trim():'',annotation:String(p.annotation||''),visualFeatures:String(p.visualFeatures||''),verified:Boolean(p.verified)};
+  return {status,questionType:QUESTION_TYPE_NAMES[p.questionType]||'未分类',answer:status==='confirmed'?String(p.studentAnswer||'').trim():'',annotation:String(p.annotation||''),visualFeatures:String(p.visualFeatures||''),verified:Boolean(p.verified)};
 }
 const QUESTION_TYPE_NAMES={other:'其他题型',single:'单项选择题',multiple:'多项选择题',fill:'填空题',judge:'判断题',answer:'问答题',calculation:'计算题',application:'应用题',proof:'证明题',reading:'阅读理解',writing:'写作题',cloze:'完形填空',translation:'翻译题',experiment:'实验探究题',material:'材料分析题'};
 function questionTypesFor(subject) {
@@ -47,9 +47,10 @@ function updateStructuredAnswer(p) {
 }
 function switchQuestionType(p,type,subject) {
   ensureAnswerStructure(p,subject);
-  p.answerDrafts[p.questionType]=p.studentAnswer||'';
+  p.answerDrafts[p.questionType]={studentAnswer:p.studentAnswer||'',choices:[...p.choices],blankAnswers:[...p.blankAnswers],blankCount:p.blankCount,optionCount:p.optionCount};
   p.questionType=questionTypesFor(subject).includes(type)?type:'other';
-  p.studentAnswer=p.answerDrafts[p.questionType]||'';
+  const saved=p.answerDrafts[p.questionType];
+  p.studentAnswer=saved?.studentAnswer||'';p.choices=saved?.choices||[];p.blankAnswers=saved?.blankAnswers||[];p.blankCount=saved?.blankCount||3;p.optionCount=saved?.optionCount||4;
   updateStructuredAnswer(p);
   p.answerStatus='unknown';invalidatePaperEvidence(p);
 }
@@ -74,11 +75,29 @@ function answerReviewFields(p,i) {
   return `<div class="answer-review"><label class="field"><span>题型</span><select data-paper="questionType" data-index="${i}">${questionTypeOptions(subject,p.questionType)}</select></label>
     ${structuredAnswerFields(p,i)}
     <label class="field"><span>作答证据状态</span><select data-paper="answerStatus" data-index="${i}">${options.map(([v,t])=>`<option value="${v}" ${(p.answerStatus||'unknown')===v?'selected':''}>${t}</option>`).join('')}</select></label>
-    <details class="answer-extra" ${p.showAnswerExtra?'open':''}><summary>补充批注与原题视觉信息（选填）</summary>
+    <details class="answer-extra" data-answer-extra="${i}" ${p.showAnswerExtra?'open':''}><summary>补充批注与原题视觉信息（选填）</summary>
     ${paperField('批注／订正（不确定是谁写的就注明，不计作原始作答）','annotation',p.annotation||'',i,true)}
     ${paperField('原题视觉信息（如加点的是哪个字、划线范围；不清楚请写无法辨认）','visualFeatures',p.visualFeatures||'',i,true)}
     <p class="result-note">括号、横线是题目的作答位置，不能据此判断手写或已作答。圈画和红勾也不代表已知的原始作答／标准答案。请将手写内容从题干移到对应字段，原卷的错误选项必须保留。</p></details>
     <label class="verify"><input type="checkbox" data-paper="verified" data-index="${i}" ${p.verified?'checked':''}> 已对照图片核对原题、全部选项及作答／批注归属；必要的加点、划线信息已补充</label></div>`;
+}
+function bindStructuredAnswerFields() {
+  const reset=(p,i)=>{invalidatePaperEvidence(p);p.error='';const cb=document.querySelector(`[data-paper="verified"][data-index="${i}"]`);if(cb)cb.checked=false;const state=document.querySelector(`[data-paper="answerStatus"][data-index="${i}"]`);if(state)state.value=p.answerStatus};
+  document.querySelectorAll('[data-answer-extra]').forEach(el=>el.ontoggle=()=>{const p=paper?.items[Number(el.dataset.answerExtra)];if(p)p.showAnswerExtra=el.open});
+  document.querySelectorAll('[data-answer-choice]').forEach(el=>el.onclick=()=>{
+    const i=Number(el.dataset.index),p=paper.items[i],v=el.dataset.answerChoice;
+    p.choices=p.questionType==='single'?(p.choices.includes(v)?[]:[v]):p.choices.includes(v)?p.choices.filter(x=>x!==v):[...p.choices,v];
+    updateStructuredAnswer(p);p.answerStatus=p.studentAnswer?'confirmed':'unknown';reset(p,i);render();
+  });
+  document.querySelectorAll('[data-blank-answer]').forEach(el=>el.oninput=()=>{
+    const i=Number(el.dataset.index),p=paper.items[i];p.blankAnswers[Number(el.dataset.blankAnswer)]=el.value;updateStructuredAnswer(p);p.answerStatus=p.studentAnswer?'confirmed':'unknown';reset(p,i);
+  });
+  document.querySelectorAll('[data-answer-count]').forEach(el=>el.onchange=()=>{
+    const i=Number(el.dataset.index),p=paper.items[i];
+    if(el.dataset.answerCount==='blanks')p.blankCount=Math.min(20,Math.max(1,Number(el.value)||1));
+    else {p.optionCount=Math.min(8,Math.max(2,Number(el.value)||4));p.choices=p.choices.filter(v=>v.charCodeAt(0)-64<=p.optionCount)}
+    updateStructuredAnswer(p);p.answerStatus='unknown';reset(p,i);render();
+  });
 }
 function invalidatePaperEvidence(p) {
   p.verified=false;p.analyzed=false;p.answer='';p.analysis='';p.reminder='';p.tags=[];p.aiVerdict='薄弱待练';p.diagnosisStatus='pending';

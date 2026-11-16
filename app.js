@@ -324,6 +324,7 @@ function capture() {
       </div>
 
       ${renderSubjectConfigModal()}
+      <label class="field"><span>题型</span><select id="capture-question-type">${questionTypeOptions(currentSubject,cfg.questionTypes?.[currentSubject]||'other')}</select></label>
 
       <div id="capture-input">
         ${mode === 'image'
@@ -813,6 +814,7 @@ function bind(tab) {
   bindOpen();
   bindSubjectConfigEvents();
   if (tab === 'capture') {
+    if($('#capture-question-type'))$('#capture-question-type').onchange=e=>{cfg.questionTypes={...cfg.questionTypes,[currentSubject]:e.target.value};saveLocalConfig()};
     document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { mode = b.dataset.mode; render(); });
     document.querySelectorAll('[data-subj]').forEach(b => b.onclick = () => {
       currentSubject = b.dataset.subj;
@@ -830,8 +832,10 @@ function bind(tab) {
     }
     if ($('#manual')) $('#manual').onclick = () => {
       editingId = null;
-      draft = { subject: currentSubject, aiVerdict: '薄弱待练', source: $('#source')?.value || '', mistake: $('#mistake')?.value || '', text: $('#question-text')?.value || '', answer: '', analysis: '', reminder: '', tags: [], image: mode === 'image' ? image : '' };
-      openDraftOnRender = true;
+      draft=null;
+      const questionType=selectedCaptureQuestionType(currentSubject);
+      paper={subject:currentSubject,questionType,source:$('#source')?.value||'',mistake:$('#mistake')?.value||'',image:mode==='image'?image:'',scope:'crop',ocrProvider:'manual',inventory:[],warnings:[],complete:true,items:[{section:'文字录入',number:'1',text:$('#question-text')?.value||'',studentAnswer:'',questionType,answerStatus:'unknown',selected:true,verified:false,analyzed:false,answer:'',analysis:'',reminder:'',tags:[]}]};
+      openPaperOnRender = true;
       render();
     };
     const cancelDraftHandler = () => {
@@ -858,7 +862,7 @@ function bind(tab) {
       q.tags = $('#draft-tags').value.split(/[,，]/).map(t => t.trim()).filter(Boolean);
       q.id = uid();
       q.created = q.updated = stamp();
-      q.number = new Date().toISOString().slice(0, 10).replaceAll('-', '') + '-' + q.id.slice(0, 6).toUpperCase();
+      q.number = questionNumber(q.subject,new Date(),data.questions);
       q.mastered = editingId ? Boolean(data.questions.find(x => x.id === editingId)?.mastered) : false;
       if (editingId) {
         q.id = editingId;

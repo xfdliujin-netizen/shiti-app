@@ -264,6 +264,7 @@ async function recognizeSelection() {
   const src = mode === 'image' ? exportCrop() : '', text = $('#question-text')?.value || '';
   if (!src && !text.trim()) throw Error('请输入题目');
   const meta = { subject: $('#subject').value, source: $('#source').value, mistake: $('#mistake').value };
+  meta.questionType=selectedCaptureQuestionType(meta.subject);
   progress('正在识别框内原文…');
   const result = await ai(`${OCR_RULES}只转录此范围内实际存在的完整题目，若边缘缺失选项或材料应注明，不能补写框外内容。不需要寻找整卷题号，无大题标题用“框选题目”，无题号用“1”等位置号，不解题。${OCR_SCHEMA}${text ? JSON.stringify({ text }) : ''}`, src || null, { ocr: true, maxTokens: 6000 });
   const items = normalizeOCR(result);

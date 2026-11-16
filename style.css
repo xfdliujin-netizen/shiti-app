@@ -2156,3 +2156,13 @@ dialog.paper-dialog .card-head {
     background: #1c1c1e;
   }
 }
+.answer-choices { display:flex; flex-wrap:wrap; gap:10px; margin:6px 0 10px; }
+.answer-choice { min-width:46px; min-height:44px; border:1px solid var(--line,#d1d5db); border-radius:12px; background:var(--surface-sub,#f8fafc); color:inherit; font-weight:700; }
+.answer-choice.selected { background:var(--primary,#007aff); border-color:var(--primary,#007aff); color:#fff; }
+.answer-tools { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:10px; font-size:13px; }
+.answer-tools label { display:flex; align-items:center; gap:8px; }
+.answer-tools input, .answer-tools select { width:76px; min-width:0; padding:6px 8px; }
+.blank-answer-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; }
+.blank-answer-grid .field { margin:0; }
+.answer-extra { margin:12px 0; }
+.answer-extra summary { cursor:pointer; font-size:13px; color:var(--muted,#6b7280); margin-bottom:10px; }

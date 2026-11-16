@@ -28,9 +28,6 @@ function paperView() {
       <label class="field"><span>原题（仅题干、印刷选项和空位；请移出手写答案与订正，不修正原卷错字）</span><textarea class="paper-textarea" data-paper="text" data-index="0">${esc(p.text)}</textarea></label>
       <div class="actions" style="margin-top:6px"><button type="button" class="secondary" id="paper-move-answer">将选中文字移到孩子作答</button></div>
       ${typeof rawOCRView === 'function' ? rawOCRView() : ''}
-      <div class="form-row">
-        ${paperField('题号 / 备注（选填）', 'number', p.number === '1' ? '' : p.number, 0)}
-      </div>
       ${answerReviewFields(p,0)}
       ${p.analyzed ? `
         <div style="margin-top:12px;padding-top:12px;border-top:1px dashed #cbd5e1">
@@ -76,7 +73,6 @@ function paperView() {
         <label><input type="checkbox" data-paper="selected" data-index="${i}" ${p.selected ? 'checked' : ''}> 选择第 ${i + 1} 个条目</label>
         <span class="pill">${p.analyzed ? '已分析 · ' + esc(p.aiVerdict || '薄弱待练') : '待核对'}</span>
       </div>
-      <div class="form-row">${paperField('大题 / 分组', 'section', p.section, i)}${paperField('原卷题号', 'number', p.number, i)}</div>
       ${paperField('原题全文（保留材料、选项和空格）', 'text', p.text, i, true)}
       ${answerReviewFields(p,i)}
       ${p.uncertainty ? `<p class="result-note">需核对：${esc(p.uncertainty)}</p>` : ''}
@@ -173,6 +169,7 @@ async function recognizePaper() {
   const sourceImage = mode === 'image' ? image : '', text = $('#question-text')?.value || '';
   if (!sourceImage && !text.trim()) throw Error('请先上传试卷或输入题目');
   const meta = { subject: $('#subject')?.value || currentSubject || '语文', source: $('#source')?.value || '', mistake: $('#mistake')?.value || '' };
+  meta.questionType=selectedCaptureQuestionType(meta.subject);
   const columns = Number($('#paper-layout')?.value || 2);
   paperLayout = String(columns);
   draft = null;
@@ -230,8 +227,9 @@ async function analyzeSelectedItems() {
     progress(`AI 正在拆解分析第 ${i + 1} / ${items.length} 题…`);
     try {
       const evidence=answerEvidence(p);
+      if(p.questionType==='single'&&p.choices?.length>1)throw Error('单选题只能选择一个选项');
       if(evidence.status==='confirmed'&&!evidence.answer)throw Error('已选择确认作答，请填写孩子实际作答；未作答或不确定请切换证据状态');
-      if(/加点|划线|画线|下划线|图中/.test(p.text) && !evidence.visualFeatures.trim())throw Error('此题依赖视觉信息，请补充加点字、划线范围或图示内容；无法确认时请暂不分析');
+      if(/加点|划线|画线|下划线|图中/.test(p.text) && !evidence.visualFeatures.trim()){p.showAnswerExtra=true;throw Error('此题依赖视觉信息，请展开补充加点字、划线范围或图示内容；无法确认时请暂不分析')}
       const canDiagnose=evidence.status==='confirmed'&&Boolean(evidence.answer);
       const r = await ai(`你只得到人工核对后的文字，没有看到原始试卷图片。学科：${paper.subject}。原题：${JSON.stringify(p.text)}。视觉信息：${JSON.stringify(evidence.visualFeatures)}。作答证据：${JSON.stringify(evidence)}。用户补充（不是孩子作答的替代证据）：${JSON.stringify(paper.mistake)}。原题错字、错误拼音、错误选项照录，不得按正确知识改写题干。括号和横线只是空位，不能推测其中的答案。圈画、订正和老师批改与孩子原始作答不同，不可混用；红勾不能证明标准答案。${canDiagnose?'仅根据已确认作答与标准解法比较，判断 correct/incorrect/unknown；即使答错，也不能断言思考过程，只能给有依据的可能原因。':'孩子作答未确认或已确认未作答：仅讲解题目，不能说孩子答错、选了某项或存在某个错因；status 必须是 unknown，aiVerdict 必须是未判定。'}条件不足或视觉信息无法辨认时明确说明无法确定，不猜测。返回 JSON {"answer":"标准答案或无法确定原因","analysis":"解题步骤；仅有已确认作答时才可比较","status":"correct/incorrect/unknown","comparisonEvidence":"对比依据，无证据则空字符串","reminder":"复习建议，不把可能错因说成事实","aiVerdict":"${canDiagnose?'选择最贴切错因标签，无法判断则未判定':'未判定'}","tags":["知识点"]}。可用错因标签：${JSON.stringify(verdictList)}。`);
       if (typeof r.answer !== 'string' || typeof r.analysis !== 'string') throw Error('分析结果不完整');
@@ -258,14 +256,16 @@ async function analyzeSelectedItems() {
 
 async function saveSelectedItems() {
   const items = selectedPaper(), created = stamp();
-  const records = items.map(p => {
+  const records = items.map((p,index) => {
     const id = uid();
     const record = {
       id,
-      number: created.slice(0, 10).replaceAll('-', '') + '-' + id.slice(0, 6).toUpperCase(),
+      number: questionNumber(paper.subject,new Date(created),data.questions,index),
       created,
       updated: created,
       subject: paper.subject,
+      questionType:p.questionType||paper.questionType||'other',
+      answerDetails:{choices:p.choices||[],blankAnswers:p.blankAnswers||[],blankCount:p.blankCount||0,optionCount:p.optionCount||0},
       source: [paper.source, p.section !== '框选题目' ? p.section : '', p.number !== '1' ? p.number : ''].filter(Boolean).join(' · '),
       text: p.text,
       studentAnswer: p.answerStatus==='confirmed'?p.studentAnswer:'',
@@ -315,6 +315,7 @@ function bindPaper() {
       if (k === 'selected' || k === 'verified') { p[k] = el.checked; return; }
       if (k === 'tagsText') { p.tags = el.value.split(/[,，]/).map(t => t.trim()).filter(Boolean); return; }
       if (k === 'aiVerdict') { p.aiVerdict = el.value; return; }
+      if(k==='questionType'){if(p.questionType!==el.value){switchQuestionType(p,el.value,paper.subject);render()}return}
       p[k] = el.value;
       if (['text', 'section', 'number', 'studentAnswer','answerStatus','annotation','visualFeatures'].includes(k)) {
         invalidatePaperEvidence(p);
@@ -334,6 +335,7 @@ function bindPaper() {
 
   document.querySelectorAll('[data-paper-delete]').forEach(b => b.onclick = () => { paper.items.splice(Number(b.dataset.paperDelete), 1); render(); });
   if (!paper) return;
+  bindStructuredAnswerFields();
 
   if ($('#paper-select-all')) $('#paper-select-all').onclick = () => { const checked = !paper.items.every(p => p.selected); paper.items.forEach(p => p.selected = checked); render(); };
   if ($('#paper-add')) $('#paper-add').onclick = () => { paper.items.push({ section: '手工补录', number: String(paper.items.length + 1), text: '', studentAnswer: '', answerStatus:'unknown', uncertainty: '手工补录，请填写原文', selected: true, verified: false, analyzed: false, aiVerdict: '薄弱待练', answer: '', analysis: '', reminder: '', tags: [] }); render(); };
@@ -355,7 +357,16 @@ function bindPaper() {
     const ta=document.querySelector('textarea.paper-textarea');if(!ta)return;
     const start=ta.selectionStart,end=ta.selectionEnd;if(start===end){toast('请先在原题文字中选中孩子实际写的答案；不要选印刷选项编号');return}
     const p=paper.items[0],answer=ta.value.slice(start,end);
+    if(p.questionType==='single'||p.questionType==='multiple'){
+      const choices=[...new Set(answer.toUpperCase().match(/[A-H]/g)||[])];
+      if(!choices.length||(p.questionType==='single'&&choices.length!==1)){toast('选中的作答不是有效选项；请直接点选，或调整题型');return}
+      p.choices=choices;p.optionCount=Math.max(p.optionCount||4,...choices.map(x=>x.charCodeAt(0)-64));
+    }else if(p.questionType==='fill'){
+      const slot=p.blankAnswers.findIndex(v=>!String(v||'').trim());const pos=slot<0?p.blankAnswers.length:slot;
+      p.blankAnswers[pos]=answer;p.blankCount=Math.max(p.blankCount||3,pos+1);
+    }
     p.studentAnswer=[p.studentAnswer,answer].filter(Boolean).join('\n');
+    updateStructuredAnswer(p);
     p.text=ta.value.slice(0,start)+'____'+ta.value.slice(end);p.answerStatus='confirmed';invalidatePaperEvidence(p);render();
   };
   const paperBox = $('#paper-crop-image-box');
