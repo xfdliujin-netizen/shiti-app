@@ -82,7 +82,6 @@ async function bindCropEditor() {
   const canvas = $('#crop-canvas');
   if (!canvas) return;
   const source = image;
-  // 默认给一个居中的初始选框，省去每次从零手画
   if (cropState.source !== source) {
     cropState = { source, rotation: 0, rect: { x: 0.06, y: 0.08, w: 0.88, h: 0.75 } };
   }
@@ -111,7 +110,6 @@ async function bindCropEditor() {
     ctx.strokeStyle = '#3478f6';
     ctx.lineWidth = 2.5 * scale;
     ctx.strokeRect(p.x, p.y, p.width, p.height);
-    // 放大四角视觉锚点，手机端更清晰
     ctx.fillStyle = '#fff';
     const handleR = 6 * scale;
     for (const [x, y] of [[p.x, p.y], [p.x + p.width, p.y], [p.x, p.y + p.height], [p.x + p.width, p.y + p.height]]) {
@@ -169,7 +167,6 @@ async function bindCropEditor() {
     e.preventDefault();
     const p = point(e), r = cropState.rect, b = canvas.getBoundingClientRect();
     let handle = null;
-    // 手机触摸热区放大到 36px，轻松拉四角及四条边
     const hitRadius = e.pointerType === 'touch' ? 36 : 18;
     if (r) {
       for (const [name, x, y] of [['nw', r.x, r.y], ['ne', r.x + r.w, r.y], ['sw', r.x, r.y + r.h], ['se', r.x + r.w, r.y + r.h]]) {
@@ -237,7 +234,6 @@ async function bindCropEditor() {
   info();
 }
 
-// 关键修复：自动限制最大边长 1800px 并使用 JPEG 压缩（兼容测试环境回退）
 function exportCrop() {
   if (!cropCanvas || cropState.source !== image || !cropState.rect) throw Error('请先在图片上框选一道完整题目');
   const p = cropPixels(cropState.rect, cropCanvas.width, cropCanvas.height);
@@ -299,7 +295,6 @@ function bindRecognition() {
     }
     const handler = e => run(e.target, baidu ? recognizeWithBaidu : (full ? recognizePaper : recognizeSelection));
     $('#analyze').onclick = handler;
-    if ($('#quick-analyze')) $('#quick-analyze').onclick = handler;
   }
   update();
   bindCropEditor();

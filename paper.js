@@ -3,6 +3,14 @@ const isTestEnv = () => Boolean(globalThis.assert);
 
 const OCR_SCHEMA = '错字、错误拼音、错误标点和错误选项必须按原图照录，不能自动修正。返回 JSON {"items":[{"section":"大题标题，严格使用目录中的名称","number":"原卷小题号，无号用位置或拼音","text":"完整原题，包含材料、全部选项和空格，不含学生填入内容","studentAnswer":"仅转录实际可见的学生作答，不可推测","uncertainty":"模糊、缺失、跨区截断或无法区分的内容，清晰则空字符串"}],"warnings":["其他问题"]}';
 
+function getVerdictTagOptions(selected) {
+  const list = typeof aiVerdictTags !== 'undefined' && Array.isArray(aiVerdictTags)
+    ? aiVerdictTags
+    : ['概念混淆', '审题偏差', '计算粗心', '知识盲区', '书写规范', '思路受阻', '薄弱待练', '巩固良好'];
+  const cur = selected && list.includes(selected) ? selected : '薄弱待练';
+  return list.map(v => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(v)}</option>`).join('');
+}
+
 function paperView() {
   if (!paper) return '';
   const isSingleCrop = paper.scope === 'crop' && paper.items.length === 1 && !isTestEnv();
@@ -14,7 +22,7 @@ function paperView() {
     return `<section class="card" style="border:2px solid #2563eb33">
       <div class="card-head">
         <h2>校对识别结果</h2>
-        <span class="pill">${p.analyzed ? '✓ 已生成 AI 解析' : '待校对 / 分析'}</span>
+        <span class="pill">${p.analyzed ? '✓ 已生成 AI 解析与错因判定' : '待校对 / 分析'}</span>
       </div>
       ${paper.image ? `<div style="margin-bottom:10px;background:#f8fafc;padding:8px;border-radius:10px;text-align:center"><img class="paper-original" src="${paper.image}" alt="框选原图" style="max-height:180px;width:auto;margin:0 auto;display:block"></div>` : ''}
       ${paperField('识别出的题目原文（可直接修改调整，原卷错字请保留）', 'text', p.text, 0, true)}
@@ -24,10 +32,16 @@ function paperView() {
       </div>
       ${p.analyzed ? `
         <div style="margin-top:12px;padding-top:12px;border-top:1px dashed #cbd5e1">
+          <div class="form-row">
+            <label class="field">
+              <span>🤖 AI 判定错因标签</span>
+              <select data-paper="aiVerdict" data-index="0">${getVerdictTagOptions(p.aiVerdict)}</select>
+            </label>
+            ${paperField('知识点标签（逗号分隔）', 'tagsText', (p.tags || []).join('，'), 0)}
+          </div>
           ${paperField('正确答案', 'answer', p.answer, 0, true)}
           ${paperField('解题步骤与错因分析', 'analysis', p.analysis, 0, true)}
           ${paperField('易错提醒', 'reminder', p.reminder, 0, true)}
-          ${paperField('知识点标签（逗号分隔）', 'tagsText', p.tags.join('，'), 0)}
         </div>
       ` : ''}
       ${p.error ? `<p class="result-note" style="color:#dc2626">${esc(p.error)}</p>` : ''}
@@ -41,6 +55,7 @@ function paperView() {
 
   const keys = new Set([...paper.items.map(p => paperKey(p)), ...(paper.savedKeys || [])]);
   const missing = paper.inventory.filter(p => !keys.has(paperKey(p)));
+  const rawViewHtml = typeof rawOCRView === 'function' ? rawOCRView() : '';
   return `<section class="card">
     <div class="card-head">
       <h2>${paper.scope === 'crop' ? '框内原文核对' : '整卷逐题核对'} · ${paper.items.length} 题</h2>
@@ -48,8 +63,8 @@ function paperView() {
     </div>
     <p class="result-note">${paper.ocrProvider === 'baidu' ? '请对照裁剪图核对原文。' : `目录发现 ${paper.inventory.length} 个题号；当前转录 ${paper.items.length} 个条目。`}${missing.length ? ' 待核对：' + esc(missing.map(p => p.section + ' / ' + p.number).join('、')) : ''}</p>
     ${paper.warnings.map(w => `<p class="result-note">${esc(w)}</p>`).join('')}
-    ${paper.image ? `<details><summary>展开原图对照</summary><a href="${paper.image}" target="_blank" rel="noopener"><img class="paper-original" src="${paper.image}" alt="原始试卷，点击放大"></a></details>` : ''}
-    ${rawOCRView()}
+    ${paper.image ? `<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">展开原图对照（默认收起）</summary><a href="${paper.image}" target="_blank" rel="noopener"><img class="paper-original" src="${paper.image}" alt="原始试卷，点击放大"></a></details>` : ''}
+    ${rawViewHtml ? (rawViewHtml.trim().startsWith('<details') ? rawViewHtml : `<details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">查看 OCR 原始转录（默认收起）</summary>${rawViewHtml}</details>`) : ''}
     <div class="actions">
       <button class="secondary" id="paper-select-all">全选 / 取消全选</button>
       <button class="secondary" id="paper-add">补录漏题</button>
@@ -57,14 +72,22 @@ function paperView() {
     ${paper.items.map((p, i) => `<article class="paper-item" data-paper-item="${i}">
       <div class="card-head">
         <label><input type="checkbox" data-paper="selected" data-index="${i}" ${p.selected ? 'checked' : ''}> 选择第 ${i + 1} 个条目</label>
-        <span class="pill">${p.analyzed ? '已分析' : '待核对'}</span>
+        <span class="pill">${p.analyzed ? '已分析 · ' + esc(p.aiVerdict || '薄弱待练') : '待核对'}</span>
       </div>
       <div class="form-row">${paperField('大题 / 分组', 'section', p.section, i)}${paperField('原卷题号', 'number', p.number, i)}</div>
       ${paperField('原题全文（保留材料、选项和空格）', 'text', p.text, i, true)}
       ${paperField('可见学生作答（不确定可清空）', 'studentAnswer', p.studentAnswer, i, true)}
       ${p.uncertainty ? `<p class="result-note">需核对：${esc(p.uncertainty)}</p>` : ''}
       <label class="verify"><input type="checkbox" data-paper="verified" data-index="${i}" ${p.verified ? 'checked' : ''}> 我已对照原图核对题干、材料和全部选项</label>
-      ${p.analyzed ? `${paperField('答案', 'answer', p.answer, i, true)}${paperField('步骤', 'analysis', p.analysis, i, true)}${paperField('提醒', 'reminder', p.reminder, i, true)}${paperField('标签（逗号分隔）', 'tagsText', p.tags.join('，'), i)}` : ''}
+      ${p.analyzed ? `
+        <div class="form-row">
+          <label class="field"><span>🤖 AI 判定错因标签</span><select data-paper="aiVerdict" data-index="${i}">${getVerdictTagOptions(p.aiVerdict)}</select></label>
+          ${paperField('标签（逗号分隔）', 'tagsText', (p.tags || []).join('，'), i)}
+        </div>
+        ${paperField('答案', 'answer', p.answer, i, true)}
+        ${paperField('步骤', 'analysis', p.analysis, i, true)}
+        ${paperField('提醒', 'reminder', p.reminder, i, true)}
+      ` : ''}
       ${p.error ? `<p class="result-note">${esc(p.error)}</p>` : ''}
       <div class="actions"><button class="text-button" data-paper-delete="${i}">移除此条目</button></div>
     </article>`).join('')}
@@ -99,6 +122,7 @@ function normalizeOCR(r) {
       selected: autoCheck,
       verified: autoCheck,
       analyzed: false,
+      aiVerdict: '薄弱待练',
       answer: '',
       analysis: '',
       reminder: '',
@@ -147,8 +171,8 @@ async function recognizePaper() {
   if (paper && !confirm('重新识别会替换当前待确认的整卷结果，继续吗？')) return;
   const sourceImage = mode === 'image' ? image : '', text = $('#question-text')?.value || '';
   if (!sourceImage && !text.trim()) throw Error('请先上传试卷或输入题目');
-  const meta = { subject: $('#subject').value, source: $('#source').value, mistake: $('#mistake').value };
-  const columns = Number($('#paper-layout').value);
+  const meta = { subject: $('#subject')?.value || currentSubject || '语文', source: $('#source')?.value || '', mistake: $('#mistake')?.value || '' };
+  const columns = Number($('#paper-layout')?.value || 2);
   paperLayout = String(columns);
   draft = null;
   editingId = null;
@@ -195,15 +219,27 @@ function selectedPaper() {
 
 async function analyzeSelectedItems() {
   const items = selectedPaper();
+  const verdictList = typeof aiVerdictTags !== 'undefined' && Array.isArray(aiVerdictTags)
+    ? aiVerdictTags
+    : ['概念混淆', '审题偏差', '计算粗心', '知识盲区', '书写规范', '思路受阻', '薄弱待练'];
   let failures = 0;
   for (let i = 0; i < items.length; i++) {
     const p = items[i];
     if (p.analyzed) continue;
     progress(`AI 正在拆解分析第 ${i + 1} / ${items.length} 题…`);
     try {
-      const r = await ai(`基于已经人工核对的原题分析，不得改写题干或编造学生答案。若条件缺失或包含【无法辨认】，应说明不能确定答案，不可猜测。学科：${paper.subject}。原文：${JSON.stringify(p.text)}。实际可见学生作答：${JSON.stringify(p.studentAnswer)}。用户补充：${paper.mistake}。返回 JSON {"answer":"正确答案或无法判定的原因","analysis":"带序号的逐步解析","reminder":"针对题目和实际作答的提醒，没作答则不声称学生选错","tags":["知识点"]}。`);
+      const r = await ai(`基于已经人工核对的原题分析，不得改写题干或编造学生答案。若条件缺失或包含【无法辨认】，应说明不能确定答案，不可猜测。学科：${paper.subject}。原文：${JSON.stringify(p.text)}。实际可见学生作答：${JSON.stringify(p.studentAnswer)}。用户补充：${paper.mistake}。请同时从 ${JSON.stringify(verdictList)} 中挑选最贴切的一项作为 aiVerdict 错因判定标签。返回 JSON {"answer":"正确答案或无法判定的原因","analysis":"带序号的逐步解析","reminder":"针对题目和实际作答的提醒，没作答则不声称学生选错","aiVerdict":"错因判定标签","tags":["知识点"]}。`);
       if (typeof r.answer !== 'string' || typeof r.analysis !== 'string') throw Error('分析结果不完整');
-      Object.assign(p, { answer: r.answer, analysis: r.analysis, reminder: String(r.reminder || ''), tags: Array.isArray(r.tags) ? r.tags.map(String) : [], analyzed: true, error: '' });
+      const matchedVerdict = verdictList.includes(r.aiVerdict) ? r.aiVerdict : '薄弱待练';
+      Object.assign(p, {
+        answer: r.answer,
+        analysis: r.analysis,
+        reminder: String(r.reminder || ''),
+        aiVerdict: matchedVerdict,
+        tags: Array.isArray(r.tags) ? r.tags.map(String) : [],
+        analyzed: true,
+        error: ''
+      });
     } catch (err) {
       p.error = err.message;
       failures++;
@@ -216,7 +252,7 @@ async function saveSelectedItems() {
   const items = selectedPaper(), created = stamp();
   const records = items.map(p => {
     const id = uid();
-    return {
+    const record = {
       id,
       number: created.slice(0, 10).replaceAll('-', '') + '-' + id.slice(0, 6).toUpperCase(),
       created,
@@ -228,7 +264,7 @@ async function saveSelectedItems() {
       answer: p.answer,
       analysis: p.analysis,
       reminder: p.reminder,
-      tags: p.tags,
+      tags: p.tags || [],
       image: paper.image,
       mastered: false,
       originalSection: p.section,
@@ -237,6 +273,8 @@ async function saveSelectedItems() {
       ocrOriginalText: paper.ocrOriginalText || '',
       ocrRaw: paper.ocrRaw || null
     };
+    record.aiVerdict = p.aiVerdict || (typeof inferAiVerdict === 'function' ? inferAiVerdict(record) : '薄弱待练');
+    return record;
   });
   await persist({ ...data, questions: [...data.questions, ...records] });
   paper.savedKeys = [...(paper.savedKeys || []), ...items.map(paperKey)];
@@ -253,13 +291,15 @@ function bindPaper() {
   const layout = $('#paper-layout');
   if (!layout) return;
   layout.onchange = () => { paperLayout = layout.value; };
-  $('#analyze').onclick = e => run(e.target, recognizePaper);
+  if ($('#analyze')) $('#analyze').onclick = e => run(e.target, recognizePaper);
 
   document.querySelectorAll('[data-paper]').forEach(el => {
-    el.oninput = () => {
+    const handler = () => {
       const p = paper.items[Number(el.dataset.index)], k = el.dataset.paper;
+      if (!p) return;
       if (k === 'selected' || k === 'verified') { p[k] = el.checked; return; }
       if (k === 'tagsText') { p.tags = el.value.split(/[,，]/).map(t => t.trim()).filter(Boolean); return; }
+      if (k === 'aiVerdict') { p.aiVerdict = el.value; return; }
       p[k] = el.value;
       if (['text', 'section', 'number', 'studentAnswer'].includes(k)) {
         if (isTestEnv()) {
@@ -281,18 +321,20 @@ function bindPaper() {
         p.tags = [];
       }
     };
+    el.oninput = handler;
+    el.onchange = handler;
   });
 
   document.querySelectorAll('[data-paper-delete]').forEach(b => b.onclick = () => { paper.items.splice(Number(b.dataset.paperDelete), 1); render(); });
   if (!paper) return;
 
   if ($('#paper-select-all')) $('#paper-select-all').onclick = () => { const checked = !paper.items.every(p => p.selected); paper.items.forEach(p => p.selected = checked); render(); };
-  if ($('#paper-add')) $('#paper-add').onclick = () => { paper.items.push({ section: '手工补录', number: String(paper.items.length + 1), text: '', studentAnswer: '', uncertainty: '手工补录，请填写原文', selected: true, verified: !isTestEnv(), analyzed: false, answer: '', analysis: '', reminder: '', tags: [] }); render(); };
+  if ($('#paper-add')) $('#paper-add').onclick = () => { paper.items.push({ section: '手工补录', number: String(paper.items.length + 1), text: '', studentAnswer: '', uncertainty: '手工补录，请填写原文', selected: true, verified: !isTestEnv(), analyzed: false, aiVerdict: '薄弱待练', answer: '', analysis: '', reminder: '', tags: [] }); render(); };
 
   if ($('#paper-analyze')) $('#paper-analyze').onclick = e => run(e.target, async () => {
     const failures = await analyzeSelectedItems();
     render();
-    toast(failures ? `${failures} 题分析失败，请检查 DeepSeek 设置后重试` : '✓ AI 分析完成，核对无误后点击收录');
+    toast(failures ? `${failures} 题分析失败，请检查 DeepSeek 设置后重试` : '✓ AI 分析与错因判定完成，核对无误后点击收录');
   });
 
   if ($('#paper-save')) $('#paper-save').onclick = e => run(e.target, async () => {
