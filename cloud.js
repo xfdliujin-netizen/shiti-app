@@ -1,6 +1,6 @@
 /* Explicit cloud sync. Offline notebook remains authoritative until a successful merge. */
 function cloudSettings() {
-  return `<section class="card" style="margin-bottom:16px"><h2>私人云端同步</h2><p class="notice">同步错题、练习和学情档案到自己的云端。首次使用请先导出 JSON 备份，再登录并同步。原图保留本机，云端题图会压缩。</p>${field('云端接口地址','cloud-endpoint',cfg.cloudEndpoint||'https://api.86518925.xyz','url')}<div class="actions"><button class="secondary" id="cloud-login">打开云端登录</button><button class="primary" id="cloud-sync">合并并同步</button></div><p class="hint">同步为手动触发；同一记录在两台设备同时修改时停止并提示，不覆盖。密钥不会上传。</p></section>`;
+  return `${field('云端接口地址','cloud-endpoint',cfg.cloudEndpoint||'https://api.86518925.xyz','url')}<div class="actions"><button class="secondary" id="cloud-login">打开云端登录</button><button class="primary" id="cloud-sync">合并并同步</button></div><p class="hint">同步为手动触发；同一记录在两台设备同时修改时停止并提示，不覆盖。密钥不会上传。</p>`;
 }
 function cloudRoot() {
   const value=($('#cloud-endpoint')?.value||cfg.cloudEndpoint||'https://api.86518925.xyz').trim();

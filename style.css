@@ -831,3 +831,1328 @@ dialog#detail::backdrop {
     grid-template-columns: 1fr;
   }
 }
+/* ============================================================
+   拾题 · Apple 风格 UI 优化（v15）
+   原则：只做视觉层，不改业务逻辑 / 不改任何字段 ID。
+   iPhone：底部 Tab + 底部 Sheet； iPad：左侧边栏 + 居中弹窗。
+   ============================================================ */
+
+:root {
+  --radius-lg: 20px;
+  --row-min: 44px;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  letter-spacing: -0.01em;
+}
+
+/* ---------- 通用打磨：大标题、卡片、按钮、输入 ---------- */
+.page-head h1 {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.card {
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+button.primary,
+button.secondary {
+  min-height: var(--row-min);
+  border-radius: 14px;
+}
+
+button.primary {
+  box-shadow: 0 4px 14px rgba(0, 122, 255, 0.22);
+}
+
+button.primary:active,
+button.secondary:active,
+.chip:active,
+.question:active {
+  transform: scale(0.98);
+}
+
+input[type="text"],
+input[type="url"],
+input[type="password"],
+input[type="number"],
+select,
+textarea,
+.search {
+  min-height: var(--row-min);
+  border-radius: 12px;
+  background: var(--surface-sub);
+  border: 0.5px solid var(--line);
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.search:focus {
+  background: var(--surface);
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.14);
+}
+
+.field {
+  gap: 7px;
+}
+
+.field > span {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.segmented {
+  border-radius: 12px;
+}
+.segmented.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.question {
+  border-radius: 18px;
+  padding: 18px;
+}
+.question h3 {
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+/* 顶部统计：iOS 胶囊更克制 */
+.stat {
+  padding: 7px 13px;
+}
+
+/* ---------- 设置页：iOS 分组列表 ---------- */
+.settings-page {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.settings-page .page-head {
+  margin-bottom: 20px;
+}
+
+.settings-group {
+  margin: 0 0 28px;
+}
+
+.settings-group-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 0 18px 7px;
+}
+
+.settings-list {
+  background: var(--surface);
+  border: 0.5px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.settings-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 13px;
+  padding: 11px 16px 11px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 0.5px solid var(--line);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text);
+  min-height: 62px;
+  transition: background 0.15s ease;
+}
+.settings-row:last-child {
+  border-bottom: none;
+}
+.settings-row:hover {
+  background: rgba(60, 60, 67, 0.03);
+}
+.settings-row:active {
+  background: rgba(60, 60, 67, 0.07);
+}
+
+.settings-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18);
+}
+.settings-icon.blue { background: linear-gradient(145deg, #0a84ff, #0066d6); }
+.settings-icon.purple { background: linear-gradient(145deg, #af52de, #8944ab); }
+.settings-icon.green { background: linear-gradient(145deg, #34c759, #248a3d); }
+.settings-icon.orange { background: linear-gradient(145deg, #ff9f0a, #ff6a00); }
+.settings-icon.teal { background: linear-gradient(145deg, #64d2ff, #0a84ff); }
+.settings-icon.gray { background: linear-gradient(145deg, #8e8e93, #636366); }
+
+.settings-row-text {
+  flex: 1;
+  min-width: 0;
+}
+.settings-row-title {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.settings-row-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.settings-row-value {
+  font-size: 15px;
+  color: var(--muted);
+  text-align: right;
+  max-width: 42%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+.settings-chevron {
+  color: #c7c7cc;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.settings-footnote {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+  padding: 0 18px;
+  margin-top: 8px;
+}
+.settings-footnote + .settings-footnote {
+  margin-top: 4px;
+}
+
+.settings-profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+}
+.settings-profile-hero .settings-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  font-size: 26px;
+}
+.settings-profile-hero .settings-row-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.settings-profile-hero .settings-row-sub {
+  font-size: 13px;
+}
+
+/* 兼容旧的 settings-grid（已不再使用，留作兜底） */
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+/* ---------- 设置弹窗：iOS Sheet ---------- */
+dialog.settings-sheet {
+  width: min(560px, calc(100vw - 32px));
+  max-height: 88vh;
+  margin: auto;
+  border: none;
+  border-radius: 22px;
+  padding: 0;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+  animation: sheet-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+dialog.settings-sheet::backdrop {
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+@keyframes sheet-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.sheet-grabber {
+  display: none;
+  width: 36px;
+  height: 5px;
+  border-radius: 99px;
+  background: rgba(120, 120, 128, 0.45);
+  margin: 10px auto 0;
+  flex-shrink: 0;
+}
+
+.sheet-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface-glass);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid var(--line);
+}
+.sheet-head-spacer {
+  width: 64px;
+  flex-shrink: 0;
+}
+.sheet-title {
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sheet-done {
+  min-width: 64px;
+  text-align: right;
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 6px 2px;
+}
+.sheet-close {
+  min-width: 64px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-family: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 6px 2px;
+}
+
+.sheet-body {
+  padding: 20px 20px calc(22px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.sheet-body .field:first-child {
+  margin-top: 0;
+}
+.sheet-body .notice {
+  margin-top: 14px;
+}
+.sheet-body .actions {
+  margin-top: 18px;
+}
+.sheet-body .actions button.primary {
+  flex: 1;
+}
+.sheet-lead {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+.sheet-section-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 20px 0 4px;
+}
+.sheet-section-label:first-child {
+  margin-top: 0;
+}
+
+/* 弹窗里的分段控件在窄屏不挤 */
+.sheet-body .segmented button {
+  padding: 8px 6px;
+  font-size: 13px;
+}
+
+/* ---------- iPad（768–1180px）：边栏 + 居中内容 ---------- */
+@media (min-width: 768px) {
+  .container {
+    padding: 32px 32px 72px;
+  }
+  .page-head h1 {
+    font-size: 34px;
+  }
+  .card {
+    padding: 24px;
+  }
+  .sidebar {
+    width: 248px;
+  }
+  .container {
+    margin-left: 248px;
+  }
+  :root {
+    --sidebar-w: 248px;
+  }
+  /* 设置页在 iPad 上收窄居中，像系统设置 */
+  .settings-page {
+    max-width: 680px;
+  }
+  dialog.settings-sheet {
+    width: min(600px, calc(100vw - 64px));
+  }
+}
+
+/* ---------- iPhone（<768px）：底部 Sheet + 底部 Tab ---------- */
+@media (max-width: 767px) {
+  .page-head h1 {
+    font-size: 26px;
+  }
+  .card {
+    padding: 18px 16px;
+    border-radius: 18px;
+  }
+  .container {
+    padding: 12px 14px calc(92px + env(safe-area-inset-bottom));
+  }
+
+  /* 底部 Tab：更像 iOS，图标 + 10pt 文字 */
+  .sidebar {
+    background: rgba(255, 255, 255, 0.86);
+    backdrop-filter: saturate(180%) blur(24px);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    padding: 4px 8px calc(6px + env(safe-area-inset-bottom));
+    box-shadow: 0 -1px 0 rgba(60, 60, 67, 0.08);
+  }
+  .main-nav a {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 5px 6px 4px;
+    gap: 2px;
+  }
+  .main-nav a svg {
+    width: 23px;
+    height: 23px;
+  }
+
+  /* 设置弹窗变底部抽屉 */
+  dialog.settings-sheet {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 92vh;
+    max-height: 92dvh;
+    margin: auto auto 0 auto;
+    border-radius: 22px 22px 0 0;
+    animation: sheet-up 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @keyframes sheet-up {
+    from { opacity: 0.6; transform: translateY(48px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .sheet-grabber {
+    display: block;
+  }
+  .sheet-head {
+    padding-top: 6px;
+  }
+  .sheet-body {
+    padding: 16px 18px calc(20px + env(safe-area-inset-bottom));
+  }
+  /* 弹窗里按钮全宽，好点按 */
+  .sheet-body .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sheet-body .actions button {
+    width: 100%;
+  }
+  .settings-row {
+    min-height: 60px;
+  }
+  .settings-row-value {
+    max-width: 36%;
+  }
+  .form-row {
+    gap: 0;
+  }
+}
+
+/* ---------- 深色模式：跟随系统 ---------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --surface-glass: rgba(28, 28, 30, 0.82);
+    --surface-sub: #2c2c2e;
+    --text: #f5f5f7;
+    --muted: #98989d;
+    --line: rgba(255, 255, 255, 0.14);
+    --primary: #0a84ff;
+    --primary-hover: #409cff;
+    --primary-soft: rgba(10, 132, 255, 0.18);
+    --shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  }
+  .sidebar {
+    background: var(--surface-glass);
+  }
+  .main-nav a {
+    color: #c7c7cc;
+  }
+  .main-nav a:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+  }
+  .segmented {
+    background: rgba(118, 118, 128, 0.28);
+  }
+  .segmented button {
+    color: #c7c7cc;
+  }
+  .segmented button.active {
+    background: #636366;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  }
+  button.secondary {
+    background: rgba(118, 118, 128, 0.28);
+  }
+  button.secondary:hover:not(:disabled) {
+    background: rgba(118, 118, 128, 0.36);
+  }
+  .chip {
+    background: var(--surface);
+    color: #e5e5ea;
+  }
+  .subject-check,
+  .subject-config-panel {
+    background: var(--surface-sub);
+  }
+  .settings-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .settings-row:active {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .settings-chevron {
+    color: #48484a;
+  }
+  .question {
+    background: var(--surface);
+  }
+  dialog#detail {
+    background: var(--surface);
+    color: var(--text);
+  }
+  dialog.settings-sheet {
+    background: #1c1c1e;
+  }
+  .sheet-head {
+    background: rgba(28, 28, 30, 0.88);
+  }
+  input[type="text"],
+  input[type="url"],
+  input[type="password"],
+  input[type="number"],
+  select,
+  textarea,
+  .search {
+    background: #2c2c2e;
+    color: var(--text);
+  }
+  input:focus,
+  select:focus,
+  textarea:focus,
+  .search:focus {
+    background: #2c2c2e;
+  }
+  @media (max-width: 767px) {
+    .sidebar {
+      background: rgba(28, 28, 30, 0.88);
+    }
+    .mobile-topbar {
+      background: rgba(28, 28, 30, 0.82);
+    }
+  }
+}
+
+/* ---------- 打印：试卷不受深色影响 ---------- */
+@media print {
+  .sidebar,
+  .mobile-topbar,
+  #toast {
+    display: none !important;
+  }
+  .container {
+    margin: 0;
+    max-width: none;
+  }
+}
+
+/* v15 补丁：设置行文字纵向排列，弹窗内徽标间距 */
+.settings-row-text { display: flex; flex-direction: column; justify-content: center; }
+.settings-row-title, .settings-row-sub { display: block; }
+.sheet-body .pill { display: inline-block; margin-bottom: 4px; }
+
+/* ============================================================
+   拾题 · UI 优化 v16：去死板，整体更有设计感
+   - 取消各页顶部学情横幅后，页面靠大标题 + 统计条 + 卡片层次撑起
+   - 字号层级：大标题 30 / 卡片标题 19 / 正文 16 / 辅助 13
+   ============================================================ */
+
+/* ---------- 字号与节奏 ---------- */
+body {
+  font-size: 16px;
+  line-height: 1.55;
+}
+.page-head {
+  margin-bottom: 20px;
+  align-items: flex-end;
+}
+.page-head h1 {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+}
+.subtitle {
+  font-size: 15px;
+  line-height: 1.5;
+  margin-top: 5px;
+}
+.card h2 {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.card h3 {
+  font-size: 16px;
+}
+.prose {
+  font-size: 15.5px;
+  line-height: 1.75;
+}
+.section-title {
+  margin: 26px 0 12px;
+}
+.section-title h2 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- 卡片：更轻的边，更柔的影 ---------- */
+.card {
+  border: 0.5px solid var(--line);
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 8px 28px rgba(0, 0, 0, 0.05);
+}
+.card-head {
+  margin-bottom: 16px;
+}
+.capture-card {
+  padding-top: 20px;
+}
+
+/* ---------- 统计：三栏数字条，替代一排小胶囊 ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  background: var(--surface);
+  border: 0.5px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.stat {
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 14px 8px 12px;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.stat + .stat {
+  border-left: 0.5px solid var(--line);
+}
+.stat-icon {
+  display: none;
+}
+.stat strong {
+  order: 1;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.stat small {
+  order: 2;
+  font-size: 12px;
+  color: var(--muted);
+}
+.top-bar-summary {
+  margin-bottom: 18px;
+}
+
+/* ---------- 按钮：主按钮更高更突出，次按钮更克制 ---------- */
+.actions .primary {
+  min-height: 52px;
+  font-size: 16px;
+  border-radius: 16px;
+  flex: 1;
+}
+.actions .secondary {
+  min-height: 52px;
+  border-radius: 16px;
+}
+.page-head .actions {
+  margin: 0;
+}
+.page-head .actions button {
+  min-height: 38px;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 99px;
+  flex: none;
+}
+
+/* 录题主操作：识别 + 手动填表并排 */
+.capture-actions {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+.capture-actions button {
+  width: 100%;
+  min-height: 52px;
+}
+.capture-actions .secondary {
+  flex: none;
+}
+
+/* 重新选图：紧凑的胶囊按钮 */
+.reselect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 9px 18px;
+  border-radius: 99px;
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.25);
+}
+label.upload:has(.reselect-btn) {
+  padding: 12px 14px;
+  border-style: solid;
+  border-color: var(--line);
+  background: var(--surface);
+  flex-direction: row;
+  justify-content: center;
+}
+
+/* ---------- 科目 chips 与筛选 ---------- */
+.chip {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+.filters {
+  gap: 9px;
+  margin: 14px 0;
+}
+.search {
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-size: 15px;
+}
+
+/* ---------- 错题卡片：标题更大，层次更清 ---------- */
+.question {
+  padding: 18px 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 6px 20px rgba(0, 0, 0, 0.04);
+}
+.question h3 {
+  font-size: 16.5px;
+  line-height: 1.6;
+  font-weight: 500;
+}
+.q-meta {
+  margin-bottom: 8px;
+}
+.subject {
+  font-size: 12.5px;
+  padding: 3px 10px;
+  border-radius: 8px;
+}
+
+/* ---------- 裁剪工具栏：4 个等宽图标按钮并排 ---------- */
+.crop-editor {
+  margin-top: 14px;
+  padding: 14px;
+  background: var(--surface-sub);
+  border: 0.5px solid var(--line);
+  border-radius: 18px;
+}
+.crop-tools {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.crop-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 56px;
+  padding: 8px 4px;
+  border: none;
+  border-radius: 13px;
+  background: var(--surface);
+  border: 0.5px solid var(--line);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+.crop-tool:hover {
+  background: rgba(0, 122, 255, 0.06);
+}
+.crop-tool:active {
+  transform: scale(0.96);
+  background: var(--primary-soft);
+}
+.crop-tool .tool-icon {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--primary);
+}
+.crop-rotation {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 6px 0 10px;
+}
+.crop-stage {
+  border-radius: 14px;
+}
+.crop-preview-img {
+  border-radius: 10px;
+}
+
+/* ---------- 裁剪图全屏 lightbox ---------- */
+dialog.image-lightbox {
+  width: min(920px, 96vw);
+  max-height: 92vh;
+  max-height: 92dvh;
+  margin: auto;
+  border: none;
+  border-radius: 20px;
+  padding: 0;
+  background: #000;
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+}
+dialog.image-lightbox::backdrop {
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+}
+dialog.image-lightbox img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 88vh;
+  max-height: 88dvh;
+  object-fit: contain;
+}
+.lightbox-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1c1c1e;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------- 错题弹窗：右上角圆形 X ---------- */
+.detail-close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(120, 120, 128, 0.16);
+  color: #3a3a3c;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s ease;
+}
+.detail-close:hover {
+  background: rgba(120, 120, 128, 0.28);
+}
+.detail-close:active {
+  transform: scale(0.94);
+}
+dialog#detail .card-head {
+  align-items: flex-start;
+}
+
+/* 弹窗底部操作：主按钮突出 */
+dialog#detail .actions .primary {
+  flex: 1;
+}
+
+/* ---------- iPad：内容更舒展 ---------- */
+@media (min-width: 768px) {
+  .container {
+    padding: 36px 36px 80px;
+  }
+  .card {
+    padding: 26px;
+  }
+  .page-head h1 {
+    font-size: 34px;
+  }
+  .capture-actions {
+    grid-template-columns: 1.6fr 1fr;
+    max-width: 560px;
+  }
+}
+
+/* ---------- iPhone ---------- */
+@media (max-width: 767px) {
+  .page-head h1 {
+    font-size: 28px;
+  }
+  .card {
+    padding: 18px 16px;
+    border-radius: 20px;
+  }
+  .stats {
+    border-radius: 16px;
+  }
+  .stat strong {
+    font-size: 21px;
+  }
+  /* 录题主操作在手机上也并排，不换行 */
+  .capture-actions {
+    grid-template-columns: 1.55fr 1fr;
+    gap: 8px;
+  }
+  .capture-actions button {
+    min-height: 50px;
+    font-size: 14px;
+    padding: 10px 6px;
+    white-space: nowrap;
+  }
+  .crop-tool {
+    min-height: 54px;
+    font-size: 12px;
+  }
+  .crop-tool .tool-icon {
+    font-size: 19px;
+  }
+  /* 弹窗底部操作在手机上主按钮全宽 */
+  dialog#detail .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  dialog#detail .actions .primary {
+    grid-column: 1 / -1;
+  }
+  dialog#detail .actions button {
+    width: 100%;
+    min-height: 48px;
+  }
+  dialog.image-lightbox {
+    width: 100vw;
+    max-width: 100vw;
+    border-radius: 0;
+  }
+}
+
+/* ---------- 深色模式补丁 ---------- */
+@media (prefers-color-scheme: dark) {
+  .crop-tool {
+    background: #2c2c2e;
+  }
+  .crop-tool:hover {
+    background: rgba(10, 132, 255, 0.16);
+  }
+  .detail-close {
+    background: rgba(255, 255, 255, 0.14);
+    color: #e5e5ea;
+  }
+  .detail-close:hover {
+    background: rgba(255, 255, 255, 0.22);
+  }
+  label.upload:has(.reselect-btn) {
+    background: var(--surface);
+  }
+}
+
+/* ============================================================
+   拾题 · UI 优化 v17
+   - 删最上端拾题栏后，页面直接以大标题开头
+   - 错题本统计：小字纯文字，黑 / 红 / 绿
+   - 错题弹窗顶栏：科目下拉 · 题号 · ×
+   ============================================================ */
+
+/* 错题本标题后的小字统计：无底框，纯文字 */
+.notebook-head h1 {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.notebook-stats {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.notebook-stats .sep {
+  color: var(--muted);
+  font-weight: 400;
+  margin: 0 2px;
+}
+.notebook-stats b {
+  font-weight: 800;
+}
+.notebook-stats .s-total {
+  color: var(--text);
+}
+.notebook-stats .s-un {
+  color: #ff3b30;
+}
+.notebook-stats .s-done {
+  color: #34c759;
+}
+
+/* 错题弹窗顶栏：科目下拉在左，题号居中偏左，× 在最右 */
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.detail-subject-select {
+  width: auto;
+  min-width: 96px;
+  max-width: 46%;
+  min-height: 38px;
+  padding: 7px 12px;
+  border-radius: 99px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--surface-sub);
+  border: 0.5px solid var(--line);
+  flex-shrink: 0;
+}
+.detail-number {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-head .detail-close {
+  margin-left: auto;
+}
+
+/* 边栏品牌已删，导航直接从顶部开始 */
+.sidebar {
+  padding-top: 28px;
+}
+.main-nav {
+  padding-top: 4px;
+}
+
+/* 移动端：去掉顶栏后，内容顶部留白收紧一点 */
+@media (max-width: 767px) {
+  .container {
+    padding-top: 18px;
+  }
+  .notebook-stats {
+    font-size: 12.5px;
+  }
+  .notebook-head .actions {
+    margin-top: 10px;
+  }
+  .detail-subject-select {
+    max-width: 52%;
+  }
+}
+
+/* 深色模式：累计错题用正文色（白），红绿保持 */
+@media (prefers-color-scheme: dark) {
+  .notebook-stats .s-total {
+    color: #f5f5f7;
+  }
+  .notebook-stats .s-un {
+    color: #ff6961;
+  }
+  .notebook-stats .s-done {
+    color: #30d158;
+  }
+}
+
+/* ============================================================
+   拾题 · UI 优化 v18
+   - 手动填表弹窗、识别原文框与图同高、来源进题号栏
+   ============================================================ */
+
+/* 错题弹窗顶栏：来源跟在题号后面，超出省略，不占正文面积 */
+.detail-source {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 34%;
+  flex-shrink: 1;
+}
+
+/* 手动填表弹窗：iPad 居中，iPhone 底部抽屉 */
+dialog.draft-dialog {
+  width: min(680px, calc(100vw - 32px));
+  max-height: 88vh;
+  max-height: 88dvh;
+  margin: auto;
+  border: none;
+  border-radius: 22px;
+  padding: 22px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  animation: sheet-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+dialog.draft-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+dialog.draft-dialog .card-head {
+  align-items: flex-start;
+}
+dialog.draft-dialog .actions .primary {
+  flex: 2;
+}
+
+/* 识别原文框：默认至少 180px 高，JS 再按图片高度与内容撑满 */
+.paper-textarea {
+  min-height: 180px;
+  line-height: 1.7;
+  font-size: 15.5px;
+  resize: vertical;
+}
+
+/* 框选图可点全屏 */
+#paper-crop-img {
+  transition: opacity 0.15s ease;
+}
+#paper-crop-img:active {
+  opacity: 0.85;
+}
+
+@media (max-width: 767px) {
+  dialog.draft-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 92vh;
+    max-height: 92dvh;
+    margin: auto auto 0 auto;
+    border-radius: 22px 22px 0 0;
+    padding: 18px 18px calc(20px + env(safe-area-inset-bottom));
+    animation: sheet-up 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  dialog.draft-dialog .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  dialog.draft-dialog .actions .primary {
+    grid-column: 1 / -1;
+  }
+  .detail-source {
+    max-width: 30%;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  dialog.draft-dialog {
+    background: #1c1c1e;
+  }
+}
+
+/* ============================================================
+   拾题 · UI 优化 v19
+   - OCR 识别结果弹窗、悬浮毛玻璃 Tab 栏、练习 Tab 拆分
+   ============================================================ */
+
+/* OCR 识别结果弹窗：iPad 居中，iPhone 底部抽屉 */
+dialog.paper-dialog {
+  width: min(720px, calc(100vw - 24px));
+  max-height: 92vh;
+  max-height: 92dvh;
+  margin: auto;
+  border: none;
+  border-radius: 22px;
+  padding: 0;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  overflow: auto;
+  animation: sheet-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+dialog.paper-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+dialog.paper-dialog .card {
+  margin: 0;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+dialog.paper-dialog .card-head {
+  padding-right: 44px;
+}
+.paper-dialog-close-wrap {
+  position: sticky;
+  top: 0;
+  height: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: flex-end;
+  padding-right: 12px;
+}
+.paper-dialog-close-wrap .detail-close {
+  margin-top: 12px;
+}
+#open-paper {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* 手机端：底部 Tab 栏改悬浮毛玻璃（对标苹果浮动标签栏） */
+@media (max-width: 767px) {
+  .sidebar {
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    width: auto;
+    border: 0.5px solid rgba(0, 0, 0, 0.08);
+    border-radius: 26px;
+    background: rgba(255, 255, 255, 0.72);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
+    padding: 6px 8px;
+  }
+  .main-nav a {
+    font-size: 10.5px;
+    padding: 5px 4px;
+  }
+  .main-nav a svg {
+    width: 21px;
+    height: 21px;
+  }
+  /* 练习难度与生成数量：手机端也保持同一行 */
+  .form-row.variant-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  dialog.paper-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 92vh;
+    max-height: 92dvh;
+    margin: auto auto 0 auto;
+    border-radius: 22px 22px 0 0;
+    animation: sheet-up 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}
+
+@media (max-width: 767px) and (prefers-color-scheme: dark) {
+  .sidebar {
+    background: rgba(28, 28, 30, 0.72);
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  dialog.paper-dialog {
+    background: #1c1c1e;
+  }
+}

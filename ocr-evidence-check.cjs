@@ -1,0 +1,40 @@
+const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+(async()=>{
+ const c={assert,console,AbortSignal,TextEncoder,TextDecoder,setTimeout,clearTimeout,crypto:globalThis.crypto,location:{hash:'#capture'},localStorage:{getItem:()=>null},sessionStorage:{getItem:()=>null},window:{addEventListener(){}},document:{querySelector:()=>null}};
+ vm.createContext(c);for(const file of ['crop.js','ocr-layout.js','paper.js','baidu.js','app.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8').replace(/window\.addEventListener\('hashchange',\s*render\);\s*boot\(\);\s*$/,''),c);
+ await vm.runInContext(`(async()=>{
+   const block=(words,left,top,width=80,height=20)=>({words,location:{left,top,width,height}});
+   const blocks=[block('注视',230,70),block('B.曾经',10,110),block('苍绳',120,70),block('A.打滚',10,70),block('题干（',10,20),block('A',125,21,10,18),block('）',145,20)];
+   const before=JSON.stringify(blocks),layout=arrangeOCRLines(blocks);
+   assert.equal(layout.text,'题干（　A　）\\nA.打滚　苍绳　注视\\nB.曾经');assert.equal(JSON.stringify(blocks),before);
+   assert.ok(layout.text.includes('苍绳'));assert.ok(!layout.text.includes('苍蝇'),'must never correct original typo');
+   const mixed=[block('印刷拼音',10,30),block('手写订正',80,12,45,10)];assert.equal(arrangeOCRLines(mixed).rows.length,2);
+   assert.equal(arrangeOCRLines([{words:'A'},{words:')'}]).located,false);
+   assert.equal(arrangeOCRLines([{words:'A'},{words:')'}]).text,'A\\n)');
+   const q=normalizeOCR({items:[{section:'框选题目',number:'1',text:'选择正确的一项（A）\\nA.原卷错字',studentAnswer:'A'}]})[0];
+   assert.equal(q.verified,false);assert.equal(q.answerStatus,'unknown');
+   paper={scope:'crop',subject:'语文',items:[q],warnings:[],mistake:''};q.selected=true;
+   assert.throws(()=>selectedPaper(),/核对/);q.verified=true;progress=()=>{};
+   let seen;ai=async prompt=>{seen=prompt;return {answer:'B',analysis:'解题步骤',status:'incorrect',aiVerdict:'审题偏差',tags:[]}};
+   assert.equal(await analyzeSelectedItems(),0);assert.ok(seen.includes('没有看到原始试卷图片'));assert.ok(seen.includes('不能说孩子答错'));assert.equal(q.diagnosisStatus,'unknown');assert.equal(q.aiVerdict,'未判定');
+   q.answerStatus='confirmed';q.studentAnswer='A';invalidatePaperEvidence(q);assert.equal(q.verified,false);q.verified=true;
+   assert.equal(await analyzeSelectedItems(),0);assert.equal(q.diagnosisStatus,'incorrect');assert.equal(q.aiVerdict,'审题偏差');
+   q.text='下列加点字读音正确的一项';invalidatePaperEvidence(q);q.verified=true;assert.equal(await analyzeSelectedItems(),1);assert.match(q.error,/视觉信息/);
+   q.visualFeatures='加点字为每组第一词的第一个字';assert.equal(await analyzeSelectedItems(),0);
+   q.answerStatus='unanswered';invalidatePaperEvidence(q);q.verified=true;assert.equal(await analyzeSelectedItems(),0);assert.equal(q.diagnosisStatus,'unknown');
+   q.answerStatus='confirmed';q.studentAnswer='';invalidatePaperEvidence(q);q.verified=true;assert.equal(await analyzeSelectedItems(),1);assert.match(q.error,/填写/);
+   q.studentAnswer='第1空：孩子写的字';q.annotation='蓝色订正，作者未知';q.verified=true;persist=async next=>{data=next};await saveSelectedItems();
+   assert.equal(data.questions[0].studentAnswer,q.studentAnswer);assert.equal(data.questions[0].annotation,'蓝色订正，作者未知');assert.equal(data.questions[0].evidenceVerified,true);
+ })()`,c);
+ const {createOCRService}=await import('./proxy/worker.mjs');let upstream=0;
+ const service=createOCRService(async(url,o)=>{
+  if(url.endsWith('/token'))return Response.json({access_token:'test',expires_in:3600});upstream++;
+  assert.ok(url.includes('/ocr/v1/accurate?'));assert.equal(o.body.get('recognize_granularity'),'small');
+  return Response.json({words_result:[{words:'原卷错字',location:{top:1,left:2,width:40,height:20},chars:[{char:'原'}]}],direction:0});
+ });
+ const env={ALLOWED_ORIGIN:'https://shiti.86518925.xyz',OCR_PROXY_TOKEN:'test-access-token-longer-than-24',BAIDU_API_KEY:'test',BAIDU_SECRET_KEY:'test'};
+ const req=mode=>new Request('https://ocr.example/api/ocr',{method:'POST',headers:{Origin:env.ALLOWED_ORIGIN,'Content-Type':'application/json','X-OCR-Token':env.OCR_PROXY_TOKEN},body:JSON.stringify({image:'data:image/png;base64,Q1JPUA==',mode})});
+ const r=await service(req('accurate'),env),j=await r.json();assert.equal(j.words_result[0].location.left,2);assert.equal(j.words_result[0].chars[0].char,'原');assert.equal(j.direction,0);assert.equal(j.mode,'accurate');assert.equal(upstream,1);
+ assert.equal((await service(req('arbitrary-url'),env)).status,400);assert.equal(upstream,1);
+ console.log('Passed: coordinate row order, literal typo preservation, no handwriting guessing, mandatory confirmation, no unsupported diagnosis, visual-information gate, separated saved evidence, accurate endpoint/coordinates, no retry.');
+})().catch(e=>{console.error(e);process.exitCode=1});

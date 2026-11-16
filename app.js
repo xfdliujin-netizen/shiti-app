@@ -7,7 +7,7 @@ function generateId() {
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '\x26amp;', '<': '\x26lt;', '>': '\x26gt;', '"': '\x26quot;', "'": '\x26#39;' }[c]));
 const subjects = ['语文', '数学', '英语', '物理', '化学', '生物', '历史', '地理', '政治', '科学', '其他'];
-const aiVerdictTags = ['概念混淆', '审题偏差', '计算粗心', '知识盲区', '书写规范', '思路受阻', '薄弱待练', '巩固良好'];
+const aiVerdictTags = ['未判定', '概念混淆', '审题偏差', '计算粗心', '知识盲区', '书写规范', '思路受阻', '薄弱待练', '巩固良好'];
 const stageConfig = {
   primary: {
     name: '小学',
@@ -53,9 +53,10 @@ const paths = [
   '<path d="M12 5v14M5 12h14"/>',
   '<path d="M4 4h6a3 3 0 0 1 2 2 3 3 0 0 1 2-2h6v15h-6a3 3 0 0 0-2 2 3 3 0 0 0-2-2H4z"/>',
   '<path d="m13 2-9 12h7l-1 8 10-12h-7z"/>',
+  '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h4"/><path d="M10 12h5M10 16h5"/>',
   '<circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/>'
 ];
-const tabs = [['capture', '录题'], ['notebook', '错题本'], ['practice', '练习'], ['settings', '设置']];
+const tabs = [['capture', '录题'], ['notebook', '错题本'], ['variants', '举一反三'], ['exam', '试卷'], ['settings', '设置']];
 
 let data = { version: 1, questions: [], practices: [], deleted: {} },
     cfg = readConfig(),
@@ -79,6 +80,9 @@ let data = { version: 1, questions: [], practices: [], deleted: {} },
     editingId = null,
     selectedPracticeId = '',
     showSubjectConfig = false,
+    openSheet = null,
+    openDraftOnRender = false,
+    openPaperOnRender = false,
     currentSubject = cfg.lastSubject || '语文',
     currentSource = '',
     currentMistake = '';
@@ -203,7 +207,7 @@ function toast(s) {
 function uid() { return generateId(); }
 function stamp() { return new Date().toISOString(); }
 function date(s) { return new Date(s).toLocaleDateString('zh-CN'); }
-function current() { return tabs.some(t => t[0] === location.hash.slice(1)) ? location.hash.slice(1) : 'capture'; }
+function current() { const h = location.hash.slice(1); if (h === 'practice') return 'variants'; return tabs.some(t => t[0] === h) ? h : 'capture'; }
 function opts(selected) { return subjects.map(s => `<option ${s === selected ? 'selected' : ''}>${s}</option>`).join(''); }
 function field(label, id, value = '', type = 'text', placeholder = '') {
   return `<label class="field"><span>${label}</span><input id="${id}" type="${type}" value="${esc(value)}" placeholder="${placeholder}"></label>`;
@@ -225,16 +229,8 @@ function inferAiVerdict(q) {
 }
 
 function renderStageBanner() {
-  const p = getStudentProfile();
-  const st = stageConfig[p.stage];
-  return `<div class="stage-banner">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <span class="stage-badge">🎓 ${esc(p.stageName)} · ${esc(p.grade)}</span>
-      <span style="font-size:13px;font-weight:600;color:var(--text)">📍 ${esc(p.region.split('（')[0])}</span>
-      <span style="font-size:12px;color:var(--muted)">${esc(st.desc)}</span>
-    </div>
-    <a href="#settings" class="text-button" style="font-size:12px;font-weight:600">⚙️ 切换年级/地区 →</a>
-  </div>`;
+  // v16：各页顶部的学情横幅已取消（年级/地区只在设置页改，AI 仍用 getStudentProfile）。
+  return '';
 }
 
 function renderSubjectConfigModal() {
@@ -254,14 +250,29 @@ function renderSubjectConfigModal() {
 function render() {
   injectCustomStyles();
   const tab = current();
+  const paperWasOpen = !!document.getElementById('paper-dialog')?.open;
   const p = getStudentProfile();
   if ($('#nav')) {
     $('#nav').innerHTML = tabs.map((t, i) => `<a href="#${t[0]}" class="${tab === t[0] ? 'active' : ''}" ${tab === t[0] ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${paths[i]}</svg><span>${t[1]}</span></a>`).join('');
   }
   if ($('#breadcrumb')) $('#breadcrumb').textContent = `${p.stageName}（${p.grade}） / ` + tabs.find(t => t[0] === tab)[1];
-  const mobileBar = `<div class="mobile-topbar"><a class="brand" href="#capture"><span class="logo">拾</span><span class="brand-name">拾题</span><span style="font-size:11px;padding:2px 7px;border-radius:99px;background:rgba(0,122,255,0.1);color:var(--primary);margin-left:6px">${esc(p.grade)}</span></a><span style="font-size:13px;color:var(--muted);font-weight:600">${tabs.find(t => t[0] === tab)[1]}</span></div>`;
-  $('#main').innerHTML = mobileBar + ({ capture, notebook, practice: practicePage, settings })[tab]();
+  const mobileBar = '';
+  $('#main').innerHTML = mobileBar + ({ capture, notebook, variants: variantsPage, exam: examPage, settings })[tab]();
   bind(tab);
+  if (tab === 'capture' && draft && openDraftOnRender) {
+    openDraftOnRender = false;
+    const dlg = document.getElementById('draft-dialog');
+    if (dlg && !dlg.open) { try { dlg.showModal(); } catch {} }
+  }
+  if (tab === 'capture' && paper && (paperWasOpen || openPaperOnRender)) {
+    openPaperOnRender = false;
+    const dlg = document.getElementById('paper-dialog');
+    if (dlg && !dlg.open) { try { dlg.showModal(); } catch {} }
+  }
+  if (tab === 'settings' && openSheet) {
+    const dlg = document.getElementById('sheet-' + openSheet);
+    if (dlg && !dlg.open) { try { dlg.showModal(); } catch {} }
+  }
 }
 
 function stats() {
@@ -292,7 +303,6 @@ function capture() {
   const quickSubjects = getQuickSubjects();
   const displaySubjects = quickSubjects.includes(currentSubject) ? quickSubjects : [...quickSubjects, currentSubject];
   const hasBaidu = typeof usesBaidu === 'function' ? usesBaidu() : false;
-  const pProg = typeof paperProgress !== 'undefined' ? paperProgress : '';
   const rScope = typeof recognitionScope !== 'undefined' ? recognitionScope : 'crop';
   const pLayout = typeof paperLayout !== 'undefined' ? paperLayout : '2';
   const uText = typeof usageText === 'function' ? usageText() : '';
@@ -300,8 +310,7 @@ function capture() {
   const cView = typeof cropView === 'function' && image ? cropView() : '';
 
   return `${renderStageBanner()}
-    <div class="top-bar-summary">${stats()}</div>
-    <section class="card">
+    <section class="card capture-card">
       <div class="card-head">
         <h2>录入新错题</h2>
         <span class="pill">${hasBaidu ? '百度高精度 OCR' : '✧ DeepSeek AI'}</span>
@@ -316,25 +325,18 @@ function capture() {
 
       ${renderSubjectConfigModal()}
 
-      <div class="segmented">
-        <button data-mode="image" class="${mode === 'image' ? 'active' : ''}">▧ 拍照 / 选图识别</button>
-        <button data-mode="text" class="${mode === 'text' ? 'active' : ''}">☷ 直接输入文字</button>
-      </div>
-
       <div id="capture-input">
         ${mode === 'image'
           ? `<label class="upload" id="drop" style="${image ? 'padding:10px 14px;flex-direction:row;justify-content:space-between' : ''}">
               <input id="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
               ${image
-                ? `<span>✓ 已载入试卷图片（拖动蓝框选定题目）</span><small style="color:var(--primary);font-weight:600">重新选图</small>`
+                ? `<span class="reselect-btn">↻ 重新选图</span>`
                 : '<span class="upload-icon">↥</span><b>点击拍照或选择试卷图片</b><small>支持手机原图自动压缩 · 框选后秒级识别</small>'}
             </label>${cView}`
           : '<textarea id="question-text" class="tall" placeholder="在这里粘贴或输入完整题目，包含题干和选项……"></textarea>'}
       </div>
 
-      <div id="paper-progress" class="result-note" role="status" style="margin-top:10px;font-weight:600;${pProg ? '' : 'display:none'}">${esc(pProg)}</div>
-
-      <div class="actions" style="margin-top:14px">
+      <div class="actions capture-actions">
         <button class="primary" id="analyze">✧ 识别框内文字</button>
         <button class="secondary" id="manual">手动填表</button>
       </div>
@@ -354,7 +356,7 @@ function capture() {
       </details>
     </section>
 
-    <div id="paper-area">${pView}</div>
+    <div id="paper-area">${paper ? `<dialog id="paper-dialog" class="paper-dialog"><div class="paper-dialog-close-wrap"><button type="button" class="detail-close" id="paper-dialog-close" aria-label="关闭">×</button></div>${pView}</dialog><button type="button" class="secondary" id="open-paper">📄 查看识别结果 · ${paper.items.length} 题</button>` : ''}</div>
     <div id="draft-area">${draft ? draftForm() : ''}</div>
 
     <div class="section-title"><h2>最近收录</h2><a class="text-button" href="#notebook">查看全部 (${data.questions.length}) →</a></div>
@@ -362,10 +364,10 @@ function capture() {
 }
 
 function draftForm() {
-  return `<section class="card" style="border:1.5px solid rgba(0,122,255,0.25)">
+  return `<dialog id="draft-dialog" class="draft-dialog">
     <div class="card-head">
       <h2>${editingId ? '编辑错题内容' : '手动填表整理'}</h2>
-      <button type="button" class="secondary" id="cancel-draft-top" style="padding:6px 14px;font-size:13px">取消</button>
+      <button type="button" class="detail-close" id="cancel-draft-top" aria-label="取消">×</button>
     </div>
     <div class="form-row">
       <label class="field"><span>所属学科</span><select id="draft-subject">${opts(draft.subject || currentSubject)}</select></label>
@@ -378,7 +380,7 @@ function draftForm() {
       <button class="primary" id="save-draft" style="flex:2">✓ 确认，保存到错题本</button>
       <button type="button" class="secondary" id="cancel-draft" style="flex:1">取消</button>
     </div>
-  </section>`;
+  </dialog>`;
 }
 
 function notebook() {
@@ -390,9 +392,11 @@ function notebook() {
   const usedVerdicts = [...new Set(data.questions.map(q => inferAiVerdict(q)))];
   const verdictOptions = ['全部', ...aiVerdictTags.filter(v => usedVerdicts.includes(v) || ['概念混淆', '审题偏差', '计算粗心', '薄弱待练'].includes(v))];
 
+  const nbTotal = data.questions.length;
+  const nbUnmastered = data.questions.filter(q => !q.mastered).length;
+  const nbMastered = nbTotal - nbUnmastered;
   return renderStageBanner() +
-    heading('MY NOTEBOOK', '错题本', '按常用科目与 AI 诊断标签精准回顾。', `<div class="actions" style="margin:0"><button class="primary" id="goto-exam" style="padding:8px 14px;font-size:13px">📄 整理成试卷</button><button class="secondary" id="sample" style="padding:8px 14px;font-size:13px">体验示例题</button></div>`) +
-    stats() +
+    `<div class="page-head notebook-head"><div><h1>错题本 <span class="notebook-stats"><span class="s-total">累计错题 <b>${nbTotal}</b></span><span class="sep"> · </span><span class="s-un">待巩固 <b>${nbUnmastered}</b></span><span class="sep"> · </span><span class="s-done">已掌握 <b>${nbMastered}</b></span></span></h1><p class="subtitle">按常用科目与 AI 诊断标签精准回顾。</p></div><div class="actions" style="margin:0"><button class="primary" id="goto-exam" style="padding:8px 14px;font-size:13px">📄 整理成试卷</button><button class="secondary" id="sample" style="padding:8px 14px;font-size:13px">体验示例题</button></div></div>` +
     `<input class="search" id="search" aria-label="搜索错题" placeholder="⌕ 搜索题干、编号、知识点、错因标签…" value="${esc(query)}">` +
     `<div class="filters" style="align-items:center">
       ${['全部', ...displaySubjects, '待巩固', '已掌握'].map(s => `<button class="chip ${filter === s ? 'active' : ''}" data-filter="${s}">${s}</button>`).join('')}
@@ -428,92 +432,102 @@ function getPracticeSubjectOptions() {
   return ['全部', ...quick];
 }
 
-function practicePage() {
-  const p = getStudentProfile();
-  const subjList = getPracticeSubjectOptions();
-  if (!subjList.includes(practiceSubject)) practiceSubject = '全部';
+function variantsPage() {
+const p = getStudentProfile();
+const subjList = getPracticeSubjectOptions();
+if (!subjList.includes(practiceSubject)) practiceSubject = '全部';
 
-  const usedVerdicts = [...new Set(data.questions.map(q => inferAiVerdict(q)))];
-  const pracVerdictOptions = ['全部', ...aiVerdictTags.filter(v => usedVerdicts.includes(v) || ['概念混淆', '审题偏差', '计算粗心', '薄弱待练'].includes(v))];
+const usedVerdicts = [...new Set(data.questions.map(q => inferAiVerdict(q)))];
+const pracVerdictOptions = ['全部',...aiVerdictTags.filter(v => usedVerdicts.includes(v) || ['概念混淆', '审题偏差', '计算粗心', '薄弱待练'].includes(v))];
 
-  const filteredQuestions = data.questions
-    .filter(q => (practiceSubject === '全部' || q.subject === practiceSubject) && (practiceAiFilter === '全部' || inferAiVerdict(q) === practiceAiFilter))
-    .sort((a, b) => b.created.localeCompare(a.created));
+const filteredQuestions = data.questions
+.filter(q => (practiceSubject === '全部' || q.subject === practiceSubject) && (practiceAiFilter === '全部' || inferAiVerdict(q) === practiceAiFilter))
+.sort((a, b) => b.created.localeCompare(a.created));
 
-  const examSubjList = ['全部', ...getQuickSubjects()];
-  if (!examSubjList.includes(examSubject)) examSubject = '全部';
-  const countOptions = examMode === 'original' ? [5, 10, 15, 20] : [3, 5, 8, 10];
-  if (!countOptions.includes(examCount)) examCount = examMode === 'original' ? 10 : 5;
+return renderStageBanner() +
+heading('TRANSFER & GROW', '举一反三', `紧扣考纲，举一反三检验掌握情况。`) + `
+<section class="card">
+<div class="card-head">
+<h2>开始举一反三（单题突破）</h2>
+<span class="pill">✧ AI 变式 + 智能批改</span>
+</div>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+<span style="font-size:13px;font-weight:600;color:var(--muted)">科目：</span>
+${subjList.map(s => `<button type="button" class="chip ${practiceSubject === s? 'active': ''}" data-prac-subj="${s}" style="padding:5px 12px;font-size:13px">${s}</button>`).join('')}
+<button type="button" class="chip-gear" id="toggle-subj-cfg" title="自定义常用科目">⚙️ 科目</button>
+</div>
+${renderSubjectConfigModal()}
+<div class="sub-filter-bar" style="margin-top:4px;margin-bottom:12px">
+<span style="font-size:12px;font-weight:700;color:var(--muted)">🤖 按 AI 判定标签筛题：</span>
+${pracVerdictOptions.map(v => `<button type="button" class="chip ${practiceAiFilter === v? 'active': ''}" data-prac-ai="${v}" style="padding:3px 10px;font-size:12px">${v}</button>`).join('')}
+</div>
+<label class="field">
+<span>选择一道错题（当前筛选下共 ${filteredQuestions.length} 题）</span>
+<select id="practice-source">
+<option value="">${filteredQuestions.length? '请选择错题…': '当前筛选下暂无错题'}</option>
+${filteredQuestions.map(q => `<option value="${esc(q.id)}" ${q.id === selectedPracticeId? 'selected': ''}>[${esc(inferAiVerdict(q))}] #${esc(q.number)} · ${esc(q.subject)} · ${esc(q.text.slice(0, 48))}</option>`).join('')}
+</select>
+</label>
+<div class="form-row variant-row">
+<label class="field"><span>练习难度</span><select id="difficulty"><option>基础巩固</option><option>同等难度</option><option>进阶挑战</option></select></label>
+<label class="field"><span>生成数量</span><select id="count"><option value="1">1 题</option><option value="3">3 题</option></select></label>
+</div>
+<div class="actions" style="margin-top:22px">
+<button class="primary" id="generate" style="flex:1">✧ 生成变式练习</button>
+</div>
+</section>
 
-  return renderStageBanner() +
-    heading('TRANSFER & GROW', '变式练习与智能组卷', `紧扣【${p.stageName} · ${p.grade}】考纲，举一反三检验掌握情况。`) + `
-    <section class="card">
-      <div class="card-head">
-        <h2>开始举一反三（单题突破）</h2>
-        <span class="pill">✧ AI 变式 + 智能批改</span>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
-        <span style="font-size:13px;font-weight:600;color:var(--muted)">科目：</span>
-        ${subjList.map(s => `<button type="button" class="chip ${practiceSubject === s ? 'active' : ''}" data-prac-subj="${s}" style="padding:5px 12px;font-size:13px">${s}</button>`).join('')}
-        <button type="button" class="chip-gear" id="toggle-subj-cfg" title="自定义常用科目">⚙️ 科目</button>
-      </div>
-      ${renderSubjectConfigModal()}
-      <div class="sub-filter-bar" style="margin-top:4px;margin-bottom:12px">
-        <span style="font-size:12px;font-weight:700;color:var(--muted)">🤖 按 AI 判定标签筛题：</span>
-        ${pracVerdictOptions.map(v => `<button type="button" class="chip ${practiceAiFilter === v ? 'active' : ''}" data-prac-ai="${v}" style="padding:3px 10px;font-size:12px">${v}</button>`).join('')}
-      </div>
-      <label class="field">
-        <span>选择一道错题（当前筛选下共 ${filteredQuestions.length} 题）</span>
-        <select id="practice-source">
-          <option value="">${filteredQuestions.length ? '请选择错题…' : '当前筛选下暂无错题'}</option>
-          ${filteredQuestions.map(q => `<option value="${esc(q.id)}" ${q.id === selectedPracticeId ? 'selected' : ''}>[${esc(inferAiVerdict(q))}] #${esc(q.number)} · ${esc(q.subject)} · ${esc(q.text.slice(0, 48))}</option>`).join('')}
-        </select>
-      </label>
-      <div class="form-row">
-        <label class="field"><span>练习难度</span><select id="difficulty"><option>基础巩固</option><option>同等难度</option><option>进阶挑战</option></select></label>
-        <label class="field"><span>生成数量</span><select id="count"><option value="1">1 题</option><option value="3">3 题</option></select></label>
-      </div>
-      <button class="primary" id="generate">✧ 生成变式练习</button>
-    </section>
+<div id="exercise">${practice? exercise(): ''}</div>
 
-    <div id="exercise">${practice ? exercise() : ''}</div>
+<div class="section-title"><h2>练习记录</h2><span class="text-button">${data.practices.length} 次练习</span></div>
+${data.practices.slice().reverse().slice(0, 20).map(p => `<div class="card"><div class="q-meta"><span>${date(p.created)}</span><span>原题 #${esc(p.number)}</span>${p.aiStatus? `<span class="ai-verdict-chip ${p.aiStatus.includes('正确') &&!p.aiStatus.includes('部分')? 'good': 'bad'}">🤖 ${esc(p.aiStatus)}</span>`: ''}<span>${esc(p.rating)}</span></div><p class="prose">${esc(p.text)}</p><details><summary>查看作答与 AI 批改解析</summary><p class="prose">我的作答：${esc(p.response || '未填写')}${p.aiFeedback? `\n\n🤖 AI 点评：${esc(p.aiFeedback)}`: ''}\n\n答案：${esc(p.answer)}\n\n解析：${esc(p.analysis)}</p></details></div>`).join('') || '<div class="empty">练习后，你的作答、AI 判定和自评会保存在这里。</div>'}`;
+}
 
-    <section class="card" id="exam-builder" style="border:1.5px solid rgba(0,122,255,0.2)">
-      <div class="card-head">
-        <h2>📄 整理成试卷（周测 / 考前巩固）</h2>
-        <span class="pill">支持打印 / 存 PDF</span>
-      </div>
-      <div class="segmented" style="margin-bottom:12px">
-        <button type="button" data-exam-mode="original" class="${examMode === 'original' ? 'active' : ''}">📋 整理错题成试卷（原题重练）</button>
-        <button type="button" data-exam-mode="ai" class="${examMode === 'ai' ? 'active' : ''}">✧ AI 扩展训练卷（同考点新题）</button>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-        <span style="font-size:13px;font-weight:600;color:var(--muted)">试卷科目：</span>
-        ${examSubjList.map(s => `<button type="button" class="chip ${examSubject === s ? 'active' : ''}" data-exam-subj="${s}" style="padding:5px 12px;font-size:13px">${s}</button>`).join('')}
-      </div>
-      <div class="form-row">
-        <label class="field">
-          <span>选题范围</span>
-          <select id="exam-scope">
-            <option value="unmastered" ${examScope === 'unmastered' ? 'selected' : ''}>仅「待巩固」错题（推荐）</option>
-            <option value="all" ${examScope === 'all' ? 'selected' : ''}>全部错题（含已掌握）</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>试卷题量（参照黄金练习时长）</span>
-          <select id="exam-count">
-            ${countOptions.map(n => `<option value="${n}" ${examCount === n ? 'selected' : ''}>${n} 题${n === 10 && examMode === 'original' ? '（标准周测 · 约20分钟）' : n === 5 && examMode === 'ai' ? '（推荐 · 约15分钟）' : ''}</option>`).join('')}
-          </select>
-        </label>
-      </div>
-      <p class="notice" style="margin-bottom:12px">${examMode === 'original' ? '从错题本中按最近录入与待巩固优先级抽取原题，自动隐藏答案与批改痕迹，适合打印重做。' : `基于错题本薄弱知识点，结合【${p.stageName} · ${p.grade} · ${p.region.split('（')[0]}】考纲批量命制全新变式考题。`}</p>
-      <button class="primary" id="build-exam">📄 立即生成试卷</button>
-    </section>
+// practicePage 保留为别名（自检 check.cjs 会调用它）
+function practicePage() { return variantsPage();}
 
-    <div id="exam-area">${examSheet ? renderExamSheet() : ''}</div>
+function examPage() {
+const p = getStudentProfile();
+const examSubjList = ['全部',...getQuickSubjects()];
+if (!examSubjList.includes(examSubject)) examSubject = '全部';
+const countOptions = examMode === 'original'? [5, 10, 15, 20]: [3, 5, 8, 10];
+if (!countOptions.includes(examCount)) examCount = examMode === 'original'? 10: 5;
 
-    <div class="section-title"><h2>练习记录</h2><span class="text-button">${data.practices.length} 次练习</span></div>
-    ${data.practices.slice().reverse().slice(0, 20).map(p => `<div class="card"><div class="q-meta"><span>${date(p.created)}</span><span>原题 #${esc(p.number)}</span>${p.aiStatus ? `<span class="ai-verdict-chip ${p.aiStatus.includes('正确') && !p.aiStatus.includes('部分') ? 'good' : 'bad'}">🤖 ${esc(p.aiStatus)}</span>` : ''}<span>${esc(p.rating)}</span></div><p class="prose">${esc(p.text)}</p><details><summary>查看作答与 AI 批改解析</summary><p class="prose">我的作答：${esc(p.response || '未填写')}${p.aiFeedback ? `\n\n🤖 AI 点评：${esc(p.aiFeedback)}` : ''}\n\n答案：${esc(p.answer)}\n\n解析：${esc(p.analysis)}</p></details></div>`).join('') || '<div class="empty">练习后，你的作答、AI 判定和自评会保存在这里。</div>'}`;
+return renderStageBanner() +
+heading('EXAM & REVIEW', '整理成试卷', '按待巩固优先级抽取原题重练，或让 AI 围绕薄弱点命制全新训练卷。') + `
+<section class="card" id="exam-builder" style="border:1.5px solid rgba(0,122,255,0.2)">
+<div class="card-head">
+<h2>📄 整理成试卷（周测 / 考前巩固）</h2>
+<span class="pill">支持打印 / 存 PDF</span>
+</div>
+<div class="segmented" style="margin-bottom:12px">
+<button type="button" data-exam-mode="original" class="${examMode === 'original'? 'active': ''}">📋 整理错题成试卷（原题重练）</button>
+<button type="button" data-exam-mode="ai" class="${examMode === 'ai'? 'active': ''}">✧ AI 扩展训练卷（同考点新题）</button>
+</div>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+<span style="font-size:13px;font-weight:600;color:var(--muted)">试卷科目：</span>
+${examSubjList.map(s => `<button type="button" class="chip ${examSubject === s? 'active': ''}" data-exam-subj="${s}" style="padding:5px 12px;font-size:13px">${s}</button>`).join('')}
+</div>
+<div class="form-row">
+<label class="field">
+<span>选题范围</span>
+<select id="exam-scope">
+<option value="unmastered" ${examScope === 'unmastered'? 'selected': ''}>仅「待巩固」错题（推荐）</option>
+<option value="all" ${examScope === 'all'? 'selected': ''}>全部错题（含已掌握）</option>
+</select>
+</label>
+<label class="field">
+<span>试卷题量（参照黄金练习时长）</span>
+<select id="exam-count">
+${countOptions.map(n => `<option value="${n}" ${examCount === n? 'selected': ''}>${n} 题${n === 10 && examMode === 'original'? '（标准周测 · 约20分钟）': n === 5 && examMode === 'ai'? '（推荐 · 约15分钟）': ''}</option>`).join('')}
+</select>
+</label>
+</div>
+<p class="notice" style="margin-bottom:12px">${examMode === 'original'? '从错题本中按最近录入与待巩固优先级抽取原题，自动隐藏答案与批改痕迹，适合打印重做。': `基于错题本薄弱知识点，结合考纲批量命制全新变式考题。`}</p>
+<button class="primary" id="build-exam">📄 立即生成试卷</button>
+</section>
+
+<div id="exam-area">${examSheet? renderExamSheet(): ''}</div>`;
 }
 
 function renderExamSheet() {
@@ -579,21 +593,88 @@ function exercise() {
   </section>`).join('');
 }
 
+function closeSettingsSheet() {
+  if (!openSheet) return;
+  const dlg = document.getElementById('sheet-' + openSheet);
+  openSheet = null;
+  if (dlg && dlg.open) dlg.close();
+}
+
+function settingsRow(sheet, icon, cls, title, sub, value) {
+  return `<button type="button" class="settings-row" data-open-sheet="${sheet}">
+    <span class="settings-icon ${cls}">${icon}</span>
+    <span class="settings-row-text">
+      <span class="settings-row-title">${title}</span>
+      ${sub ? `<span class="settings-row-sub">${sub}</span>` : ''}
+    </span>
+    ${value ? `<span class="settings-row-value">${esc(value)}</span>` : ''}
+    <span class="settings-chevron">\u203a</span>
+  </button>`;
+}
+
+function settingsSheet(id, title, lead, inner) {
+  return `<dialog class="settings-sheet" id="sheet-${id}">
+    <div class="sheet-grabber"></div>
+    <div class="sheet-head">
+      <button type="button" class="sheet-close" data-close-sheet>\u53d6\u6d88</button>
+      <div class="sheet-title">${title}</div>
+      <button type="button" class="sheet-done" data-close-sheet>\u5b8c\u6210</button>
+    </div>
+    <div class="sheet-body">
+      ${lead ? `<p class="sheet-lead">${lead}</p>` : ''}
+      ${inner}
+    </div>
+  </dialog>`;
+}
+
 function settings() {
   const p = getStudentProfile();
+  const st = stageConfig[p.stage];
   const gradeOptions = stageConfig[p.stage].grades;
   const bSettings = typeof baiduSettings === 'function' ? baiduSettings() : '';
-  return heading('YOUR PREFERENCES', '系统设置与学情档案', '定制孩子的学段年级与地区考纲，AI 出题与批改将自动适配。') + `
-    <section class="card" style="margin-bottom:16px;border:1.5px solid rgba(0,122,255,0.25)">
-      <div class="card-head">
-        <h2>🎓 宝宝学情档案与界面主题</h2>
-        <span class="pill">AI 精准出题依据</span>
+  const ocrLabel = (cfg.ocrProvider || 'baidu') === 'baidu' ? '百度高精度 OCR' : 'DeepSeek 图片转录';
+  const ghLabel = cfg.owner && cfg.repo ? cfg.owner + '/' + cfg.repo : '未配置';
+  const cloudLabel = cfg.cloudEndpoint || 'api.86518925.xyz';
+  return `<div class="settings-page">` + heading('YOUR PREFERENCES', '设置', '学情档案、识别、同步与数据，都在这里管理。') + `
+    <div class="settings-group">
+      <div class="settings-group-title">学情档案</div>
+      <div class="settings-list">
+        ${settingsRow('profile', '🎓', 'blue', p.stageName + ' · ' + p.grade, p.region + ' · ' + st.desc, '')}
       </div>
-      <div style="margin-bottom:12px">
-        <span style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px">选择学段（自动切换小学 / 初中 / 高中专属界面风格）：</span>
-        <div class="segmented">
-          ${Object.entries(stageConfig).map(([k, v]) => `<button type="button" data-stage-pick="${k}" class="${p.stage === k ? 'active' : ''}">${v.name}阶段</button>`).join('')}
-        </div>
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-group-title">识别与 AI</div>
+      <div class="settings-list">
+        ${settingsRow('ocr', '◐', 'purple', '图片文字识别', '框选题目后用什么识别文字', ocrLabel)}
+        ${settingsRow('deepseek', '✦', 'orange', 'DeepSeek 文字分析与练习', '校对后的文字分析、变式与组卷', cfg.model || 'deepseek-chat')}
+      </div>
+      <p class="settings-footnote">识别默认走百度高精度 OCR，DeepSeek 只做校对后的文字分析，不直接识图。</p>
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-group-title">云端与同步</div>
+      <div class="settings-list">
+        ${settingsRow('cloud', '☁', 'teal', '私人云端同步', '同步错题、练习与学情档案到自己的云端', '')}
+        ${settingsRow('github', '▣', 'gray', 'GitHub 私有仓库同步', '手动合并同步到私有数据仓库', ghLabel)}
+      </div>
+      <p class="settings-footnote">同步均为手动触发，不会自动上传。同一记录在两台设备同时修改时会停下并提示，不会覆盖。</p>
+    </div>
+
+    <div class="settings-group">
+      <div class="settings-group-title">数据</div>
+      <div class="settings-list">
+        ${settingsRow('data', '⇅', 'green', '数据备份与迁移', '导出 JSON 备份，或导入合并到本机', data.questions.length + ' 道错题')}
+      </div>
+      <p class="settings-footnote">API Key、Token 与口令只保存在当前设备浏览器，不会随备份或同步上传。换设备前请先导出 JSON 备份。</p>
+    </div>
+
+    <p class="settings-footnote">拾题 1.3.0 · 本地优先，离线题库始终保留在本机。</p>
+
+    ${settingsSheet('profile', '学情档案', 'AI 出题、解析与组卷都会严格按这个学段、年级和地区教材来，不用超纲解法。', `
+      <div class="sheet-section-label">学段</div>
+      <div class="segmented three">
+        ${Object.entries(stageConfig).map(([k, v]) => `<button type="button" data-stage-pick="${k}" class="${p.stage === k ? 'active' : ''}">${v.name}阶段</button>`).join('')}
       </div>
       <div class="form-row">
         <label class="field">
@@ -609,45 +690,42 @@ function settings() {
           </select>
         </label>
       </div>
-      <p class="notice">当前生效策略：<strong>${esc(p.stageName)} · ${esc(p.grade)} · ${esc(p.region)}</strong>。AI 解析错题、生成变式题与扩展试卷时将严格遵循该年级课标，不使用超纲解法。</p>
-      <button class="primary" id="save-profile" style="margin-top:8px">✓ 保存学情档案</button>
-    </section>
+      <p class="notice">当前生效策略：<strong>${esc(p.stageName)} · ${esc(p.grade)} · ${esc(p.region)}</strong>。</p>
+      <div class="actions"><button class="primary" id="save-profile">✓ 保存学情档案</button></div>
+    `)}
 
-    ${typeof cloudSettings === 'function' ? cloudSettings() : ''}
-    <div class="settings-grid">
-      <div>
-        ${bSettings}
-        <section class="card">
-          <div class="card-head"><h2>DeepSeek 文字分析与练习</h2><span class="pill">自带 API Key</span></div>
-          ${field('API 地址（或兼容的代理地址）', 'endpoint', cfg.endpoint || 'https://api.deepseek.com')}
-          ${field('模型名称', 'model', cfg.model || 'deepseek-chat')}
-          ${field('API Key（保存在当前设备浏览器）', 'api-key', getStoredKey('shiti-key'), 'password', 'sk-…')}
-          <p class="notice">默认仅将校对后的题目文字发给 DeepSeek，图片 OCR 由百度处理。</p>
-          <button class="primary" id="save-settings">保存设置</button>
-        </section>
-        <section class="card">
-          <h2>数据备份与迁移</h2>
-          <p class="subtitle" style="margin:10px 0">更换域名或设备时，可先导出 JSON 再导入合并。</p>
-          <div class="actions">
-            <button class="secondary" id="export">导出 JSON</button>
-            <button class="secondary" id="import">导入并合并</button>
-            <input type="file" id="import-file" accept="application/json,.json" hidden>
-          </div>
-        </section>
+    ${settingsSheet('ocr', '图片文字识别', '框选题目后，先由百度高精度 OCR 转录原文，人工校对后再交给 DeepSeek 分析。', bSettings)}
+
+    ${settingsSheet('deepseek', 'DeepSeek 文字分析', '只把校对后的题目文字发给 DeepSeek，图片 OCR 由百度处理。', `
+      ${field('API 地址（或兼容的代理地址）', 'endpoint', cfg.endpoint || 'https://api.deepseek.com')}
+      ${field('模型名称', 'model', cfg.model || 'deepseek-chat')}
+      ${field('API Key（保存在当前设备浏览器）', 'api-key', getStoredKey('shiti-key'), 'password', 'sk-…')}
+      <div class="actions"><button class="primary" id="save-settings">保存设置</button></div>
+    `)}
+
+    ${settingsSheet('cloud', '私人云端同步', '同步错题、练习和学情档案到自己的云端。首次使用请先导出 JSON 备份，再登录并同步。原图保留本机，云端题图会压缩。', typeof cloudSettings === 'function' ? cloudSettings() : '')}
+
+    ${settingsSheet('github', 'GitHub 私有仓库同步', '同步到你自己的私有数据仓库，Secret Gist 并不真正私密，这里不用。', `
+      ${field('仓库所有者', 'owner', cfg.owner)}
+      ${field('私有仓库名称', 'repo', cfg.repo)}
+      ${field('数据文件路径', 'path', cfg.path || 'shiti/notebook.json')}
+      ${field('分支', 'branch', cfg.branch || 'main')}
+      ${field('Fine-grained Token（保存在当前设备）', 'github-token', getStoredKey('shiti-gh'), 'password', 'github_pat_…')}
+      <div class="actions">
+        <button class="primary" id="sync">合并并同步</button>
+        <button class="secondary" id="save-github">保存配置</button>
       </div>
-      <section class="card">
-        <div class="card-head"><h2>GitHub 私有仓库同步</h2><span class="pill">可选云同步</span></div>
-        ${field('仓库所有者', 'owner', cfg.owner)}
-        ${field('私有仓库名称', 'repo', cfg.repo)}
-        ${field('数据文件路径', 'path', cfg.path || 'shiti/notebook.json')}
-        ${field('分支', 'branch', cfg.branch || 'main')}
-        ${field('Fine-grained Token（保存在当前设备）', 'github-token', getStoredKey('shiti-gh'), 'password', 'github_pat_…')}
-        <div class="actions">
-          <button class="primary" id="sync">合并并同步</button>
-          <button class="secondary" id="save-github">保存配置</button>
-        </div>
-      </section>
-    </div>`;
+    `)}
+
+    ${settingsSheet('data', '数据备份与迁移', '更换域名或设备时，先导出 JSON 再导入合并，本地题库不会被覆盖。', `
+      <div class="actions">
+        <button class="secondary" id="export">导出 JSON</button>
+        <button class="secondary" id="import">导入并合并</button>
+        <input type="file" id="import-file" accept="application/json,.json" hidden>
+      </div>
+      <p class="notice">导入采用合并：相同 ID 取更新时间较新的记录，删除会随同步传播。备份文件不含 API Key、Token 或连接配置。</p>
+    `)}
+  </div>`;
 }
 
 async function ai(prompt, img, options = {}) {
@@ -753,8 +831,8 @@ function bind(tab) {
     if ($('#manual')) $('#manual').onclick = () => {
       editingId = null;
       draft = { subject: currentSubject, aiVerdict: '薄弱待练', source: $('#source')?.value || '', mistake: $('#mistake')?.value || '', text: $('#question-text')?.value || '', answer: '', analysis: '', reminder: '', tags: [], image: mode === 'image' ? image : '' };
+      openDraftOnRender = true;
       render();
-      $('#draft-area').scrollIntoView({ behavior: 'smooth' });
     };
     const cancelDraftHandler = () => {
       draft = null;
@@ -765,12 +843,17 @@ function bind(tab) {
     if ($('#cancel-draft')) $('#cancel-draft').onclick = cancelDraftHandler;
     if ($('#cancel-draft-top')) $('#cancel-draft-top').onclick = cancelDraftHandler;
 
+    if ($('#draft-dialog')) {
+      $('#draft-dialog').onclick = e => { if (e.target === $('#draft-dialog')) { draft = null; editingId = null; render(); toast('已取消编辑'); } };
+      $('#draft-dialog').addEventListener('close', () => { draft = null; editingId = null; });
+    }
     if ($('#save-draft')) $('#save-draft').onclick = e => run(e.target, async () => {
       const q = { ...draft };
       q.subject = $('#draft-subject').value;
       q.aiVerdict = $('#draft-verdict') ? $('#draft-verdict').value : inferAiVerdict(q);
       q.source = $('#draft-source').value.trim();
       for (const k of ['text', 'mistake', 'answer', 'analysis', 'reminder']) q[k] = $('#draft-' + k).value.trim();
+      if(['text','mistake','answer'].some(k=>q[k]!==draft[k])){q.evidenceVerified=false;q.diagnosisStatus='pending';q.aiVerdict='未判定'}
       if (!q.text) throw Error('请补全题干');
       q.tags = $('#draft-tags').value.split(/[,，]/).map(t => t.trim()).filter(Boolean);
       q.id = uid();
@@ -800,9 +883,8 @@ function bind(tab) {
     document.querySelectorAll('[data-ai-filter]').forEach(b => b.onclick = () => { aiFilter = b.dataset.aiFilter; render(); });
     if ($('#goto-exam')) $('#goto-exam').onclick = () => {
       if (subjects.includes(filter)) examSubject = filter;
-      location.hash = 'practice';
+      location.hash = 'exam';
       render();
-      setTimeout(() => $('#exam-builder')?.scrollIntoView({ behavior: 'smooth' }), 50);
     };
     $('#sample').onclick = e => run(e.target, async () => {
       if (data.questions.some(q => q.source === '应用示例')) throw Error('示例题已存在');
@@ -813,31 +895,27 @@ function bind(tab) {
     });
   }
   if (tab === 'settings') bindSettings();
-  if (tab === 'practice') bindPractice();
+  if (tab === 'variants' || tab === 'exam') bindPractice();
   if (tab === 'capture') {
     if (typeof bindPaper === 'function') bindPaper();
     if (typeof bindRecognition === 'function') bindRecognition();
+    if ($('#paper-dialog-close')) $('#paper-dialog-close').onclick = () => $('#paper-dialog').close();
+    if ($('#paper-dialog')) $('#paper-dialog').onclick = e => { if (e.target === $('#paper-dialog')) $('#paper-dialog').close(); };
+    if ($('#open-paper')) $('#open-paper').onclick = () => { openPaperOnRender = true; render(); };
   }
 }
 
 function openQuestion(id) {
   const q = data.questions.find(q => q.id === id);
   if (!q) return;
-  const quickList = getQuickSubjects();
-  const extraSubjects = subjects.filter(s => !quickList.includes(s));
   const rawOcr = q.ocrProvider === 'baidu' && q.ocrOriginalText ? q.ocrOriginalText : '';
   const curVerdict = inferAiVerdict(q);
   $('#detail').innerHTML = `
-    <div class="card-head">
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        ${quickList.map(s => `<button type="button" class="chip ${q.subject === s ? 'active' : ''}" data-detail-subj="${s}" style="padding:4px 12px;font-size:13px">${s}</button>`).join('')}
-        ${extraSubjects.length ? `<select id="detail-subject" aria-label="其他学科" style="width:auto;min-width:76px;padding:4px 10px;border-radius:99px;font-size:13px;font-weight:600;color:var(--text);background:var(--surface-sub)">
-          <option value="" ${quickList.includes(q.subject) ? 'selected' : ''}>更多学科…</option>
-          ${extraSubjects.map(s => `<option value="${s}" ${q.subject === s ? 'selected' : ''}>${s}</option>`).join('')}
-        </select>` : ''}
-        <span style="font-size:13px;color:var(--muted);font-weight:600;margin-left:2px">#${esc(q.number)}</span>
-      </div>
-      <button class="secondary" id="close-detail" style="padding:6px 14px;font-size:13px">关闭</button>
+    <div class="card-head detail-head">
+      <select id="detail-subject" class="detail-subject-select" aria-label="更改科目">${opts(q.subject)}</select>
+      <span class="detail-number">#${esc(q.number)}</span>
+      ${q.source ? `<span class="detail-source">${esc(q.source)}</span>` : ''}
+      <button type="button" class="detail-close" id="close-detail" aria-label="关闭">×</button>
     </div>
 
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;background:var(--surface-sub, #f8fafc);border-radius:10px">
@@ -849,9 +927,12 @@ function openQuestion(id) {
     </div>
 
     <p class="prose">${esc(q.text)}</p>
+    <p class="result-note">作答证据：${q.evidenceVerified&&q.answerStatus==='confirmed'?'已人工核对孩子作答':q.answerStatus==='unanswered'?'已确认未作答':'未确认；不能据此诊断孩子错因'}</p>
+    ${q.annotation?`<div class="analysis-block"><h3>批注／订正（非原始作答）</h3><p class="prose">${esc(q.annotation)}</p></div>`:''}
+    ${q.visualFeatures?`<div class="analysis-block"><h3>加点／划线等视觉信息</h3><p class="prose">${esc(q.visualFeatures)}</p></div>`:''}
     ${q.image ? `<img src="${q.image}" alt="原题图片" style="max-width:100%;max-height:320px;object-fit:contain;margin-top:10px;border-radius:10px">` : ''}
     ${rawOcr ? `<details style="margin-top:10px;padding:8px 12px;background:var(--surface-sub, #f8fafc);border-radius:10px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--muted)">查看百度 OCR 原始转录（默认收起）</summary><div class="prose" style="margin-top:8px;font-size:13px;color:var(--muted)">${esc(rawOcr)}</div></details>` : ''}
-    ${[['来源', q.source], ['孩子的错误作答 / 困惑', q.mistake], ['正确答案', q.answer], ['解题步骤', q.analysis], ['易错提醒', q.reminder], ['知识点', (q.tags || []).join(' · ')]].filter(x => x[1]).map(x => `<div class="analysis-block"><h3>${x[0]}</h3><div class="prose">${esc(x[1])}</div></div>`).join('')}
+    ${[['孩子的错误作答 / 困惑', q.mistake], ['正确答案', q.answer], ['解题步骤', q.analysis], ['易错提醒', q.reminder], ['知识点', (q.tags || []).join(' · ')]].filter(x => x[1]).map(x => `<div class="analysis-block"><h3>${x[0]}</h3><div class="prose">${esc(x[1])}</div></div>`).join('')}
     <div class="actions">
       <button class="primary" id="master">${q.mastered ? '重新巩固' : '标记已掌握'}</button>
       <button class="secondary" id="edit-q">编辑</button>
@@ -859,6 +940,7 @@ function openQuestion(id) {
       <button class="secondary danger" id="delete-q">删除</button>
     </div>`;
   $('#detail').showModal();
+  $('#detail').onclick = e => { if (e.target === $('#detail')) $('#detail').close(); };
   $('#close-detail').onclick = () => $('#detail').close();
 
   const changeDetailSubject = async (nextSubject) => {
@@ -874,9 +956,6 @@ function openQuestion(id) {
     }
   };
 
-  document.querySelectorAll('[data-detail-subj]').forEach(btn => {
-    btn.onclick = () => changeDetailSubject(btn.dataset.detailSubj);
-  });
   if ($('#detail-subject')) $('#detail-subject').onchange = e => changeDetailSubject(e.target.value);
 
   if ($('#detail-verdict')) $('#detail-verdict').onchange = async e => {
@@ -887,7 +966,9 @@ function openQuestion(id) {
   };
 
   if ($('#ai-diagnose-btn')) $('#ai-diagnose-btn').onclick = e => run(e.target, async () => {
-    const r = await ai(`请诊断以下学生错题的核心错因，从列表 ${JSON.stringify(aiVerdictTags)} 中选择最准确的一个作为 aiVerdict，并给出简短的一句话易错提醒 reminder。题目：${q.text}。学生错误作答：${q.mistake || '未记录'}。原解析：${q.analysis || ''}。返回 JSON：{"aiVerdict":"标签名","reminder":"一句话提醒"}`);
+    if(!q.evidenceVerified||q.answerStatus!=='confirmed'||!q.studentAnswer?.trim())throw Error('缺少已确认的孩子原始作答，不能诊断错因；请重新录入并分离题干、作答与批注');
+    if(q.diagnosisStatus!=='incorrect')throw Error('此题尚未确认为答错，不能强行归因；请先核对作答与标准答案');
+    const r = await ai(`只依据已核对的文字给出有依据的可能错因，不得推断孩子的心理或把批注当成原始作答。题目：${q.text}。已确认作答：${q.studentAnswer}。视觉补充：${q.visualFeatures||''}。标准答案：${q.answer||''}。从 ${JSON.stringify(aiVerdictTags)} 选择 aiVerdict，无证据则未判定。返回 JSON：{"aiVerdict":"标签名","reminder":"一句话提醒"}`);
     const nextV = aiVerdictTags.includes(r.aiVerdict) ? r.aiVerdict : '薄弱待练';
     const nextReminder = r.reminder ? String(r.reminder) : q.reminder;
     await persist({ ...data, questions: data.questions.map(x => x.id === id ? { ...x, aiVerdict: nextV, reminder: nextReminder, updated: stamp() } : x) });
@@ -903,13 +984,13 @@ function openQuestion(id) {
     $('#detail').close();
     render();
   });
-  $('#edit-q').onclick = () => { editingId = id; draft = { ...q }; $('#detail').close(); location.hash = 'capture'; render(); $('#draft-area').scrollIntoView(); };
+  $('#edit-q').onclick = () => { editingId = id; draft = { ...q }; openDraftOnRender = true; $('#detail').close(); if (location.hash === '#capture') render(); else location.hash = 'capture'; };
   $('#practice-q').onclick = () => {
     selectedPracticeId = id;
     practiceSubject = q.subject;
     practiceAiFilter = '全部';
     $('#detail').close();
-    location.hash = 'practice';
+    location.hash = 'variants';
     render();
     if ($('#practice-source')) $('#practice-source').value = id;
   };
@@ -925,8 +1006,8 @@ function bindPractice() {
     practiceAiFilter = b.dataset.pracAi;
     render();
   });
-  $('#practice-source').onchange = e => { selectedPracticeId = e.target.value; };
-  $('#generate').onclick = e => run(e.target, async () => {
+  if ($('#practice-source')) $('#practice-source').onchange = e => { selectedPracticeId = e.target.value; };
+  if ($('#generate')) $('#generate').onclick = e => run(e.target, async () => {
     const q = data.questions.find(q => q.id === $('#practice-source').value);
     if (!q) throw Error('请先选择一道错题');
     const count = Number($('#count').value), difficulty = $('#difficulty').value;
@@ -1087,6 +1168,7 @@ function saveConfig() {
     path: $('#path') ? $('#path').value.trim() : cfg.path,
     branch: $('#branch') ? $('#branch').value.trim() : cfg.branch,
     ocrProvider: $('#ocr-provider') ? $('#ocr-provider').value : cfg.ocrProvider,
+    ocrMode: $('#ocr-mode') ? $('#ocr-mode').value : (cfg.ocrMode || 'accurate'),
     ocrProxy: $('#ocr-proxy') ? $('#ocr-proxy').value.trim() : cfg.ocrProxy
   };
   if ($('#ocr-token')) setStoredKey('shiti-ocr-token', $('#ocr-token').value.trim());
@@ -1118,6 +1200,20 @@ function merge(a, b) {
 
 function bindSettings() {
   if (typeof bindCloudSettings === 'function') bindCloudSettings();
+  document.querySelectorAll('[data-open-sheet]').forEach(btn => {
+    btn.onclick = () => {
+      openSheet = btn.dataset.openSheet;
+      const dlg = document.getElementById('sheet-' + openSheet);
+      if (dlg && !dlg.open) dlg.showModal();
+    };
+  });
+  document.querySelectorAll('dialog.settings-sheet').forEach(dlg => {
+    dlg.addEventListener('close', () => { if (openSheet && dlg.id === 'sheet-' + openSheet) openSheet = null; });
+    dlg.addEventListener('click', e => { if (e.target === dlg) { openSheet = null; dlg.close(); } });
+  });
+  document.querySelectorAll('[data-close-sheet]').forEach(btn => {
+    btn.onclick = () => { const dlg = btn.closest('dialog'); openSheet = null; if (dlg) dlg.close(); };
+  });
   document.querySelectorAll('[data-stage-pick]').forEach(btn => {
     btn.onclick = () => {
       const nextStage = btn.dataset.stagePick;
@@ -1132,13 +1228,14 @@ function bindSettings() {
   if ($('#student-region')) $('#student-region').onchange = e => { cfg.region = e.target.value; saveLocalConfig(); render(); };
   if ($('#save-profile')) $('#save-profile').onclick = () => {
     saveConfig();
+    openSheet = null;
     render();
     toast('✓ 学情档案已保存，AI 将按此年级与地区精准出题');
   };
 
-  if ($('#save-settings')) $('#save-settings').onclick = () => { saveConfig(); toast('✓ 配置与密钥已持久保存在此设备'); };
-  if ($('#save-github')) $('#save-github').onclick = () => { saveConfig(); toast('✓ 配置与密钥已持久保存在此设备'); };
-  if ($('#save-ocr')) $('#save-ocr').onclick = () => { saveConfig(); toast('✓ 配置与密钥已持久保存在此设备'); };
+  if ($('#save-settings')) $('#save-settings').onclick = () => { saveConfig(); closeSettingsSheet(); toast('✓ 配置与密钥已持久保存在此设备'); };
+  if ($('#save-github')) $('#save-github').onclick = () => { saveConfig(); closeSettingsSheet(); toast('✓ 配置与密钥已持久保存在此设备'); };
+  if ($('#save-ocr')) $('#save-ocr').onclick = () => { saveConfig(); closeSettingsSheet(); toast('✓ 配置与密钥已持久保存在此设备'); };
   if ($('#test-ocr')) $('#test-ocr').onclick = () => { saveConfig(); if (typeof testOCRConnection === 'function') testOCRConnection(); };
   if ($('#export')) $('#export').onclick = () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));

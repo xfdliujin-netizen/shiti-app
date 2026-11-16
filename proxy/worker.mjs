@@ -116,17 +116,20 @@ export function createOCRService(fetcher = globalThis.fetch) {
     const m = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(body.image);
     if (!m || m[2].length % 4 !== 0) return reply(400, { error: '需要 PNG 或 JPEG 的 base64 图片' });
     if (m[2].length > MAX_IMAGE) return reply(413, { error: '图片编码超过 10 MB，请缩小选框' });
+    const mode = body.mode || 'basic';
+    if (!['basic','accurate'].includes(mode)) return reply(400,{error:'不支持的 OCR 模式'});
 
     try {
       const token = await accessToken(env);
-      const r = await fetcher('https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic?access_token=' + encodeURIComponent(token), {
+      const r = await fetcher('https://aip.baidubce.com/rest/2.0/ocr/v1/' + (mode === 'accurate' ? 'accurate' : 'accurate_basic') + '?access_token=' + encodeURIComponent(token), {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           image: m[2],
           detect_direction: 'true', // 自动检测朝向，即使手机拍照稍微倒置也能准确识别
           probability: 'true',
-          paragraph: 'false'
+          paragraph: 'false',
+          ...(mode === 'accurate' ? {recognize_granularity:'small',char_probability:'true'} : {})
         }),
         signal: AbortSignal.timeout(60000)
       });
@@ -139,7 +142,7 @@ export function createOCRService(fetcher = globalThis.fetch) {
       if (!Array.isArray(j.words_result) || j.words_result.some(p => typeof p.words !== 'string')) {
         return reply(502, { error: '百度 OCR 返回了异常格式' });
       }
-      return reply(200, { words_result: j.words_result, words_result_num: j.words_result.length, log_id: j.log_id });
+      return reply(200, { words_result: j.words_result, words_result_num: j.words_result.length, log_id: j.log_id, direction:j.direction, mode });
     } catch (e) {
       return reply(502, { error: e.message === 'BAIDU_AUTH' ? '百度鉴权失败，请检查代理端 API Key / Secret Key 及 OCR 服务权限' : '百度 OCR 请求失败或超时，未自动重试' });
     }

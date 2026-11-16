@@ -98,3 +98,7 @@ node -e "console.log(require('node:crypto').randomBytes(24).toString('hex'))"
 当前为本地逻辑和模拟上游响应验证，尚未使用你的百度 / DeepSeek 凭据完成真实识别精度和额度验收。
 
 参考：[百度高精度 OCR API](https://aca.bce.baidu.com/doc/OCR/s/1k3h7y3db) · [百度免费测试资源](https://ai.baidu.com/ai-doc/OCR/fk3h7xu7h) · [Cloudflare Worker Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
+# v21 识别与作答证据修复
+
+当前前端以用户提供的 v20 UI 为基准。默认请求高精度含位置版 accurate，需百度对应权限；没有权限可在设置中选纯文字兼容版，不自动重试。位置不代表手写分类：必须核对原题、单独确认孩子作答，圈画、批注和加点信息不可从纯文字推断。详情和验证边界见 [OCR-REVIEW.md](OCR-REVIEW.md)。生产 Worker 名称为 baidu-ocr-proxy，自定义域名 ocr.86518925.xyz；下文早期部署示例仅作历史参考。
+

@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const controls={'#subject':{value:'语文'},'#source':{value:'第二单元'},'#mistake':{value:''},'#paper-progress':{textContent:''},'#paper-area':{scrollIntoView(){}}};let drawn;
 const ctx={assert,console,AbortSignal,TextEncoder,TextDecoder,crypto:globalThis.crypto,setTimeout,clearTimeout,confirm:()=>true,location:{hash:'#capture'},localStorage:{getItem:()=>null},sessionStorage:{getItem:()=> 'test'},window:{addEventListener(){}},document:{querySelector:s=>controls[s]||null,createElement:()=>({getContext:()=>({drawImage(...args){drawn=args}}),toDataURL:()=> 'data:image/png;base64,Q1JPUA=='})}};
-vm.createContext(ctx);for(const file of ['crop.js','paper.js','app.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8').replace("window.addEventListener('hashchange',render);boot();",''),ctx);
+vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/ocr-layout.js','utf8'),ctx);for(const file of ['crop.js','paper.js','app.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8').replace(/window\.addEventListener\('hashchange',\s*render\);\s*boot\(\);\s*$/,''),ctx);
 vm.runInContext(`(async()=>{
   assert.equal(recognitionScope,'crop');
   assert.equal(rotatedSize(400,300,90).width,300);assert.equal(rotatedSize(400,300,90).height,400);

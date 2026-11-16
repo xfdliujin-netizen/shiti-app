@@ -1,4 +1,5 @@
 let paper = null, paperLayout = '2', paperProgress = '';
+let paperMergeUndoText = null; // v19：合并换行前一次的校对框内容，点“恢复”可一键回到合并前
 const isTestEnv = () => Boolean(globalThis.assert);
 
 const OCR_SCHEMA = '错字、错误拼音、错误标点和错误选项必须按原图照录，不能自动修正。返回 JSON {"items":[{"section":"大题标题，严格使用目录中的名称","number":"原卷小题号，无号用位置或拼音","text":"完整原题，包含材料、全部选项和空格，不含学生填入内容","studentAnswer":"仅转录实际可见的学生作答，不可推测","uncertainty":"模糊、缺失、跨区截断或无法区分的内容，清晰则空字符串"}],"warnings":["其他问题"]}';
@@ -18,18 +19,26 @@ function paperView() {
   if (isSingleCrop) {
     const p = paper.items[0];
     p.selected = true;
-    p.verified = true;
     return `<section class="card" style="border:2px solid #2563eb33">
       <div class="card-head">
         <h2>校对识别结果</h2>
         <span class="pill">${p.analyzed ? '✓ 已生成 AI 解析与错因判定' : '待校对 / 分析'}</span>
       </div>
-      ${paper.image ? `<div style="margin-bottom:10px;background:#f8fafc;padding:8px;border-radius:10px;text-align:center"><img class="paper-original" src="${paper.image}" alt="框选原图" style="max-height:180px;width:auto;margin:0 auto;display:block"></div>` : ''}
-      ${paperField('识别出的题目原文（可直接修改调整，原卷错字请保留）', 'text', p.text, 0, true)}
+      ${paper.image ? `<div id="paper-crop-image-box" style="margin-bottom:10px;background:#f8fafc;padding:8px;border-radius:10px;text-align:center"><img id="paper-crop-img" class="paper-original" src="${paper.image}" alt="框选原图，点击全屏查看" title="点击全屏查看" style="max-height:180px;width:auto;margin:0 auto;display:block;cursor:zoom-in"></div><dialog id="paper-lightbox" class="image-lightbox"><button type="button" class="lightbox-close" id="paper-lightbox-close" aria-label="关闭">×</button><img id="paper-lightbox-img" alt="框选图全屏预览"></dialog>` : ''}
+      ${paper.warnings.map(w=>`<p class="result-note">${esc(w)}</p>`).join('')}
+      <label class="field"><span>原题（仅题干、印刷选项和空位；请移出手写答案与订正，不修正原卷错字）</span><textarea class="paper-textarea" data-paper="text" data-index="0">${esc(p.text)}</textarea></label>
+      <div class="actions" style="margin-top:6px"><button type="button" class="secondary" id="paper-move-answer">将选中文字移到孩子作答</button></div>
+      ${paper.ocrProvider === 'baidu' && paper.ocrRaw?.words_result?.length > 1 ? `
+      <div class="actions" style="margin-top:8px;justify-content:flex-start">
+        <button type="button" class="secondary" id="paper-merge-lines">⇄ 一键合并换行</button>
+        <button type="button" class="secondary" id="paper-undo-merge" ${paperMergeUndoText == null ? 'hidden' : ''}>↩ 恢复合并前换行</button>
+      </div>
+      <p class="result-note" style="margin-top:6px">只合并百度判定为同一行的断行，不改任何文字；跨行题干、选项、新题号不会拼。合并后不对可点恢复对照，下方有百度原始转录只读对照。</p>
+      ${typeof rawOCRView === 'function' ? rawOCRView() : ''}` : ''}
       <div class="form-row">
-        ${paperField('孩子的错误作答（选填）', 'studentAnswer', p.studentAnswer, 0)}
         ${paperField('题号 / 备注（选填）', 'number', p.number === '1' ? '' : p.number, 0)}
       </div>
+      ${answerReviewFields(p,0)}
       ${p.analyzed ? `
         <div style="margin-top:12px;padding-top:12px;border-top:1px dashed #cbd5e1">
           <div class="form-row">
@@ -76,9 +85,8 @@ function paperView() {
       </div>
       <div class="form-row">${paperField('大题 / 分组', 'section', p.section, i)}${paperField('原卷题号', 'number', p.number, i)}</div>
       ${paperField('原题全文（保留材料、选项和空格）', 'text', p.text, i, true)}
-      ${paperField('可见学生作答（不确定可清空）', 'studentAnswer', p.studentAnswer, i, true)}
+      ${answerReviewFields(p,i)}
       ${p.uncertainty ? `<p class="result-note">需核对：${esc(p.uncertainty)}</p>` : ''}
-      <label class="verify"><input type="checkbox" data-paper="verified" data-index="${i}" ${p.verified ? 'checked' : ''}> 我已对照原图核对题干、材料和全部选项</label>
       ${p.analyzed ? `
         <div class="form-row">
           <label class="field"><span>🤖 AI 判定错因标签</span><select data-paper="aiVerdict" data-index="${i}">${getVerdictTagOptions(p.aiVerdict)}</select></label>
@@ -99,7 +107,42 @@ function paperView() {
 }
 
 function paperField(label, key, value, i, area = false) {
-  return `<label class="field"><span>${label}</span>${area ? `<textarea data-paper="${key}" data-index="${i}">${esc(value)}</textarea>` : `<input data-paper="${key}" data-index="${i}" value="${esc(value)}">`}</label>`;
+  return `<label class="field"><span>${label}</span>${area ? `<textarea data-paper="${key}" data-index="${i}">${esc(value)}</textarea>` : `<input type="text" data-paper="${key}" data-index="${i}" value="${esc(value)}">`}</label>`;
+}
+
+// 一键合并换行：把百度 OCR 把一行切成的两段拼回去。
+// 判定两条：① 位置：百度每行自带 location，两段中心线高度差不到半行高，
+// 说明本来就在同一条基线上；② 内容：前一段结尾不是句末标点，后一段开头
+// 不是选项/题号/解:答:这类新条目标记。两条都满足才拼。
+// 只动换行符本身，不改任何字；百度原始转录 ocrOriginalText 原样保留。
+function mergeLineBreaks(text, locs) {
+const lines = String(text == null? '': text).split('\n');
+const aligned = Array.isArray(locs) && locs.length === lines.length;
+const terminal = /[。？！；：…:!?]$/;
+const newItem = /^(?:[A-DＡ-Ｄ][\.．、\s]|[(（]\d+[)）]|[①-⑳]|第[一二三四五六七八九十\d]+[题条]|(?:解|答|证明|分析)[:：]|\d+[\.．、])/;
+const out = [];
+for (let i = 0; i < lines.length; i++) {
+const line = lines[i];
+const prev = out.length? out[out.length - 1]: null;
+if (prev === null || prev === '' || line === '') { out.push(line); continue;}
+let sameLine = true;
+if (aligned) {
+const a = locs[i - 1] && locs[i - 1].location, b = locs[i] && locs[i].location;
+if (a && b) {
+const h = Math.max(a.height, b.height, 1);
+sameLine = Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) < h * 0.6;
+} else sameLine = false;
+}
+const prevTrim = prev.replace(/\s+$/, '');
+const nextTrim = line.replace(/^\s+/, '');
+const stepHead = /^(?:解|答|证明|分析)[:：]/;
+const textOk = !terminal.test(prevTrim) && !stepHead.test(prevTrim) && !newItem.test(nextTrim);
+if (sameLine && textOk) {
+const joiner = /[A-Za-z0-9]$/.test(prevTrim) && /^[A-Za-z0-9]/.test(nextTrim)? ' ': '';
+out[out.length - 1] = prevTrim + joiner + nextTrim;
+} else out.push(line);
+}
+return out.join('\n');
 }
 
 function paperKey(p) {
@@ -120,7 +163,10 @@ function normalizeOCR(r) {
       studentAnswer: typeof p.studentAnswer === 'string' ? p.studentAnswer : '',
       uncertainty: typeof p.uncertainty === 'string' ? p.uncertainty : '',
       selected: autoCheck,
-      verified: autoCheck,
+      verified: false,
+      answerStatus: 'unknown',
+      annotation: '',
+      visualFeatures: '',
       analyzed: false,
       aiVerdict: '薄弱待练',
       answer: '',
@@ -158,11 +204,8 @@ async function paperTiles(src, columns) {
 
 function progress(s) {
   paperProgress = s;
-  const p = $('#paper-progress');
-  if (p) {
-    p.textContent = s;
-    p.style.display = s ? 'block' : 'none';
-  }
+  // v18：完成/进行中提示改走顶部 toast，不再单独占一个位置。
+  if (s && typeof toast === 'function') toast(s);
 }
 
 async function recognizePaper() {
@@ -196,20 +239,20 @@ async function recognizePaper() {
       if (Array.isArray(r.warnings)) paper.warnings.push(...r.warnings.map(String));
     }
     paper.complete = true;
+    openPaperOnRender = true;
     progress('3 / 3 · 转录已返回，请对照原卷逐题核对。');
   } catch (e) {
     paper.warnings.push('识别未完成：' + e.message);
     throw e;
   } finally {
     render();
-    $('#paper-area')?.scrollIntoView({ behavior: 'smooth' });
+
   }
 }
 
 function selectedPaper() {
   if (!isTestEnv() && paper.scope === 'crop' && paper.items.length === 1) {
     paper.items[0].selected = true;
-    paper.items[0].verified = true;
   }
   const items = paper.items.filter(p => p.selected);
   if (!items.length) throw Error('请先选择要处理的题目');
@@ -228,14 +271,21 @@ async function analyzeSelectedItems() {
     if (p.analyzed) continue;
     progress(`AI 正在拆解分析第 ${i + 1} / ${items.length} 题…`);
     try {
-      const r = await ai(`基于已经人工核对的原题分析，不得改写题干或编造学生答案。若条件缺失或包含【无法辨认】，应说明不能确定答案，不可猜测。学科：${paper.subject}。原文：${JSON.stringify(p.text)}。实际可见学生作答：${JSON.stringify(p.studentAnswer)}。用户补充：${paper.mistake}。请同时从 ${JSON.stringify(verdictList)} 中挑选最贴切的一项作为 aiVerdict 错因判定标签。返回 JSON {"answer":"正确答案或无法判定的原因","analysis":"带序号的逐步解析","reminder":"针对题目和实际作答的提醒，没作答则不声称学生选错","aiVerdict":"错因判定标签","tags":["知识点"]}。`);
+      const evidence=answerEvidence(p);
+      if(evidence.status==='confirmed'&&!evidence.answer)throw Error('已选择确认作答，请填写孩子实际作答；未作答或不确定请切换证据状态');
+      if(/加点|划线|画线|下划线|图中/.test(p.text) && !evidence.visualFeatures.trim())throw Error('此题依赖视觉信息，请补充加点字、划线范围或图示内容；无法确认时请暂不分析');
+      const canDiagnose=evidence.status==='confirmed'&&Boolean(evidence.answer);
+      const r = await ai(`你只得到人工核对后的文字，没有看到原始试卷图片。学科：${paper.subject}。原题：${JSON.stringify(p.text)}。视觉信息：${JSON.stringify(evidence.visualFeatures)}。作答证据：${JSON.stringify(evidence)}。用户补充（不是孩子作答的替代证据）：${JSON.stringify(paper.mistake)}。原题错字、错误拼音、错误选项照录，不得按正确知识改写题干。括号和横线只是空位，不能推测其中的答案。圈画、订正和老师批改与孩子原始作答不同，不可混用；红勾不能证明标准答案。${canDiagnose?'仅根据已确认作答与标准解法比较，判断 correct/incorrect/unknown；即使答错，也不能断言思考过程，只能给有依据的可能原因。':'孩子作答未确认或已确认未作答：仅讲解题目，不能说孩子答错、选了某项或存在某个错因；status 必须是 unknown，aiVerdict 必须是未判定。'}条件不足或视觉信息无法辨认时明确说明无法确定，不猜测。返回 JSON {"answer":"标准答案或无法确定原因","analysis":"解题步骤；仅有已确认作答时才可比较","status":"correct/incorrect/unknown","comparisonEvidence":"对比依据，无证据则空字符串","reminder":"复习建议，不把可能错因说成事实","aiVerdict":"${canDiagnose?'选择最贴切错因标签，无法判断则未判定':'未判定'}","tags":["知识点"]}。可用错因标签：${JSON.stringify(verdictList)}。`);
       if (typeof r.answer !== 'string' || typeof r.analysis !== 'string') throw Error('分析结果不完整');
-      const matchedVerdict = verdictList.includes(r.aiVerdict) ? r.aiVerdict : '薄弱待练';
+      const status=canDiagnose&&['correct','incorrect'].includes(r.status)?r.status:'unknown';
+      const matchedVerdict = status==='incorrect'&&verdictList.includes(r.aiVerdict) ? r.aiVerdict : '未判定';
       Object.assign(p, {
         answer: r.answer,
         analysis: r.analysis,
         reminder: String(r.reminder || ''),
         aiVerdict: matchedVerdict,
+        diagnosisStatus: status,
+        comparisonEvidence: status!=='unknown'?String(r.comparisonEvidence||''):'',
         tags: Array.isArray(r.tags) ? r.tags.map(String) : [],
         analyzed: true,
         error: ''
@@ -260,7 +310,14 @@ async function saveSelectedItems() {
       subject: paper.subject,
       source: [paper.source, p.section !== '框选题目' ? p.section : '', p.number !== '1' ? p.number : ''].filter(Boolean).join(' · '),
       text: p.text,
-      mistake: [paper.mistake, p.studentAnswer && '原卷作答：' + p.studentAnswer].filter(Boolean).join('\n'),
+      studentAnswer: p.answerStatus==='confirmed'?p.studentAnswer:'',
+      answerStatus: p.answerStatus||'unknown',
+      annotation: p.annotation||'',
+      visualFeatures: p.visualFeatures||'',
+      evidenceVerified: Boolean(p.verified),
+      diagnosisStatus: p.diagnosisStatus||'pending',
+      comparisonEvidence:p.comparisonEvidence||'',
+      mistake: [paper.mistake, p.answerStatus==='confirmed'&&p.studentAnswer && '已确认的原卷作答：' + p.studentAnswer].filter(Boolean).join('\n'),
       answer: p.answer,
       analysis: p.analysis,
       reminder: p.reminder,
@@ -301,17 +358,9 @@ function bindPaper() {
       if (k === 'tagsText') { p.tags = el.value.split(/[,，]/).map(t => t.trim()).filter(Boolean); return; }
       if (k === 'aiVerdict') { p.aiVerdict = el.value; return; }
       p[k] = el.value;
-      if (['text', 'section', 'number', 'studentAnswer'].includes(k)) {
-        if (isTestEnv()) {
-          p.verified = false;
-          const container = el.closest('[data-paper-item]');
-          const cb = container?.querySelector('[data-paper="verified"]');
-          if (cb) cb.checked = false;
-        } else {
-          p.verified = true;
-          p.selected = true;
-        }
-        p.analyzed = false;
+      if (['text', 'section', 'number', 'studentAnswer','answerStatus','annotation','visualFeatures'].includes(k)) {
+        invalidatePaperEvidence(p);
+        const cb=document.querySelector(`[data-paper="verified"][data-index="${el.dataset.index}"]`);if(cb)cb.checked=false;
         const container = el.closest('[data-paper-item]');
         const badge = container?.querySelector('.pill');
         if (badge) badge.textContent = '修改后可重新分析';
@@ -329,7 +378,7 @@ function bindPaper() {
   if (!paper) return;
 
   if ($('#paper-select-all')) $('#paper-select-all').onclick = () => { const checked = !paper.items.every(p => p.selected); paper.items.forEach(p => p.selected = checked); render(); };
-  if ($('#paper-add')) $('#paper-add').onclick = () => { paper.items.push({ section: '手工补录', number: String(paper.items.length + 1), text: '', studentAnswer: '', uncertainty: '手工补录，请填写原文', selected: true, verified: !isTestEnv(), analyzed: false, aiVerdict: '薄弱待练', answer: '', analysis: '', reminder: '', tags: [] }); render(); };
+  if ($('#paper-add')) $('#paper-add').onclick = () => { paper.items.push({ section: '手工补录', number: String(paper.items.length + 1), text: '', studentAnswer: '', answerStatus:'unknown', uncertainty: '手工补录，请填写原文', selected: true, verified: false, analyzed: false, aiVerdict: '薄弱待练', answer: '', analysis: '', reminder: '', tags: [] }); render(); };
 
   if ($('#paper-analyze')) $('#paper-analyze').onclick = e => run(e.target, async () => {
     const failures = await analyzeSelectedItems();
@@ -343,7 +392,76 @@ function bindPaper() {
     toast(`✓ 已收录 ${count} 道错题`);
   });
 
-  if ($('#paper-analyze-and-save')) $('#paper-analyze-and-save').onclick = e => run(e.target, async () => {
+  const paperTa = document.querySelector('textarea.paper-textarea');
+  if($('#paper-move-answer'))$('#paper-move-answer').onclick=()=>{
+    const ta=document.querySelector('textarea.paper-textarea');if(!ta)return;
+    const start=ta.selectionStart,end=ta.selectionEnd;if(start===end){toast('请先在原题文字中选中孩子实际写的答案；不要选印刷选项编号');return}
+    const p=paper.items[0],answer=ta.value.slice(start,end);
+    p.studentAnswer=[p.studentAnswer,answer].filter(Boolean).join('\n');
+    p.text=ta.value.slice(0,start)+'____'+ta.value.slice(end);p.answerStatus='confirmed';invalidatePaperEvidence(p);render();
+  };
+  const paperBox = $('#paper-crop-image-box');
+  const paperImg = $('#paper-crop-img');
+  if (paperTa && typeof paperTa.addEventListener === 'function') {
+    const fitPaperText = () => {
+      const boxH = paperBox && Number.isFinite(paperBox.offsetHeight) ? paperBox.offsetHeight : 0;
+      const contentH = Number.isFinite(paperTa.scrollHeight) ? paperTa.scrollHeight : 0;
+      paperTa.style.height = 'auto';
+      paperTa.style.height = Math.max(180, boxH, contentH) + 'px';
+    };
+    paperTa.addEventListener('input', fitPaperText);
+    if (paperImg) {
+      if (paperImg.complete) fitPaperText();
+      else if (typeof paperImg.addEventListener === 'function') paperImg.addEventListener('load', fitPaperText);
+    }
+    fitPaperText();
+  }
+  if ($('#paper-merge-lines')) $('#paper-merge-lines').onclick = () => {
+    const ta = document.querySelector('textarea.paper-textarea');
+    const raw = paper?.ocrRaw?.words_result;
+    if (!ta || !paper?.items?.[0] || !Array.isArray(raw) || !raw.length || typeof mergeBaiduLines !== 'function') { toast('本次识别没有可合并的百度行数据'); return; }
+    const curLines = ta.value.split('\n');
+    // 行数没变：用当前文字（保留你的手动改字）+ 百度行位置判断；行数已变：按百度原始行合并，点恢复可回到你改过的版本
+    if(raw.length!==curLines.length){toast('文字行数已修改，不能把原始坐标套到校对稿；请手动调整，当前修改已保留');return}
+    const result = mergeBaiduLines(raw.map((r, i) => ({ ...r, words: curLines[i] })));
+    if (!result.usable) { toast('本次识别没有返回行位置，无法安全判断，请手动删换行'); return; }
+    if (!result.merged) { toast('没有找到可合并的断行（已按行位置 + 标点判断）'); return; }
+    paperMergeUndoText = ta.value;
+    ta.value = result.text;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    const undoBtn = $('#paper-undo-merge'); if (undoBtn) undoBtn.hidden = false;
+    toast(`已合并 ${result.merged} 处换行，文字未改动；不对可点「恢复合并前换行」`);
+  };
+  if ($('#paper-undo-merge')) $('#paper-undo-merge').onclick = () => {
+    const ta = document.querySelector('textarea.paper-textarea');
+    if (!ta || paperMergeUndoText == null) return;
+    ta.value = paperMergeUndoText;
+    paperMergeUndoText = null;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    const undoBtn = $('#paper-undo-merge'); if (undoBtn) undoBtn.hidden = true;
+    toast('已恢复合并前的换行');
+  };
+  if (paperImg) paperImg.onclick = () => {
+    const lb = $('#paper-lightbox'), im = $('#paper-lightbox-img');
+    if (!lb || !im || lb.open) return;
+    im.src = (typeof paper !== 'undefined' && paper.image) ? paper.image : paperImg.src;
+    lb.showModal();
+  };
+  if ($('#paper-lightbox-close')) $('#paper-lightbox-close').onclick = () => $('#paper-lightbox').close();
+  if ($('#paper-lightbox')) $('#paper-lightbox').onclick = e => { if (e.target === $('#paper-lightbox')) $('#paper-lightbox').close(); };
+   if ($('#merge-lines')) $('#merge-lines').onclick = () => {
+const ta = document.querySelector('textarea.paper-textarea');
+if (!ta ||!paper ||!paper.items ||!paper.items.length) return;
+const before = ta.value;
+const locs = paper.ocrRaw && Array.isArray(paper.ocrRaw.words_result)? paper.ocrRaw.words_result: null;
+const merged = mergeLineBreaks(before, locs);
+const count = before.split('\n').length - merged.split('\n').length;
+if (count <= 0) { toast('没有可合并的换行'); return;}
+ta.value = merged;
+ta.dispatchEvent(new Event('input', { bubbles: true}));
+toast(`✓ 已合并 ${count} 处换行，核对无误后可分析或收录`);
+};
+if ($('#paper-analyze-and-save')) $('#paper-analyze-and-save').onclick = e => run(e.target, async () => {
     const failures = await analyzeSelectedItems();
     if (failures) {
       render();
