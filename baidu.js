@@ -1,5 +1,11 @@
 const baiduUsage = { calls: 0 };
 
+function ocrLocalFileWarning() {
+  return typeof location !== 'undefined' && (location.protocol === 'file:' || location.origin === 'null')
+    ? '当前从本地文件／压缩包临时目录打开，浏览器来源为 null，线上 OCR 不接受此来源。请先在数据备份中导出 JSON，再打开 https://shiti.86518925.xyz 并导入；两个地址的本地题库不会自动互通。'
+    : '';
+}
+
 function getOcrToken() {
   return localStorage.getItem('shiti-ocr-token') || sessionStorage.getItem('shiti-ocr-token') || '';
 }
@@ -13,6 +19,7 @@ function defaultOCRProxy() {
 
 function baiduSettings() {
   return `<span class="pill">百度 OCR · 默认</span>
+    ${ocrLocalFileWarning()?`<p class="notice">${esc(ocrLocalFileWarning())} <a href="https://shiti.86518925.xyz" target="_blank" rel="noopener">打开线上拾题</a></p>`:''}
     <label class="field"><span>识别服务</span>
       <select id="ocr-provider">
         <option value="baidu" ${(cfg.ocrProvider || 'baidu') === 'baidu' ? 'selected' : ''}>百度高精度 OCR → 校对 → DeepSeek 分析</option>
@@ -48,6 +55,8 @@ function baiduError(code) {
 
 async function testOCRConnection() {
   const out = $('#ocr-test-result');
+  const localWarning = ocrLocalFileWarning();
+  if (localWarning) { out.textContent = '⚠️ ' + localWarning; return; }
   const endpoint = ($('#ocr-proxy')?.value || cfg.ocrProxy || defaultOCRProxy()).trim();
   const token = ($('#ocr-token')?.value || getOcrToken()).trim();
   if (!endpoint) { out.textContent = '❌ 请先填写 OCR 代理地址'; return; }
@@ -72,6 +81,8 @@ async function testOCRConnection() {
 }
 
 async function callBaiduOCR(src) {
+  const localWarning = ocrLocalFileWarning();
+  if (localWarning) throw Error(localWarning);
   const endpoint = (cfg.ocrProxy || defaultOCRProxy()).trim(),
         token = getOcrToken();
   if (!endpoint) throw Error('请先在「设置」填写百度 OCR 代理地址');
