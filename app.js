@@ -931,6 +931,7 @@ function openQuestion(id) {
     </div>
 
     <p class="prose">${esc(q.text)}</p>
+    ${q.questionType?`<p class="result-note">题型：${esc(QUESTION_TYPE_NAMES[q.questionType]||'其他题型')}</p>`:''}
     <p class="result-note">作答证据：${q.evidenceVerified&&q.answerStatus==='confirmed'?'已人工核对孩子作答':q.answerStatus==='unanswered'?'已确认未作答':'未确认；不能据此诊断孩子错因'}</p>
     ${q.annotation?`<div class="analysis-block"><h3>批注／订正（非原始作答）</h3><p class="prose">${esc(q.annotation)}</p></div>`:''}
     ${q.visualFeatures?`<div class="analysis-block"><h3>加点／划线等视觉信息</h3><p class="prose">${esc(q.visualFeatures)}</p></div>`:''}

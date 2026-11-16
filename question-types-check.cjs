@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const c={console,Intl,Date};vm.createContext(c);vm.runInContext(fs.readFileSync(__dirname+'/ocr-layout.js','utf8'),c);
+const run=s=>vm.runInContext(s,c);
+assert.ok(run("questionTypesFor('数学').includes('calculation')"));assert.ok(!run("questionTypesFor('语文').includes('calculation')"));assert.ok(run("questionTypesFor('英语').includes('cloze')"));
+run("globalThis.p={questionType:'multiple',studentAnswer:'',choices:['A','C'],blankAnswers:[]};updateStructuredAnswer(p)");assert.equal(c.p.studentAnswer,'A、C');
+run("switchQuestionType(p,'single','数学')");assert.equal(c.p.studentAnswer,'');assert.equal(c.p.answerStatus,'unknown');
+run("p.choices=['B'];updateStructuredAnswer(p);switchQuestionType(p,'multiple','数学')");assert.equal(c.p.studentAnswer,'A、C');
+run("switchQuestionType(p,'fill','数学');p.blankAnswers=['原作答1','原作答2','原作答3'];updateStructuredAnswer(p)");assert.equal(c.p.studentAnswer,'第1空：原作答1\n第2空：原作答2\n第3空：原作答3');
+run("switchQuestionType(p,'single','数学')");assert.equal(c.p.studentAnswer,'B');run("switchQuestionType(p,'fill','数学')");assert.equal(c.p.blankAnswers[1],'原作答2');
+assert.equal(run("questionNumber('语文',new Date('2026-11-15T16:01:00Z'),[])"),'语文-20261116-001');
+assert.equal(run("questionNumber('数学',new Date('2026-11-16T00:00:00Z'),[{number:'数学-20261116-003'},{number:'语文-20261116-099'}],1)"),'数学-20261116-005');
+console.log('Passed: subject-specific types, choice serialization, separate type drafts, blank numbering, Shanghai date, per-subject daily sequence.');
