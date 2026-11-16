@@ -1,5 +1,4 @@
 let paper = null, paperLayout = '2', paperProgress = '';
-let paperMergeUndoText = null; // v19：合并换行前一次的校对框内容，点“恢复”可一键回到合并前
 const isTestEnv = () => Boolean(globalThis.assert);
 
 const OCR_SCHEMA = '错字、错误拼音、错误标点和错误选项必须按原图照录，不能自动修正。返回 JSON {"items":[{"section":"大题标题，严格使用目录中的名称","number":"原卷小题号，无号用位置或拼音","text":"完整原题，包含材料、全部选项和空格，不含学生填入内容","studentAnswer":"仅转录实际可见的学生作答，不可推测","uncertainty":"模糊、缺失、跨区截断或无法区分的内容，清晰则空字符串"}],"warnings":["其他问题"]}';
@@ -28,13 +27,7 @@ function paperView() {
       ${paper.warnings.map(w=>`<p class="result-note">${esc(w)}</p>`).join('')}
       <label class="field"><span>原题（仅题干、印刷选项和空位；请移出手写答案与订正，不修正原卷错字）</span><textarea class="paper-textarea" data-paper="text" data-index="0">${esc(p.text)}</textarea></label>
       <div class="actions" style="margin-top:6px"><button type="button" class="secondary" id="paper-move-answer">将选中文字移到孩子作答</button></div>
-      ${paper.ocrProvider === 'baidu' && paper.ocrRaw?.words_result?.length > 1 ? `
-      <div class="actions" style="margin-top:8px;justify-content:flex-start">
-        <button type="button" class="secondary" id="paper-merge-lines">⇄ 一键合并换行</button>
-        <button type="button" class="secondary" id="paper-undo-merge" ${paperMergeUndoText == null ? 'hidden' : ''}>↩ 恢复合并前换行</button>
-      </div>
-      <p class="result-note" style="margin-top:6px">只合并百度判定为同一行的断行，不改任何文字；跨行题干、选项、新题号不会拼。合并后不对可点恢复对照，下方有百度原始转录只读对照。</p>
-      ${typeof rawOCRView === 'function' ? rawOCRView() : ''}` : ''}
+      ${typeof rawOCRView === 'function' ? rawOCRView() : ''}
       <div class="form-row">
         ${paperField('题号 / 备注（选填）', 'number', p.number === '1' ? '' : p.number, 0)}
       </div>
@@ -108,41 +101,6 @@ function paperView() {
 
 function paperField(label, key, value, i, area = false) {
   return `<label class="field"><span>${label}</span>${area ? `<textarea data-paper="${key}" data-index="${i}">${esc(value)}</textarea>` : `<input type="text" data-paper="${key}" data-index="${i}" value="${esc(value)}">`}</label>`;
-}
-
-// 一键合并换行：把百度 OCR 把一行切成的两段拼回去。
-// 判定两条：① 位置：百度每行自带 location，两段中心线高度差不到半行高，
-// 说明本来就在同一条基线上；② 内容：前一段结尾不是句末标点，后一段开头
-// 不是选项/题号/解:答:这类新条目标记。两条都满足才拼。
-// 只动换行符本身，不改任何字；百度原始转录 ocrOriginalText 原样保留。
-function mergeLineBreaks(text, locs) {
-const lines = String(text == null? '': text).split('\n');
-const aligned = Array.isArray(locs) && locs.length === lines.length;
-const terminal = /[。？！；：…:!?]$/;
-const newItem = /^(?:[A-DＡ-Ｄ][\.．、\s]|[(（]\d+[)）]|[①-⑳]|第[一二三四五六七八九十\d]+[题条]|(?:解|答|证明|分析)[:：]|\d+[\.．、])/;
-const out = [];
-for (let i = 0; i < lines.length; i++) {
-const line = lines[i];
-const prev = out.length? out[out.length - 1]: null;
-if (prev === null || prev === '' || line === '') { out.push(line); continue;}
-let sameLine = true;
-if (aligned) {
-const a = locs[i - 1] && locs[i - 1].location, b = locs[i] && locs[i].location;
-if (a && b) {
-const h = Math.max(a.height, b.height, 1);
-sameLine = Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) < h * 0.6;
-} else sameLine = false;
-}
-const prevTrim = prev.replace(/\s+$/, '');
-const nextTrim = line.replace(/^\s+/, '');
-const stepHead = /^(?:解|答|证明|分析)[:：]/;
-const textOk = !terminal.test(prevTrim) && !stepHead.test(prevTrim) && !newItem.test(nextTrim);
-if (sameLine && textOk) {
-const joiner = /[A-Za-z0-9]$/.test(prevTrim) && /^[A-Za-z0-9]/.test(nextTrim)? ' ': '';
-out[out.length - 1] = prevTrim + joiner + nextTrim;
-} else out.push(line);
-}
-return out.join('\n');
 }
 
 function paperKey(p) {
@@ -416,31 +374,6 @@ function bindPaper() {
     }
     fitPaperText();
   }
-  if ($('#paper-merge-lines')) $('#paper-merge-lines').onclick = () => {
-    const ta = document.querySelector('textarea.paper-textarea');
-    const raw = paper?.ocrRaw?.words_result;
-    if (!ta || !paper?.items?.[0] || !Array.isArray(raw) || !raw.length || typeof mergeBaiduLines !== 'function') { toast('本次识别没有可合并的百度行数据'); return; }
-    const curLines = ta.value.split('\n');
-    // 行数没变：用当前文字（保留你的手动改字）+ 百度行位置判断；行数已变：按百度原始行合并，点恢复可回到你改过的版本
-    if(raw.length!==curLines.length){toast('文字行数已修改，不能把原始坐标套到校对稿；请手动调整，当前修改已保留');return}
-    const result = mergeBaiduLines(raw.map((r, i) => ({ ...r, words: curLines[i] })));
-    if (!result.usable) { toast('本次识别没有返回行位置，无法安全判断，请手动删换行'); return; }
-    if (!result.merged) { toast('没有找到可合并的断行（已按行位置 + 标点判断）'); return; }
-    paperMergeUndoText = ta.value;
-    ta.value = result.text;
-    ta.dispatchEvent(new Event('input', { bubbles: true }));
-    const undoBtn = $('#paper-undo-merge'); if (undoBtn) undoBtn.hidden = false;
-    toast(`已合并 ${result.merged} 处换行，文字未改动；不对可点「恢复合并前换行」`);
-  };
-  if ($('#paper-undo-merge')) $('#paper-undo-merge').onclick = () => {
-    const ta = document.querySelector('textarea.paper-textarea');
-    if (!ta || paperMergeUndoText == null) return;
-    ta.value = paperMergeUndoText;
-    paperMergeUndoText = null;
-    ta.dispatchEvent(new Event('input', { bubbles: true }));
-    const undoBtn = $('#paper-undo-merge'); if (undoBtn) undoBtn.hidden = true;
-    toast('已恢复合并前的换行');
-  };
   if (paperImg) paperImg.onclick = () => {
     const lb = $('#paper-lightbox'), im = $('#paper-lightbox-img');
     if (!lb || !im || lb.open) return;
@@ -449,18 +382,6 @@ function bindPaper() {
   };
   if ($('#paper-lightbox-close')) $('#paper-lightbox-close').onclick = () => $('#paper-lightbox').close();
   if ($('#paper-lightbox')) $('#paper-lightbox').onclick = e => { if (e.target === $('#paper-lightbox')) $('#paper-lightbox').close(); };
-   if ($('#merge-lines')) $('#merge-lines').onclick = () => {
-const ta = document.querySelector('textarea.paper-textarea');
-if (!ta ||!paper ||!paper.items ||!paper.items.length) return;
-const before = ta.value;
-const locs = paper.ocrRaw && Array.isArray(paper.ocrRaw.words_result)? paper.ocrRaw.words_result: null;
-const merged = mergeLineBreaks(before, locs);
-const count = before.split('\n').length - merged.split('\n').length;
-if (count <= 0) { toast('没有可合并的换行'); return;}
-ta.value = merged;
-ta.dispatchEvent(new Event('input', { bubbles: true}));
-toast(`✓ 已合并 ${count} 处换行，核对无误后可分析或收录`);
-};
 if ($('#paper-analyze-and-save')) $('#paper-analyze-and-save').onclick = e => run(e.target, async () => {
     const failures = await analyzeSelectedItems();
     if (failures) {
