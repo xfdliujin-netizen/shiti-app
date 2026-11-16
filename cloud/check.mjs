@@ -1,0 +1,44 @@
+import {DatabaseSync} from 'node:sqlite';
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+import {handle,hex} from './worker.mjs';
+const sql=new DatabaseSync(':memory:');sql.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));
+let calls=0;
+const DB={prepare(query){calls++;return {bind(...args){const stmt=sql.prepare(query);return {async first(){return stmt.get(...args)||null},async all(){return {results:stmt.all(...args)}},async run(){return stmt.run(...args)}}}}}};
+const env={DB,STORAGE_ENABLED:'true',ALLOWED_ORIGIN:'https://shiti.86518925.xyz',ACCESS_ISSUER:'https://test.cloudflareaccess.com',ACCESS_AUD:'test-aud',ALLOWED_EMAIL:'owner@example.com'};
+const pair=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
+const jwk=await crypto.subtle.exportKey('jwk',pair.publicKey);jwk.kid='test-key';
+const realFetch=globalThis.fetch;globalThis.fetch=async()=>new Response(JSON.stringify({keys:[jwk]}));
+const b64=v=>Buffer.from(typeof v==='string'?v:JSON.stringify(v)).toString('base64url');
+async function jwt(overrides={}){const input=b64({alg:'RS256',kid:jwk.kid})+'.'+b64({iss:env.ACCESS_ISSUER,aud:[env.ACCESS_AUD],exp:Date.now()/1000+300,email:env.ALLOWED_EMAIL,...overrides});return input+'.'+Buffer.from(await crypto.subtle.sign('RSASSA-PKCS1-v1_5',pair.privateKey,new TextEncoder().encode(input))).toString('base64url')}
+const token=await jwt();
+async function call(path,method='GET',body,auth=token,origin=env.ALLOWED_ORIGIN,contentType='application/json'){
+ return handle(new Request('https://api.86518925.xyz'+path,{method,headers:{Origin:origin,...(auth?{'Cf-Access-Jwt-Assertion':auth}:{}),'Content-Type':contentType},...(body!==undefined?{body:body instanceof Uint8Array?body:JSON.stringify(body)}:{})}),env);
+}
+assert.equal((await call('/api/session','GET',undefined,null)).status,401);assert.equal(calls,0);
+assert.equal((await call('/api/session','GET',undefined,await jwt({email:'attacker@example.com'}))).status,401);assert.equal(calls,0);
+assert.equal((await call('/api/session','GET',undefined,await jwt({exp:1}))).status,401);assert.equal(calls,0);
+assert.equal((await call('/api/session','GET',undefined,token,'https://evil.example')).status,403);assert.equal(calls,0);
+assert.equal((await call('/api/session','GET',undefined,token+'x')).status,401);assert.equal(calls,0);
+const payload={id:'q1',number:'001',subject:'语文',text:'测试题',tags:[],created:new Date().toISOString(),updated:new Date().toISOString()};
+const record={kind:'question',id:'q1',payload,revision:0,deleted:false};
+assert.equal((await call('/api/record','PUT',record)).status,200);
+assert.equal((await call('/api/record','PUT',record)).status,409);
+const first=await(await call('/api/changes')).json();assert.equal(first.items.length,1);assert.equal(first.items[0].revision,1);
+const race=await Promise.all([call('/api/record','PUT',{...record,revision:1}),call('/api/record','PUT',{...record,revision:1})]);
+assert.deepEqual(race.map(r=>r.status).sort(),[200,409]);
+const incremental=await(await call('/api/changes?after='+first.cursor)).json();assert.equal(incremental.items[0].revision,2);assert.ok(incremental.cursor>first.cursor);
+const image=new Uint8Array([255,216,255,224,0,0,255,217]),id=hex(await crypto.subtle.digest('SHA-256',image));
+assert.equal((await call('/api/image?id='+id,'PUT',image,token,env.ALLOWED_ORIGIN,'image/jpeg')).status,200);
+assert.equal((await call('/api/image?id='+id,'PUT',image,token,env.ALLOWED_ORIGIN,'image/jpeg')).status,200);
+assert.equal(sql.prepare('SELECT bytes FROM storage').get().bytes,image.length);
+assert.deepEqual(new Uint8Array(await(await call('/api/image?id='+id)).arrayBuffer()),image);
+assert.equal((await call('/api/image?id='+id,'PUT',new Uint8Array(300001),token,env.ALLOWED_ORIGIN,'image/jpeg')).status,413);
+assert.equal((await call('/api/record','PUT',{...record,revision:2,deleted:true,payload:{updated:payload.updated}})).status,200);
+assert.equal((await(await call('/api/changes')).json()).items[0].deleted,1);
+sql.prepare('UPDATE storage SET bytes=209715200').run();
+assert.throws(()=>sql.prepare('INSERT INTO images VALUES(?,?,?)').run('another','image/jpeg',image),/storage_limit/);
+sql.prepare('UPDATE quotas SET requests=10000').run();assert.equal((await call('/api/session')).status,429);
+env.STORAGE_ENABLED='false';const before=calls;assert.equal((await call('/api/session')).status,503);assert.equal(calls,before);
+globalThis.fetch=realFetch;sql.close();
+console.log('Cloud checks passed: signed Access JWT, zero DB before auth, origin, optimistic concurrency, incremental cursor, binary images, dedup, upload/storage quotas, tombstones, fail-closed switch.');

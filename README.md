@@ -1,5 +1,7 @@
 # 拾题 · 错题本
 
+新增 Worker + D1 私人云端架构：设置页可打开云端登录并手动同步错题、压缩题图、练习及学情档案。服务默认关闭，需按 [cloud/README.md](cloud/README.md) 创建 D1、配置 Access 后启用；不使用 R2。离线题库与 JSON 备份继续保留。验证：`node cloud/check.mjs`、`node cloud/client-check.mjs`。
+
 **当前默认已改为：框选 → 百度高精度 OCR → 校对原文 → DeepSeek 文字分析。** 百度接入、代理部署与实际填写方法请优先阅读 [BAIDU-OCR.md](BAIDU-OCR.md)。下面保留原有功能说明和版本记录。
 
 无需构建、无第三方运行时依赖的个人错题本。四个 Tab：录题、错题本、练习、设置。浅灰与白色卡片、苹果系统字体、移动端底栏。

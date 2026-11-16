@@ -1,0 +1,21 @@
+name = "shiti-data"
+main = "worker.mjs"
+compatibility_date = "2026-11-16"
+workers_dev = false
+preview_urls = false
+
+[vars]
+ALLOWED_ORIGIN = "https://shiti.86518925.xyz"
+STORAGE_ENABLED = "false"
+# Configure before enabling: ACCESS_ISSUER=https://your-team.cloudflareaccess.com
+# ACCESS_AUD=Access application audience; ALLOWED_EMAIL=your personal email
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shiti-notebook"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# Bind api.86518925.xyz only AFTER enabling Cloudflare Access on this hostname.
+# [[routes]]
+# pattern = "api.86518925.xyz"
+# custom_domain = true

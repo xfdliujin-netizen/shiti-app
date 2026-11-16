@@ -613,6 +613,7 @@ function settings() {
       <button class="primary" id="save-profile" style="margin-top:8px">✓ 保存学情档案</button>
     </section>
 
+    ${typeof cloudSettings === 'function' ? cloudSettings() : ''}
     <div class="settings-grid">
       <div>
         ${bSettings}
@@ -1116,6 +1117,7 @@ function merge(a, b) {
 }
 
 function bindSettings() {
+  if (typeof bindCloudSettings === 'function') bindCloudSettings();
   document.querySelectorAll('[data-stage-pick]').forEach(btn => {
     btn.onclick = () => {
       const nextStage = btn.dataset.stagePick;
