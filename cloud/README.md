@@ -1,6 +1,12 @@
 # Worker + D1 私人云端架构
 
-现有 GitHub Pages 网站继续使用 shiti.86518925.xyz；本目录提供独立的 api.86518925.xyz Worker。仅用 D1，无 R2、DO、第三方运行时依赖。配置默认关闭，不会自动上传本地题库。
+现有 GitHub Pages 网站继续使用 shiti.86518925.xyz；本目录提供独立的 api.86518925.xyz Worker。仅用 D1，无 R2、DO、第三方运行时依赖。同步由用户手动触发，不会自动上传本地题库。
+
+## 当前部署状态（2026-11-16）
+
+D1 已初始化，shiti-data Worker 已部署并启用，绑定 api.86518925.xyz。Access 应用“拾题私人数据”只允许用户确认的本人邮箱，邮箱以 Worker Secret 配置；团队域名 aged-cake-0b04.cloudflareaccess.com，应用 ID 7eeac063-484c-47b3-b96d-f47651a615ef。后台已确认 Zero Trust Free 和 Workers Free。
+
+上线验证：匿名 GET/PUT 均 302 跳转 Access 登录，OPTIONS 为 204，精确来源与 credentials 响应正确。后端 SQLite/JWT、两设备同步和核心检查通过。尚待用户邮箱验证码登录后的真实题库同步验收；验证码不应提供给代理或写入代码。首次同步前请先导出 JSON 备份。
 
 ## 已实现
 
@@ -13,7 +19,7 @@
 
 ## 部署（在 review-app/cloud 目录执行）
 
-需要 Node.js 与 Wrangler CLI，以及你自己的 Cloudflare 登录。不要把账户 Token 写进源码。下面命令由已登录的账户执行；本次未取得 Cloudflare 会话，未创建远端资源。
+以下为重新部署或在其他账户部署时的参考流程，当前账户已有资源无需重复创建。需要 Node.js 与 Wrangler CLI，以及你自己的 Cloudflare 登录。不要把账户 Token 写进源码。
 
 ```powershell
 npx wrangler login

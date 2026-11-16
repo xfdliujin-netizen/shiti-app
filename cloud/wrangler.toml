@@ -6,18 +6,17 @@ preview_urls = false
 
 [vars]
 ALLOWED_ORIGIN = "https://shiti.86518925.xyz"
-STORAGE_ENABLED = "false"
+STORAGE_ENABLED = "true"
 ACCESS_ISSUER = "https://aged-cake-0b04.cloudflareaccess.com"
 ACCESS_AUD = "f11240b2bb3f019d2d84b90887d4370ed3acb10a09bc7578a02ba4022ce68189"
-# Configure before enabling: ACCESS_ISSUER=https://your-team.cloudflareaccess.com
-# ACCESS_AUD=Access application audience; ALLOWED_EMAIL=your personal email
+# ALLOWED_EMAIL is configured as a Worker Secret, not stored in this repository.
 
 [[d1_databases]]
 binding = "DB"
 database_name = "shiti-notebook"
 database_id = "6001080c-5898-4ddc-a87c-302cd0434932"
 
-# Bind api.86518925.xyz only AFTER enabling Cloudflare Access on this hostname.
+# This hostname is protected by a Cloudflare Access personal-email allowlist.
 [[routes]]
 pattern = "api.86518925.xyz"
 custom_domain = true
