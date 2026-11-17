@@ -47,7 +47,7 @@ function cloudEntries(notebook) {
     for(const kind of ['question','practice'])result.set(kind+':'+id,{kind,id,payload:{updated},deleted:true});
   }
   if(typeof extraCloudEntries==='function')for(const entry of extraCloudEntries(notebook))result.set(entry.kind+':'+entry.id,entry);
-  result.set('profile:student',{kind:'profile',id:'student',payload:{stage:cfg.stage||'primary',grade:getStudentProfile().grade,term:getStudentProfile().term||'上',region:getStudentProfile().region,teachingStyle:cfg.teachingStyle||'step',teachingFocus:cfg.teachingFocus||'understanding',knowledgeProgress:cfg.knowledgeProgress||{},methodProgress:cfg.methodProgress||{},bankReviewed:cfg.bankReviewed||[]},deleted:false});
+  result.set('profile:student',{kind:'profile',id:'student',payload:{stage:cfg.stage||'primary',grade:getStudentProfile().grade,term:getStudentProfile().term||'上',region:getStudentProfile().region,teachingStyle:cfg.teachingStyle||'step',teachingFocus:cfg.teachingFocus||'understanding',knowledgeProgress:cfg.knowledgeProgress||{},methodProgress:cfg.methodProgress||{},bankReviewed:cfg.bankReviewed||[],sourceChoices:cfg.sourceChoices,typeChoices:cfg.typeChoices},deleted:false});
   return result;
 }
 async function syncCloud() {
@@ -94,7 +94,7 @@ async function syncCloud() {
   }
   if(JSON.stringify(data)!==initial||JSON.stringify(cloudEntries(data).get('profile:student').payload)!==profileInitial)throw Error('同步期间本地内容发生变化，请重试');
   validate(next);await persist(next);
-  if(profile){cfg.stage=profile.stage;cfg.grade=profile.grade;cfg.term=['上','下'].includes(profile.term)?profile.term:getStudentProfile().term;cfg.region=profile.region;cfg.teachingStyle=profile.teachingStyle||'step';cfg.teachingFocus=profile.teachingFocus||'understanding';cfg.knowledgeProgress=profile.knowledgeProgress||{};cfg.methodProgress=profile.methodProgress||{};cfg.bankReviewed=profile.bankReviewed||[];saveLocalConfig()}
+  if(profile){cfg.stage=profile.stage;cfg.grade=profile.grade;cfg.term=['上','下'].includes(profile.term)?profile.term:getStudentProfile().term;cfg.region=profile.region;cfg.teachingStyle=profile.teachingStyle||'step';cfg.teachingFocus=profile.teachingFocus||'understanding';cfg.knowledgeProgress=profile.knowledgeProgress||{};cfg.methodProgress=profile.methodProgress||{};cfg.bankReviewed=profile.bankReviewed||[];if(Array.isArray(profile.sourceChoices))cfg.sourceChoices=profile.sourceChoices;if(profile.typeChoices&&typeof profile.typeChoices==='object')cfg.typeChoices=profile.typeChoices;saveLocalConfig()}
   await cloudSaveState(stateKey,state);
   // Persist progress per accepted record. Conflicts and interruptions never overwrite remote edits.
   for(const [key,entry] of pending) {

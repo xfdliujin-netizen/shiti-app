@@ -17,7 +17,7 @@ function arrangeOCRLines(blocks) {
 }
 function answerEvidence(p) {
   const status=p.answerStatus||'unknown';
-  return {status,questionType:QUESTION_TYPE_NAMES[p.questionType]||'未分类',answer:status==='confirmed'?String(p.studentAnswer||'').trim():'',annotation:String(p.annotation||''),visualFeatures:String(p.visualFeatures||''),verified:Boolean(p.verified)};
+  return {status,questionType:p.questionTypeName||QUESTION_TYPE_NAMES[p.questionType]||'未分类',answer:status==='confirmed'?String(p.studentAnswer||'').trim():'',annotation:String(p.annotation||''),visualFeatures:String(p.visualFeatures||''),verified:Boolean(p.verified)};
 }
 const QUESTION_TYPE_NAMES={other:'其他题型',choice:'选择题',single:'选择题',multiple:'选择题',fill:'填空题',judge:'判断题',answer:'问答题',calculation:'计算题',application:'应用题',proof:'证明题',reading:'阅读理解',writing:'写作题',cloze:'完形填空',translation:'翻译题',experiment:'实验探究题',material:'材料分析题'};
 function normalizeQuestionType(type){return ['single','multiple'].includes(type)?'choice':type}
@@ -74,7 +74,7 @@ function answerReviewFields(p,i) {
   const subject=typeof paper!=='undefined'&&paper?paper.subject:currentSubject;
   ensureAnswerStructure(p,subject);
   const options=[['unknown','无法确认孩子作答（只解题，不判断错因）'],['confirmed','已确认孩子的作答'],['unanswered','已确认未作答']];
-  return `<div class="answer-review"><label class="field"><span>题型</span><select data-paper="questionType" data-index="${i}">${questionTypeOptions(subject,p.questionType)}</select></label>
+  return `<div class="answer-review">${typeof editableTypeFields==='function'?editableTypeFields(p,i,subject):`<label class="field"><span>题型</span><select data-paper="questionType" data-index="${i}">${questionTypeOptions(subject,p.questionType)}</select></label>`}
     ${structuredAnswerFields(p,i)}
     <label class="field"><span>作答证据状态</span><select data-paper="answerStatus" data-index="${i}">${options.map(([v,t])=>`<option value="${v}" ${(p.answerStatus||'unknown')===v?'selected':''}>${t}</option>`).join('')}</select></label>
     <details class="answer-extra" data-answer-extra="${i}" ${p.showAnswerExtra?'open':''}><summary>补充批注与原题视觉信息（选填）</summary>

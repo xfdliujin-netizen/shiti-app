@@ -24,6 +24,7 @@ function paperView() {
         <span class="pill">${p.analyzed ? '✓ 已生成 AI 解析与错因判定' : '待校对 / 分析'}</span>
       </div>
       ${typeof paperNotebookField==='function'?paperNotebookField():''}
+      ${typeof paperSourceFields==='function'?paperSourceFields():''}
       ${paper.image ? `<div id="paper-crop-image-box" style="margin-bottom:10px;background:#f8fafc;padding:8px;border-radius:10px;text-align:center"><img id="paper-crop-img" class="paper-original" src="${paper.image}" alt="框选原图，点击全屏查看" title="点击全屏查看" style="max-height:180px;width:auto;margin:0 auto;display:block;cursor:zoom-in"></div><dialog id="paper-lightbox" class="image-lightbox"><button type="button" class="lightbox-close" id="paper-lightbox-close" aria-label="关闭">×</button><img id="paper-lightbox-img" alt="框选图全屏预览"></dialog>` : ''}
       ${paper.warnings.map(w=>`<p class="result-note">${esc(w)}</p>`).join('')}
       <label class="field"><span>原题（仅题干、印刷选项和空位；请移出手写答案与订正，不修正原卷错字）</span><textarea class="paper-textarea" data-paper="text" data-index="0">${esc(p.text)}</textarea></label>
@@ -61,6 +62,7 @@ function paperView() {
       <h2>${paper.scope === 'crop' ? '框内原文核对' : '整卷逐题核对'} · ${paper.items.length} 题</h2>
       <span class="pill">${paper.complete ? '转录已返回' : '转录尚未完成'}</span>
     </div>
+    ${typeof paperSourceFields==='function'?paperSourceFields():''}
     <p class="result-note">${paper.ocrProvider === 'baidu' ? '请对照裁剪图核对原文。' : `目录发现 ${paper.inventory.length} 个题号；当前转录 ${paper.items.length} 个条目。`}${missing.length ? ' 待核对：' + esc(missing.map(p => p.section + ' / ' + p.number).join('、')) : ''}</p>
     ${paper.warnings.map(w => `<p class="result-note">${esc(w)}</p>`).join('')}
     ${paper.image ? `<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">展开原图对照（默认收起）</summary><a href="${paper.image}" target="_blank" rel="noopener"><img class="paper-original" src="${paper.image}" alt="原始试卷，点击放大"></a></details>` : ''}
@@ -268,6 +270,7 @@ async function saveSelectedItems() {
       notebookId:$('#paper-notebook')?.value||paper.notebookId||(typeof captureNotebookId==='function'?captureNotebookId():'default'),
       grade:getStudentProfile().grade,term:getStudentProfile().term,
       questionType:p.questionType||paper.questionType||'other',
+      questionTypeName:p.questionTypeName||QUESTION_TYPE_NAMES[p.questionType]||'其他题型',
       answerDetails:{choices:p.choices||[],blankAnswers:p.blankAnswers||[],blankCount:p.blankCount||0,optionCount:p.optionCount||0},
       source: [paper.source, p.section !== '框选题目' ? p.section : '', p.number !== '1' ? p.number : ''].filter(Boolean).join(' · '),
       text: p.text,
@@ -307,8 +310,7 @@ async function saveSelectedItems() {
 
 function bindPaper() {
   const layout = $('#paper-layout');
-  if (!layout) return;
-  layout.onchange = () => { paperLayout = layout.value; };
+  if(layout)layout.onchange = () => { paperLayout = layout.value; };
   if ($('#analyze')) $('#analyze').onclick = e => run(e.target, recognizePaper);
 
   document.querySelectorAll('[data-paper]').forEach(el => {
@@ -339,6 +341,7 @@ function bindPaper() {
   document.querySelectorAll('[data-paper-delete]').forEach(b => b.onclick = () => { paper.items.splice(Number(b.dataset.paperDelete), 1); render(); });
   if (!paper) return;
   bindStructuredAnswerFields();
+  if(typeof bindCaptureOptions==='function')bindCaptureOptions();
 
   if ($('#paper-select-all')) $('#paper-select-all').onclick = () => { const checked = !paper.items.every(p => p.selected); paper.items.forEach(p => p.selected = checked); render(); };
   if ($('#paper-add')) $('#paper-add').onclick = () => { paper.items.push({ section: '手工补录', number: String(paper.items.length + 1), text: '', studentAnswer: '', answerStatus:'unknown', uncertainty: '手工补录，请填写原文', selected: true, verified: false, analyzed: false, aiVerdict: '薄弱待练', answer: '', analysis: '', reminder: '', tags: [] }); render(); };

@@ -311,9 +311,6 @@ function capture() {
   const quickSubjects = getQuickSubjects();
   const displaySubjects = quickSubjects.includes(currentSubject) ? quickSubjects : [...quickSubjects, currentSubject];
   const hasBaidu = typeof usesBaidu === 'function' ? usesBaidu() : false;
-  const rScope = typeof recognitionScope !== 'undefined' ? recognitionScope : 'crop';
-  const pLayout = typeof paperLayout !== 'undefined' ? paperLayout : '2';
-  const uText = typeof usageText === 'function' ? usageText() : '';
   const pView = typeof paperView === 'function' ? paperView() : '';
   const cView = typeof cropView === 'function' && image ? cropView() : '';
 
@@ -321,7 +318,7 @@ function capture() {
     <section class="card capture-card">
       <div class="card-head capture-head">
         <h2>录入新错题</h2>
-        <label class="capture-type"><span>题型</span><select id="capture-question-type">${questionTypeOptions(currentSubject,cfg.questionTypes?.[currentSubject]||'other')}</select></label>
+        <div class="ocr-switch" role="group" aria-label="图片识别服务"><button type="button" data-ocr-provider="baidu" aria-pressed="${hasBaidu}" class="${hasBaidu?'active':''}">百度 OCR</button><button type="button" data-ocr-provider="deepseek" aria-pressed="${!hasBaidu}" class="${!hasBaidu?'active':''}">DeepSeek</button></div>
       </div>
       
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
@@ -333,11 +330,9 @@ function capture() {
 
       ${renderSubjectConfigModal()}
       ${typeof captureNotebookField==='function'?captureNotebookField():''}
-      <div class="ocr-switch" role="group" aria-label="图片识别服务"><button type="button" data-ocr-provider="baidu" aria-pressed="${hasBaidu}" class="${hasBaidu?'active':''}">百度 OCR</button><button type="button" data-ocr-provider="deepseek" aria-pressed="${!hasBaidu}" class="${!hasBaidu?'active':''}">DeepSeek</button></div>
-      ${!hasBaidu?'<p class="ocr-provider-note">视觉转录后，请核对原题及孩子作答。</p>':''}
       <div id="capture-input">
         ${mode === 'image'
-          ? (image ? '<input id="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>'+cView : '<label class="upload" id="drop"><input id="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden><span class="upload-icon">↥</span><b>点击拍照或选择试卷图片</b><small>选图后全屏框选，支持双指缩放和旋转</small></label>')
+          ? (image ? '<input id="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>'+cView : '<label class="upload" id="drop"><input id="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden><span class="upload-icon">↥</span><b>点击拍照或选择试卷图片</b><small>单指框选，双指缩放和旋转</small></label>')
           : '<textarea id="question-text" class="tall" placeholder="在这里粘贴或输入完整题目，包含题干和选项……"></textarea>'}
       </div>
 
@@ -346,19 +341,7 @@ function capture() {
         <button class="secondary" id="manual">手动填表</button>
       </div>
 
-      <details style="margin-top:12px">
-        <summary style="cursor:pointer;font-size:13px;color:var(--muted)">➕ 补充试卷来源、我的错因或切换整卷模式（选填）</summary>
-        <div style="padding-top:10px">
-          <div class="form-row">
-            ${field('来源（选填）', 'source', currentSource, 'text', '例如：单元测验 · 第 4 题')}
-            <label class="field"><span>识别范围</span><select id="recognition-scope"><option value="crop" ${rScope === 'crop' ? 'selected' : ''}>取景框内 · 单题识别</option><option value="full" ${rScope === 'full' ? 'selected' : ''}>整张试卷 · 批量扫描</option></select></label>
-          </div>
-          <label class="field"><span>孩子的错误作答 / 困惑（选填）</span><textarea id="mistake" placeholder="记下孩子的错误答案或卡点，AI 解析与判定标签会更有针对性。" style="min-height:60px">${esc(currentMistake)}</textarea></label>
-          <label class="field"><span>试卷排版</span><select id="paper-layout"><option value="2" ${pLayout === '2' ? 'selected' : ''}>双栏试卷</option><option value="1" ${pLayout === '1' ? 'selected' : ''}>单栏试卷</option></select></label>
-          <p class="notice" id="scope-note" hidden></p>
-          <p class="hint" id="token-usage">${uText}</p>
-        </div>
-      </details>
+
     </section>
 
     <div id="paper-area">${paper ? `<dialog id="paper-dialog" class="paper-dialog"><div class="paper-dialog-close-wrap"><button type="button" class="detail-close" id="paper-dialog-close" aria-label="关闭">×</button></div>${pView}</dialog><button type="button" class="secondary" id="open-paper">📄 查看识别结果 · ${paper.items.length} 题</button>` : ''}</div>
@@ -397,13 +380,15 @@ function notebook() {
   const usedVerdicts = [...new Set(data.questions.map(q => inferAiVerdict(q)))];
   const verdictOptions = ['全部', ...aiVerdictTags.filter(v => usedVerdicts.includes(v) || ['概念混淆', '审题偏差', '计算粗心', '薄弱待练'].includes(v))];
 
+  if(typeof activeNotebook!=='undefined'&&activeNotebook!=='all'&&!notebookList().some(b=>b.id===activeNotebook))activeNotebook='all';
   const bookQuestions = data.questions.filter(q => typeof activeNotebook==='undefined'||activeNotebook==='all'||questionNotebook(q)===activeNotebook);
   const nbTotal = bookQuestions.length;
   const nbUnmastered = bookQuestions.filter(q => !q.mastered).length;
   const nbMastered = nbTotal - nbUnmastered;
   return renderStageBanner() +
-    `<div class="page-head notebook-head"><div class="notebook-title"><h1>错题本</h1><button class="secondary" id="sample">体验示例题</button></div><div class="notebook-status" role="group" aria-label="掌握状态筛选">${[['all','累计错题',nbTotal],['unmastered','待巩固',nbUnmastered],['mastered','已掌握',nbMastered]].map(([value,label,count])=>`<button type="button" data-status="${value}" class="status-stat ${notebookStatus===value?'active':''}" aria-pressed="${notebookStatus===value}"><span>${label}</span><b>${count}</b></button>`).join('')}</div></div>` +
+    `<div class="page-head notebook-head"><div class="notebook-title"><h1>错题本</h1><button class="secondary" id="sample">体验示例题</button></div></div>` +
     (typeof notebooksPanel==='function'?notebooksPanel():'') +
+    `<div class="notebook-status" role="group" aria-label="掌握状态筛选">${[['all','累计错题',nbTotal],['unmastered','待巩固',nbUnmastered],['mastered','已掌握',nbMastered]].map(([value,label,count])=>`<button type="button" data-status="${value}" class="status-stat ${notebookStatus===value?'active':''}" aria-pressed="${notebookStatus===value}"><span>${label}</span><b>${count}</b></button>`).join('')}</div>` +
     `<input class="search" id="search" aria-label="搜索错题" placeholder="⌕ 搜索题干、编号、知识点、错因标签…" value="${esc(query)}">` +
     `<div class="filters" style="align-items:center">
       ${['全部', ...displaySubjects].map(s => `<button class="chip ${filter === s ? 'active' : ''}" data-filter="${s}">${s}</button>`).join('')}
@@ -845,6 +830,7 @@ function bind(tab) {
   if(typeof bindNotebooks==='function')bindNotebooks();
   if(tab==='libraries'){bindLibraries();bindPractice()}
   if (tab === 'capture') {
+    recognitionScope='crop';
     document.querySelectorAll('[data-ocr-provider]').forEach(b=>b.onclick=()=>{if(busy)return;cfg.ocrProvider=b.dataset.ocrProvider;recognitionScope='crop';saveLocalConfig();render()});
     if($('#capture-question-type'))$('#capture-question-type').onchange=e=>{cfg.questionTypes={...cfg.questionTypes,[currentSubject]:e.target.value};saveLocalConfig()};
     document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { mode = b.dataset.mode; render(); });
@@ -966,7 +952,7 @@ function openQuestion(id) {
 
     ${typeof notebookOptions==='function'?`<label class="paper-destination"><span>移动到错题本</span><select id="detail-notebook" data-id="${esc(q.id)}">${notebookOptions(questionNotebook(q))}</select></label>`:''}
     <p class="prose">${esc(q.text)}</p>
-    ${q.questionType?`<p class="result-note">题型：${esc(QUESTION_TYPE_NAMES[q.questionType]||'其他题型')}</p>`:''}
+    ${q.questionType?`<p class="result-note">题型：${esc(q.questionTypeName||QUESTION_TYPE_NAMES[q.questionType]||'其他题型')}</p>`:''}
     <p class="result-note">作答证据：${q.evidenceVerified&&q.answerStatus==='confirmed'?'已人工核对孩子作答':q.answerStatus==='unanswered'?'已确认未作答':'未确认；不能据此诊断孩子错因'}</p>
     ${q.annotation?`<div class="analysis-block"><h3>批注／订正（非原始作答）</h3><p class="prose">${esc(q.annotation)}</p></div>`:''}
     ${q.visualFeatures?`<div class="analysis-block"><h3>加点／划线等视觉信息</h3><p class="prose">${esc(q.visualFeatures)}</p></div>`:''}
