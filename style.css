@@ -2246,3 +2246,26 @@ dialog.image-lightbox .image-view-stage img { max-width:100%; max-height:100%; w
 .bank-history { margin:18px 0 90px; }
 @media(max-width:359px){.bank-profile-grid{grid-template-columns:1fr}}
 @media(max-width:359px) { .notebook-title { gap:4px; } .notebook-title h1 { font-size:22px; } .status-stat { font-size:9px; padding:4px 2px; } .capture-type select { max-width:120px; } }
+
+/* ============================================================
+   拾题 · Apple iOS 18 / iPadOS 18 Liquid Glass & Spring Motion (v35)
+   保留全部原有 DOM 结构与选择器，注入非线性弹簧曲线与高质感材质
+   ============================================================ */
+:root {
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-fluid: cubic-bezier(0.16, 1, 0.3, 1);
+  --glass-border: rgba(255, 255, 255, 0.68);
+  --shadow-ambient: 0 2px 6px rgba(0, 0, 0, 0.02), 0 12px 32px -6px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  --shadow-hover: 0 8px 20px -4px rgba(0, 122, 255, 0.10), 0 20px 42px -10px rgba(0, 0, 0, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --shadow-btn-primary: 0 8px 20px -4px rgba(0, 122, 255, 0.36), 0 2px 6px rgba(0, 122, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass-border: rgba(255, 255, 255, 0.14);
+    --shadow-ambient: 0 4px 12px rgba(0, 0, 0, 0.35), 0 16px 36px -8px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --shadow-hover: 0 10px 26px -4px rgba(10, 132, 255, 0.24), 0 22px 48px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    --shadow-btn-primary: 0 8px 22px -4px rgba(10, 132, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+}

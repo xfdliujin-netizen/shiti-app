@@ -266,7 +266,11 @@ function render() {
   }
   if ($('#breadcrumb')) $('#breadcrumb').textContent = `${p.stageName}（${p.grade}） / ` + tabs.find(t => t[0] === parentTab)[1];
   const mobileBar = '';
-  $('#main').innerHTML = mobileBar + ({ capture, notebook, variants: variantsPage, libraries:librariesPage, exam: examPage, settings })[tab]();
+  const mainEl = $('#main');
+  mainEl.innerHTML = mobileBar + ({ capture, notebook, variants: variantsPage, libraries:librariesPage, exam: examPage, settings })[tab]();
+  mainEl.classList.remove('apple-view-swap');
+  if (typeof mainEl.offsetWidth === 'number') void mainEl.offsetWidth;
+  mainEl.classList.add('apple-view-swap');
   bind(tab);
   if (tab === 'capture' && draft && openDraftOnRender) {
     openDraftOnRender = false;
