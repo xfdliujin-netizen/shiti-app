@@ -27,7 +27,7 @@ function paperView() {
       ${paper.image ? `<div id="paper-crop-image-box" style="margin-bottom:10px;background:#f8fafc;padding:8px;border-radius:10px;text-align:center"><img id="paper-crop-img" class="paper-original" src="${paper.image}" alt="框选原图，点击全屏查看" title="点击全屏查看" style="max-height:180px;width:auto;margin:0 auto;display:block;cursor:zoom-in"></div><dialog id="paper-lightbox" class="image-lightbox"><button type="button" class="lightbox-close" id="paper-lightbox-close" aria-label="关闭">×</button><img id="paper-lightbox-img" alt="框选图全屏预览"></dialog>` : ''}
       ${paper.warnings.map(w=>`<p class="result-note">${esc(w)}</p>`).join('')}
       <label class="field"><span>原题（仅题干、印刷选项和空位；请移出手写答案与订正，不修正原卷错字）</span><textarea class="paper-textarea" data-paper="text" data-index="0">${esc(p.text)}</textarea></label>
-      <div class="actions" style="margin-top:6px"><button type="button" class="secondary" id="paper-move-answer">将选中文字移到孩子作答</button></div>
+      ${typeof answerTransferTools==='function'?answerTransferTools():''}
       ${typeof rawOCRView === 'function' ? rawOCRView() : ''}
       ${answerReviewFields(p,0)}
       ${p.analyzed ? `
@@ -310,6 +310,8 @@ async function saveSelectedItems() {
 async function runPaperAction(event,fn){const button=event.currentTarget||event.target,markup=button.innerHTML;await run(button,fn);if(button.isConnected&&markup!==undefined)button.innerHTML=markup}
 
 function bindPaper() {
+  if(typeof releaseAnswerTransfer==='function'){releaseAnswerTransfer();releaseAnswerTransfer=null}
+  if(typeof answerMoveUndo!=='undefined'&&answerMoveUndo?.paper!==paper)answerMoveUndo=null;
   const layout = $('#paper-layout');
   if(layout)layout.onchange = () => { paperLayout = layout.value; };
   if ($('#analyze')) $('#analyze').onclick = e => run(e.target, recognizePaper);
@@ -360,22 +362,7 @@ function bindPaper() {
   });
 
   const paperTa = document.querySelector('textarea.paper-textarea');
-  if($('#paper-move-answer'))$('#paper-move-answer').onclick=()=>{
-    const ta=document.querySelector('textarea.paper-textarea');if(!ta)return;
-    const start=ta.selectionStart,end=ta.selectionEnd;if(start===end){toast('请先在原题文字中选中孩子实际写的答案；不要选印刷选项编号');return}
-    const p=paper.items[0],answer=ta.value.slice(start,end);
-    if(isChoiceType(p.questionType)){
-      const choices=[...new Set(answer.toUpperCase().match(/[A-H]/g)||[])];
-      if(!choices.length){toast('选中的作答不是有效选项；请直接点选，或调整题型');return}
-      p.choices=choices;p.optionCount=Math.max(p.optionCount||5,...choices.map(x=>x.charCodeAt(0)-64));
-    }else if(p.questionType==='fill'){
-      const slot=p.blankAnswers.findIndex(v=>!String(v||'').trim());const pos=slot<0?p.blankAnswers.length:slot;
-      p.blankAnswers[pos]=answer;p.blankCount=Math.max(p.blankCount||3,pos+1);
-    }
-    p.studentAnswer=[p.studentAnswer,answer].filter(Boolean).join('\n');
-    updateStructuredAnswer(p);
-    p.text=ta.value.slice(0,start)+'____'+ta.value.slice(end);p.answerStatus='confirmed';invalidatePaperEvidence(p);render();
-  };
+  if(typeof bindAnswerTransfer==='function')bindAnswerTransfer(paperTa);
   const paperBox = $('#paper-crop-image-box');
   const paperImg = $('#paper-crop-img');
   if (paperTa && typeof paperTa.addEventListener === 'function') {
