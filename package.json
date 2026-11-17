@@ -5,8 +5,8 @@
   "scripts": {
     "test:cloud": "node cloud/check.mjs && node cloud/client-check.mjs",
     "start": "node server.cjs",
-    "check": "node --check app.js && node --check ocr-layout.js && node --check paper.js && node --check crop.js && node --check crop-touch.js && node --check modal-scroll.js && node --check baidu.js && node --check proxy/worker.mjs && node --check server.cjs && node --check learning.js && node --check bank.js && node --check bank-catalog.js && node --check cloud/bank-api.mjs",
-    "test": "node check.cjs && node paper-check.cjs && node crop-check.cjs && node baidu-check.cjs && node ocr-evidence-check.cjs && node ocr-origin-check.cjs && node question-types-check.cjs && node learning-check.cjs && node bank-check.cjs"
+    "check": "node --check app.js && node --check ocr-layout.js && node --check paper.js && node --check crop.js && node --check crop-touch.js && node --check modal-scroll.js && node --check baidu.js && node --check proxy/worker.mjs && node --check server.cjs && node --check learning.js && node --check bank.js && node --check bank-catalog.js && node --check cloud/bank-api.mjs && node --check notebooks.js && node --check libraries.js",
+    "test": "node check.cjs && node paper-check.cjs && node crop-check.cjs && node baidu-check.cjs && node ocr-evidence-check.cjs && node ocr-origin-check.cjs && node question-types-check.cjs && node learning-check.cjs && node bank-check.cjs && node collections-check.cjs"
   },
   "type": "module"
 }

@@ -116,7 +116,7 @@ async function callBaiduOCR(src) {
 async function recognizeWithBaidu() {
   const src = mode === 'image' ? exportCrop() : '', text = $('#question-text')?.value || '';
   if (!src && !text.trim()) throw Error('请上传并框选题目，或输入文字');
-  const meta = { subject: $('#subject').value, source: $('#source').value, mistake: $('#mistake').value };
+  const meta = { notebookId:typeof captureNotebookId==='function'?captureNotebookId():'default', subject: $('#subject').value, source: $('#source').value, mistake: $('#mistake').value };
   meta.questionType=selectedCaptureQuestionType(meta.subject);
   let raw = null, transcript = text, mergedTranscript = text, mergedCount = 0, warnings = [];
   if (src) {

@@ -64,3 +64,7 @@ node check.cjs
 
 
 独立题库使用额外的 bank_questions / bank_batches 表，网页只读，沿用相同身份校验与每日请求上限。首次安装请另外执行 bank/schema.sql 与 bank/seed.sql；步骤、许可、复算方式和客户端边界见 [题库试点说明](../bank/README.md)。
+
+### 独立题库与自建错题本（v31）
+
+继续使用当前 D1 records 表：profile 的 notebook: 前缀保存错题本目录，library: 前缀保存导入题库的元数据和不可变内容分块。客户端手动同步，不需要新建表或迁移既有题目。Worker 的 /api/changes 默认只向旧版客户端返回 student 档案；新版携带 collections=1 才接收新增目录和分块。发布顺序是先 Worker 后网页。原 Access 签名校验、唯一邮箱保护及请求/写入配额保持生效。

@@ -42,29 +42,33 @@ function cloudEntries(notebook) {
   const result=new Map();
   for(const [kind,list] of [['question',notebook.questions],['practice',notebook.practices]])for(const p of list)result.set(kind+':'+p.id,{kind,id:p.id,payload:p,deleted:false});
   for(const [id,updated] of Object.entries(notebook.deleted)) {
+    if(id.startsWith('profile:')){const recordId=id.slice(8);result.set('profile:'+recordId,{kind:'profile',id:recordId,payload:{updated},deleted:true});continue}
     // Existing application uses a shared tombstone namespace; preserve its semantics.
     for(const kind of ['question','practice'])result.set(kind+':'+id,{kind,id,payload:{updated},deleted:true});
   }
-  result.set('profile:student',{kind:'profile',id:'student',payload:{stage:cfg.stage||'primary',grade:getStudentProfile().grade,term:getStudentProfile().term||'上',region:getStudentProfile().region,teachingStyle:cfg.teachingStyle||'step',teachingFocus:cfg.teachingFocus||'understanding',knowledgeProgress:cfg.knowledgeProgress||{},methodProgress:cfg.methodProgress||{}},deleted:false});
+  if(typeof extraCloudEntries==='function')for(const entry of extraCloudEntries(notebook))result.set(entry.kind+':'+entry.id,entry);
+  result.set('profile:student',{kind:'profile',id:'student',payload:{stage:cfg.stage||'primary',grade:getStudentProfile().grade,term:getStudentProfile().term||'上',region:getStudentProfile().region,teachingStyle:cfg.teachingStyle||'step',teachingFocus:cfg.teachingFocus||'understanding',knowledgeProgress:cfg.knowledgeProgress||{},methodProgress:cfg.methodProgress||{},bankReviewed:cfg.bankReviewed||[]},deleted:false});
   return result;
 }
 async function syncCloud() {
   if(!db)throw Error('本地数据库不可用，请先导出备份');
   const root=cloudRoot(),stateKey='cloud-state:'+root;
   const state=(await req(db.transaction('data').objectStore('data').get(stateKey)))||{cursor:0,base:{}};
+  const collections=typeof extraCloudEntries==='function';
+  if(collections&&state.collectionsVersion!==1){state.cursor=0;state.collectionsVersion=1}
   const initial=JSON.stringify(data),profileInitial=JSON.stringify(cloudEntries(data).get('profile:student').payload);
   const entries=cloudEntries(data),pending=new Map();
   for(const [key,entry] of entries){const hash=await cloudHash(JSON.stringify(entry));if(hash!==state.base[key]?.hash)pending.set(key,{...entry,hash})}
   let cursor=state.cursor;const received=[];
   for(let page=0;;page++) {
     if(page>=400)throw Error('本次同步记录过多，请联系管理员分批迁移');
-    const result=await(await cloudRequest(root,'/api/changes?after='+cursor)).json();
+    const result=await(await cloudRequest(root,'/api/changes?after='+cursor+(collections?'&collections=1':''))).json();
     received.push(...result.items);cursor=result.cursor;if(!result.more)break;
   }
   // Abort before applying anything when concurrent edits are detected.
   for(const r of received){const key=r.kind+':'+r.id;if(pending.has(key)&&r.revision!==(state.base[key]?.revision||0)) {
     const normalized={kind:r.kind,id:r.id,payload:r.payload,deleted:Boolean(r.deleted)};
-    if(r.kind==='profile'&&!state.base[key]){pending.delete(key);continue}
+    if(r.kind==='profile'&&r.id==='student'&&!state.base[key]){pending.delete(key);continue}
     if(!r.payload.cloudImage&&await cloudHash(JSON.stringify(normalized))===pending.get(key).hash){pending.delete(key);continue}
     throw Error('同步冲突：'+r.id+' 已在另一设备修改。本地内容已保留，请导出备份后核对；没有覆盖云端');
   }}
@@ -72,7 +76,12 @@ async function syncCloud() {
   for(const r of received) {
     const key=r.kind+':'+r.id;if(pending.has(key))continue;
     if(r.revision===state.base[key]?.revision)continue;
-    if(r.kind==='profile'){profile=r.payload;state.base[key]={revision:r.revision,hash:await cloudHash(JSON.stringify({kind:r.kind,id:r.id,payload:r.payload,deleted:Boolean(r.deleted)}))};continue}
+    if(r.kind==='profile'){
+      const target=typeof extraCloudTarget==='function'?extraCloudTarget(r.id):null;
+      if(target){const list=next[target.list]||=[];const index=list.findIndex(p=>p.id===target.id);if(r.deleted){if(index>=0)list.splice(index,1);next.deleted['profile:'+r.id]=r.payload.updated}else{if(r.payload.id!==target.id)throw Error('云端错题本或题库编号不一致');if(index>=0)list[index]=r.payload;else list.push(r.payload);delete next.deleted['profile:'+r.id]}}
+      else if(r.id==='student')profile=r.payload;
+      state.base[key]={revision:r.revision,hash:await cloudHash(JSON.stringify({kind:r.kind,id:r.id,payload:r.payload,deleted:Boolean(r.deleted)}))};continue;
+    }
     const list=r.kind==='question'?next.questions:next.practices;
     const index=list.findIndex(q=>q.id===r.id);
     if(r.deleted){if(index>=0)list.splice(index,1);next.deleted[r.id]=r.payload.updated}
@@ -85,7 +94,7 @@ async function syncCloud() {
   }
   if(JSON.stringify(data)!==initial||JSON.stringify(cloudEntries(data).get('profile:student').payload)!==profileInitial)throw Error('同步期间本地内容发生变化，请重试');
   validate(next);await persist(next);
-  if(profile){cfg.stage=profile.stage;cfg.grade=profile.grade;cfg.term=['上','下'].includes(profile.term)?profile.term:getStudentProfile().term;cfg.region=profile.region;cfg.teachingStyle=profile.teachingStyle||'step';cfg.teachingFocus=profile.teachingFocus||'understanding';cfg.knowledgeProgress=profile.knowledgeProgress||{};cfg.methodProgress=profile.methodProgress||{};saveLocalConfig()}
+  if(profile){cfg.stage=profile.stage;cfg.grade=profile.grade;cfg.term=['上','下'].includes(profile.term)?profile.term:getStudentProfile().term;cfg.region=profile.region;cfg.teachingStyle=profile.teachingStyle||'step';cfg.teachingFocus=profile.teachingFocus||'understanding';cfg.knowledgeProgress=profile.knowledgeProgress||{};cfg.methodProgress=profile.methodProgress||{};cfg.bankReviewed=profile.bankReviewed||[];saveLocalConfig()}
   await cloudSaveState(stateKey,state);
   // Persist progress per accepted record. Conflicts and interruptions never overwrite remote edits.
   for(const [key,entry] of pending) {

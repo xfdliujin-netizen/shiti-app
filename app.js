@@ -56,7 +56,8 @@ const paths = [
   '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h4"/><path d="M10 12h5M10 16h5"/>',
   '<circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/>'
 ];
-const tabs = [['capture', '录题'], ['notebook', '错题本'], ['variants', '举一反三'], ['exam', '试卷'], ['settings', '设置']];
+paths.splice(2,0,'<path d="M4 4h16v16H4z"/><path d="M8 4v16M4 9h16M12 13h4M12 16h4"/>');
+const tabs = [['capture', '录题'], ['notebook', '错题本'], ['libraries','题库'], ['variants', '举一反三'], ['exam', '试卷'], ['settings', '设置']];
 
 let data = { version: 1, questions: [], practices: [], deleted: {} },
     cfg = readConfig(),
@@ -264,7 +265,7 @@ function render() {
   }
   if ($('#breadcrumb')) $('#breadcrumb').textContent = `${p.stageName}（${p.grade}） / ` + tabs.find(t => t[0] === tab)[1];
   const mobileBar = '';
-  $('#main').innerHTML = mobileBar + ({ capture, notebook, variants: variantsPage, exam: examPage, settings })[tab]();
+  $('#main').innerHTML = mobileBar + ({ capture, notebook, variants: variantsPage, libraries:librariesPage, exam: examPage, settings })[tab]();
   bind(tab);
   if (tab === 'capture' && draft && openDraftOnRender) {
     openDraftOnRender = false;
@@ -331,7 +332,7 @@ function capture() {
       </div>
 
       ${renderSubjectConfigModal()}
-
+      ${typeof captureNotebookField==='function'?captureNotebookField():''}
       <div class="ocr-switch" role="group" aria-label="图片识别服务"><button type="button" data-ocr-provider="baidu" aria-pressed="${hasBaidu}" class="${hasBaidu?'active':''}">百度 OCR</button><button type="button" data-ocr-provider="deepseek" aria-pressed="${!hasBaidu}" class="${!hasBaidu?'active':''}">DeepSeek</button></div>
       ${!hasBaidu?'<p class="ocr-provider-note">视觉转录后，请核对原题及孩子作答。</p>':''}
       <div id="capture-input">
@@ -396,11 +397,13 @@ function notebook() {
   const usedVerdicts = [...new Set(data.questions.map(q => inferAiVerdict(q)))];
   const verdictOptions = ['全部', ...aiVerdictTags.filter(v => usedVerdicts.includes(v) || ['概念混淆', '审题偏差', '计算粗心', '薄弱待练'].includes(v))];
 
-  const nbTotal = data.questions.length;
-  const nbUnmastered = data.questions.filter(q => !q.mastered).length;
+  const bookQuestions = data.questions.filter(q => typeof activeNotebook==='undefined'||activeNotebook==='all'||questionNotebook(q)===activeNotebook);
+  const nbTotal = bookQuestions.length;
+  const nbUnmastered = bookQuestions.filter(q => !q.mastered).length;
   const nbMastered = nbTotal - nbUnmastered;
   return renderStageBanner() +
     `<div class="page-head notebook-head"><div class="notebook-title"><h1>错题本</h1><button class="secondary" id="sample">体验示例题</button></div><div class="notebook-status" role="group" aria-label="掌握状态筛选">${[['all','累计错题',nbTotal],['unmastered','待巩固',nbUnmastered],['mastered','已掌握',nbMastered]].map(([value,label,count])=>`<button type="button" data-status="${value}" class="status-stat ${notebookStatus===value?'active':''}" aria-pressed="${notebookStatus===value}"><span>${label}</span><b>${count}</b></button>`).join('')}</div></div>` +
+    (typeof notebooksPanel==='function'?notebooksPanel():'') +
     `<input class="search" id="search" aria-label="搜索错题" placeholder="⌕ 搜索题干、编号、知识点、错因标签…" value="${esc(query)}">` +
     `<div class="filters" style="align-items:center">
       ${['全部', ...displaySubjects].map(s => `<button class="chip ${filter === s ? 'active' : ''}" data-filter="${s}">${s}</button>`).join('')}
@@ -422,7 +425,8 @@ function filtered() {
         const verdict = inferAiVerdict(q);
         const matchAi = aiFilter === '全部' || verdict === aiFilter;
         const matchQuery = [q.text, q.number, verdict, ...(q.tags || [])].join(' ').toLowerCase().includes(query.toLowerCase());
-        return matchSubj && matchAi && matchQuery;
+        const matchBook=typeof questionNotebook!=='function'||activeNotebook==='all'||questionNotebook(q)===activeNotebook;
+        return matchBook && matchSubj && matchAi && matchQuery;
       })
       .sort((a, b) => b.created.localeCompare(a.created))
   );
@@ -584,12 +588,12 @@ function renderExamSheet() {
 function exercise() {
   return practice.items.map((p, i) => `<section class="card practice-card">
     <div class="q-meta">
-      <span>${practice.sourceKind==='bank'?'题库练习':'变式'} ${i + 1} / ${practice.items.length} · ${esc(practice.difficulty)}</span>
+      <span>${['bank','library'].includes(practice.sourceKind)?'题库练习':'变式'} ${i + 1} / ${practice.items.length} · ${esc(practice.difficulty)}</span>
       ${practice.sourceKind==='bank-variant'?'<span class="pill">AI 生成 · 待核对</span>':''}
       ${p.aiStatus ? `<span class="ai-verdict-chip ${p.aiStatus === '回答正确' ? 'good' : 'bad'}">🤖 AI 判定：${esc(p.aiStatus)}</span>` : ''}
     </div>
-    <p class="prose">${esc(p.text)}</p>
-    ${practice.bankId?`<details class="bank-origin"><summary>来源与许可</summary><p>${esc(practice.attribution)} · CC BY 4.0 · 本系统补充解析与标签${practice.sourceKind==='bank-variant'?'，此题为 AI 生成的变式':''}。<a href="${esc(practice.originUrl)}" target="_blank" rel="noopener">查看母题来源</a></p></details>`:''}
+    <div class="prose">${typeof renderStudyText==='function'?renderStudyText(p.text):esc(p.text)}</div>
+    ${practice.bankId?`<details class="bank-origin"><summary>来源与许可</summary><p>${esc(practice.attribution)} · ${esc(practice.license||'来源许可待核对')} · 本系统整理题库${practice.sourceKind==='bank-variant'?'，此题为 AI 生成的变式':''}。${practice.originUrl?`<a href="${esc(practice.originUrl)}" target="_blank" rel="noopener">查看母题来源</a>`:''}</p></details>`:''}
     <textarea ${p.saved?'disabled':''} id="response-${i}" placeholder="先独立思考，在这里输入你的作答过程或答案（可点击下方 AI 智能批改）……">${esc(p.response || '')}</textarea>
     <div class="actions">
       ${practice.sourceKind==='bank'?`<button type="button" class="primary" data-bank-check="${i}" ${p.saved?'disabled':''}>核对数值</button>`:''}
@@ -600,7 +604,7 @@ function exercise() {
     ${p.aiFeedback ? `<div class="ai-eval-box"><strong>🤖 AI 批改判定（${esc(p.aiStatus)}）：</strong>${esc(p.aiFeedback)}</div>` : ''}
     <div class="analysis-block ${p.revealed ? '' : 'hidden'}" id="solution-${i}">
       <h3>答案与解析</h3>
-      <p class="prose">${esc(p.answer)}\n\n${esc(p.analysis)}</p>
+      <p class="prose">${typeof renderStudyText==='function'?renderStudyText(p.answer+'\n\n'+p.analysis):esc(p.answer)+'\n\n'+esc(p.analysis)}</p>
       <div style="margin-top:10px;font-size:12px;font-weight:600;color:var(--muted)">点击下方标签完成自评归档：</div>
       <div class="actions" style="margin-top:6px">
         ${['还需巩固', '基本理解', '已经掌握'].map(r => `<button class="${p.suggestedRating === r ? 'primary' : 'secondary'}" data-rate="${i}" data-rating="${r}" ${p.saved ? 'disabled' : ''}>${r}${p.suggestedRating === r ? '（AI 推荐）' : ''}</button>`).join('')}
@@ -838,6 +842,8 @@ function bindSubjectConfigEvents() {
 function bind(tab) {
   bindOpen();
   bindSubjectConfigEvents();
+  if(typeof bindNotebooks==='function')bindNotebooks();
+  if(tab==='libraries'){bindLibraries();bindPractice()}
   if (tab === 'capture') {
     document.querySelectorAll('[data-ocr-provider]').forEach(b=>b.onclick=()=>{if(busy)return;cfg.ocrProvider=b.dataset.ocrProvider;recognitionScope='crop';saveLocalConfig();render()});
     if($('#capture-question-type'))$('#capture-question-type').onchange=e=>{cfg.questionTypes={...cfg.questionTypes,[currentSubject]:e.target.value};saveLocalConfig()};
@@ -860,7 +866,7 @@ function bind(tab) {
       editingId = null;
       draft=null;
       const questionType=selectedCaptureQuestionType(currentSubject);
-      paper={subject:currentSubject,questionType,source:$('#source')?.value||'',mistake:$('#mistake')?.value||'',image:mode==='image'?image:'',scope:'crop',ocrProvider:'manual',inventory:[],warnings:[],complete:true,items:[{section:'文字录入',number:'1',text:$('#question-text')?.value||'',studentAnswer:'',questionType,answerStatus:'unknown',selected:true,verified:false,analyzed:false,answer:'',analysis:'',reminder:'',tags:[]}]};
+      paper={subject:currentSubject,questionType,notebookId:typeof captureNotebookId==='function'?captureNotebookId():'default',source:$('#source')?.value||'',mistake:$('#mistake')?.value||'',image:mode==='image'?image:'',scope:'crop',ocrProvider:'manual',inventory:[],warnings:[],complete:true,items:[{section:'文字录入',number:'1',text:$('#question-text')?.value||'',studentAnswer:'',questionType,answerStatus:'unknown',selected:true,verified:false,analyzed:false,answer:'',analysis:'',reminder:'',tags:[]}]};
       openPaperOnRender = true;
       render();
     };
@@ -958,6 +964,7 @@ function openQuestion(id) {
       <button type="button" class="secondary" id="ai-diagnose-btn" style="padding:4px 10px;font-size:12px">✧ AI 重新诊断错因</button>
     </div>
 
+    ${typeof notebookOptions==='function'?`<label class="paper-destination"><span>移动到错题本</span><select id="detail-notebook" data-id="${esc(q.id)}">${notebookOptions(questionNotebook(q))}</select></label>`:''}
     <p class="prose">${esc(q.text)}</p>
     ${q.questionType?`<p class="result-note">题型：${esc(QUESTION_TYPE_NAMES[q.questionType]||'其他题型')}</p>`:''}
     <p class="result-note">作答证据：${q.evidenceVerified&&q.answerStatus==='confirmed'?'已人工核对孩子作答':q.answerStatus==='unanswered'?'已确认未作答':'未确认；不能据此诊断孩子错因'}</p>
@@ -973,6 +980,7 @@ function openQuestion(id) {
       <button class="secondary danger" id="delete-q">删除</button>
     </div>`;
   $('#detail').showModal();
+  if(typeof bindNotebooks==='function')bindNotebooks();
   $('#detail').onclick = e => { if (e.target === $('#detail')) $('#detail').close(); };
   $('#close-detail').onclick = () => $('#detail').close();
 
@@ -1180,6 +1188,7 @@ function bindPractice() {
         sourceId: practice.sourceId,
         sourceKind:practice.sourceKind||'question',
         bankId:practice.bankId||'',
+        libraryId:practice.libraryId||'',
         knowledgeId:practice.knowledgeId||'',
         originUrl:practice.originUrl||'',
         attribution:practice.attribution||'',
@@ -1240,18 +1249,19 @@ function validate(d) {
   }
   for (const p of d.practices) if (!p.id || typeof p.text !== 'string' || !Number.isFinite(Date.parse(p.created)) || !Number.isFinite(Date.parse(p.updated))) throw Error('备份中存在无效练习');
   for (const [k, v] of Object.entries(d.deleted)) if (!k || !Number.isFinite(Date.parse(v))) throw Error('删除记录无效');
+  if(typeof validateExtraData==='function')validateExtraData(d);
   return d;
 }
 
 function merge(a, b) {
   const deleted = { ...a.deleted };
   for (const [k, v] of Object.entries(b.deleted)) if (!deleted[k] || v > deleted[k]) deleted[k] = v;
-  const combine = (x, y) => {
+  const combine = (x, y, prefix='') => {
     const m = new Map(x.map(i => [i.id, i]));
     for (const i of y) if (!m.has(i.id) || i.updated > m.get(i.id).updated) m.set(i.id, i);
-    return [...m.values()].filter(i => !deleted[i.id] || i.updated > deleted[i.id]);
+    return [...m.values()].filter(i => !deleted[prefix+i.id] || i.updated > deleted[prefix+i.id]);
   };
-  return { version: 1, questions: combine(a.questions, b.questions), practices: combine(a.practices, b.practices), deleted };
+  return { version: 1, questions: combine(a.questions, b.questions), practices: combine(a.practices, b.practices), notebooks:combine(a.notebooks||[],b.notebooks||[],'profile:notebook:'), bankRecords:combine(a.bankRecords||[],b.bankRecords||[],'profile:library:'), deleted };
 }
 
 function bindSettings() {

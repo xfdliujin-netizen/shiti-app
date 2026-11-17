@@ -23,6 +23,7 @@ function paperView() {
         <h2>校对识别结果</h2>
         <span class="pill">${p.analyzed ? '✓ 已生成 AI 解析与错因判定' : '待校对 / 分析'}</span>
       </div>
+      ${typeof paperNotebookField==='function'?paperNotebookField():''}
       ${paper.image ? `<div id="paper-crop-image-box" style="margin-bottom:10px;background:#f8fafc;padding:8px;border-radius:10px;text-align:center"><img id="paper-crop-img" class="paper-original" src="${paper.image}" alt="框选原图，点击全屏查看" title="点击全屏查看" style="max-height:180px;width:auto;margin:0 auto;display:block;cursor:zoom-in"></div><dialog id="paper-lightbox" class="image-lightbox"><button type="button" class="lightbox-close" id="paper-lightbox-close" aria-label="关闭">×</button><img id="paper-lightbox-img" alt="框选图全屏预览"></dialog>` : ''}
       ${paper.warnings.map(w=>`<p class="result-note">${esc(w)}</p>`).join('')}
       <label class="field"><span>原题（仅题干、印刷选项和空位；请移出手写答案与订正，不修正原卷错字）</span><textarea class="paper-textarea" data-paper="text" data-index="0">${esc(p.text)}</textarea></label>
@@ -168,7 +169,7 @@ async function recognizePaper() {
   if (paper && !confirm('重新识别会替换当前待确认的整卷结果，继续吗？')) return;
   const sourceImage = mode === 'image' ? image : '', text = $('#question-text')?.value || '';
   if (!sourceImage && !text.trim()) throw Error('请先上传试卷或输入题目');
-  const meta = { subject: $('#subject')?.value || currentSubject || '语文', source: $('#source')?.value || '', mistake: $('#mistake')?.value || '' };
+  const meta = { notebookId:typeof captureNotebookId==='function'?captureNotebookId():'default', subject: $('#subject')?.value || currentSubject || '语文', source: $('#source')?.value || '', mistake: $('#mistake')?.value || '' };
   meta.questionType=selectedCaptureQuestionType(meta.subject);
   const columns = Number($('#paper-layout')?.value || 2);
   paperLayout = String(columns);
@@ -264,6 +265,7 @@ async function saveSelectedItems() {
       created,
       updated: created,
       subject: paper.subject,
+      notebookId:$('#paper-notebook')?.value||paper.notebookId||(typeof captureNotebookId==='function'?captureNotebookId():'default'),
       grade:getStudentProfile().grade,term:getStudentProfile().term,
       questionType:p.questionType||paper.questionType||'other',
       answerDetails:{choices:p.choices||[],blankAnswers:p.blankAnswers||[],blankCount:p.blankCount||0,optionCount:p.optionCount||0},

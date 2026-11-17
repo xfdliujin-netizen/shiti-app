@@ -1,0 +1,69 @@
+/* UI composition and theme adapted from Wrong Notebook (MIT); see THIRD_PARTY_NOTICES.md. */
+:root { --bg:#f7f9fc; --surface:#fff; --surface-sub:#f0f3f8; --text:#172033; --muted:#69758a; --line:#e1e7ef; --primary:#4668dc !important; --primary-soft:#eaf0ff; --radius:12px; --radius-sm:8px; }
+html,body { background:var(--bg) !important; color:var(--text) !important; }
+body .card:not(#printable-exam) { background:var(--surface) !important; border:1px solid var(--line); border-radius:12px; box-shadow:none; }
+.page-head { margin-bottom:20px; }
+.page-head h1 { font-size:28px; font-weight:700; letter-spacing:-.03em; }
+.card h2,.section-title h2 { font-size:18px; }
+button.primary,button.secondary,.text-button { border-radius:8px; box-shadow:none; font-weight:500; padding:10px 15px; }
+button.primary { background:var(--primary); color:#fff; }
+button.secondary { background:var(--surface); border:1px solid var(--line); color:var(--text); }
+.small-button { font-size:12px !important; padding:7px 11px !important; min-height:34px; }
+.sidebar { background:var(--surface) !important; border-color:var(--line); box-shadow:none !important; backdrop-filter:none; -webkit-backdrop-filter:none; }
+.main-nav a { color:var(--muted) !important; font-weight:500; border-radius:8px; }
+.main-nav a.active { color:var(--primary) !important; background:var(--primary-soft) !important; box-shadow:none; }
+.field input,.field select,.field textarea,.search,input:not([type=checkbox]):not([type=file]),select,textarea { border-radius:8px; }
+.notice { color:var(--muted) !important; }
+.capture-destination,.paper-destination { display:flex; align-items:center; gap:10px; margin:10px 0; font-size:12px; color:var(--muted); }
+.capture-destination select,.paper-destination select { flex:1; min-width:0; font-size:13px; padding:8px; }
+.notebook-shelf { margin:0 0 20px; }
+.notebook-shelf .section-title { margin:0 0 12px; }
+.notebook-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; }
+.notebook-tile { text-align:left; display:flex; flex-direction:column; align-items:flex-start; gap:8px; min-width:0; padding:16px; background:var(--surface); border:1px solid var(--line); border-radius:12px; color:var(--text); cursor:pointer; }
+.notebook-tile strong { font-size:14px; overflow-wrap:anywhere; }
+.notebook-tile small { font-size:11px; color:var(--muted); }
+.notebook-tile.selected,.library-owned.selected { border-color:var(--primary); background:var(--primary-soft) !important; }
+.notebook-cover,.package-icon { display:inline-grid; place-items:center; width:36px; height:40px; border-radius:8px; font-size:25px; }
+.notebook-cover.blue,.package-icon { background:#e9efff; color:#4668dc; }
+.notebook-cover.green { background:#e4f5ec; color:#25805a; }
+.notebook-cover.purple { background:#f0eaff; color:#8254bb; }
+.notebook-cover.orange { background:#fff0df; color:#b36b24; }
+.notebook-manage { display:flex; justify-content:flex-end; gap:4px; }
+.notebook-manage button { font-size:12px; }
+.compact-dialog { width:min(520px,94vw); max-height:90dvh; margin:auto; padding:20px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--text); overflow:auto; }
+.compact-dialog .card-head { align-items:center; gap:12px; margin-bottom:16px; }
+.compact-dialog .notice { padding:10px; font-size:12px; }
+.dialog-x { background:transparent; color:var(--muted); border:0; font-size:22px; padding:4px; cursor:pointer; }
+.library-tabs { margin-bottom:18px; }
+.library-catalog { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr)); gap:14px; margin:14px 0 20px; }
+.library-package { display:flex; flex-direction:column; align-items:flex-start; text-align:left; gap:10px; padding:18px; background:var(--surface); border:1px solid var(--line); border-radius:12px; color:var(--text); min-width:0; }
+.library-package h3,.library-package strong { font-size:16px; line-height:1.4; }
+.library-package p,.library-package span:not(.package-icon) { color:var(--muted); font-size:12px; }
+.library-package small { font-size:11px; color:var(--muted); overflow-wrap:anywhere; }
+.library-owned { cursor:pointer; }
+.library-detail .card-head h2 { overflow-wrap:anywhere; }
+.library-question { border-top:1px solid var(--line); padding:18px 0; }
+.library-question .prose { margin:12px 0; }
+.library-question details,.bank-origin { margin:10px 0; color:var(--muted); font-size:13px; }
+.library-question button:disabled { opacity:.5; cursor:default; }
+.katex { font-size:1.05em; }
+.katex-display { max-width:100%; overflow-x:auto; overflow-y:hidden; }
+.practice-bank-link { display:grid; place-items:center; color:var(--primary); text-decoration:none; font-size:13px; }
+@media(prefers-color-scheme:dark){:root { --bg:#0a0d14; --surface:#141821; --surface-sub:#212630; --text:#f3f5f9; --muted:#9ea5b2; --line:#ffffff1a; --primary:#6e91fa !important; --primary-soft:#252d42; } button.secondary { color:var(--text) !important; background:var(--surface-sub) !important; } }
+@media(max-width:767px){
+  .container { padding-bottom:100px; }
+  .page-head h1 { font-size:25px; }
+  .sidebar { left:0; right:0; bottom:0; top:auto; width:100%; border:0; border-top:1px solid var(--line); border-radius:0; padding:6px 4px max(6px,env(safe-area-inset-bottom)); }
+  .main-nav { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:0; }
+  .main-nav a { padding:7px 1px; font-size:10px; gap:3px; min-width:0; }
+  .main-nav a svg { width:20px; height:20px; }
+  .notebook-title h1 { font-size:22px; }
+  .notebook-title #sample { font-size:10px; }
+  .notebook-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+.library-detail .form-row,.library-filters { display:grid; grid-template-columns:minmax(0,1fr) 140px; gap:10px; margin:12px 0; }
+.library-manage { display:flex; gap:4px; flex-wrap:wrap; }
+.library-manage button { font-size:12px; padding:6px; }
+.library-question > button + button { margin-left:8px; }
+@media(max-width:767px){.library-detail .form-row { grid-template-columns:1fr; }.library-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }}
+@media print { html,body { background:#fff !important; color:#111 !important; } }

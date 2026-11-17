@@ -56,7 +56,8 @@ export async function handle(request, env) {
     if(path==='/api/changes'&&request.method==='GET') {
       const after=Number(url.searchParams.get('after')||0);
       if(!Number.isSafeInteger(after)||after<0) fail(400,'游标无效');
-      const rows=await db.prepare('SELECT kind,id,payload,deleted,revision,seq FROM records WHERE seq>? ORDER BY seq LIMIT 50').bind(after).all();
+      const collections=url.searchParams.get('collections')==='1';
+      const rows=await db.prepare("SELECT kind,id,payload,deleted,revision,seq FROM records WHERE seq>?"+(collections?'':" AND (kind!='profile' OR id='student')")+' ORDER BY seq LIMIT 50').bind(after).all();
       return json({items:rows.results.map(r=>({...r,payload:JSON.parse(r.payload)})),cursor:rows.results.at(-1)?.seq||after,more:rows.results.length===50},200,cors);
     }
     if(path==='/api/record'&&request.method==='PUT') {

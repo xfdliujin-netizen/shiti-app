@@ -51,6 +51,10 @@ assert.deepEqual(new Uint8Array(await(await call('/api/image?id='+id)).arrayBuff
 assert.equal((await call('/api/image?id='+id,'PUT',new Uint8Array(300001),token,env.ALLOWED_ORIGIN,'image/jpeg')).status,413);
 assert.equal((await call('/api/record','PUT',{...record,revision:2,deleted:true,payload:{updated:payload.updated}})).status,200);
 assert.equal((await(await call('/api/changes')).json()).items[0].deleted,1);
+const collection={kind:'profile',id:'notebook:nb-test',payload:{id:'nb-test',name:'book'},revision:0,deleted:false};
+assert.equal((await call('/api/record','PUT',collection)).status,200);
+assert.ok(!(await(await call('/api/changes')).json()).items.some(r=>r.id===collection.id),'legacy clients must not see collection profiles');
+assert.ok((await(await call('/api/changes?collections=1')).json()).items.some(r=>r.id===collection.id),'new clients opt into collection profiles');
 sql.prepare('UPDATE storage SET bytes=209715200').run();
 assert.throws(()=>sql.prepare('INSERT INTO images VALUES(?,?,?)').run('another','image/jpeg',image),/storage_limit/);
 sql.prepare('UPDATE quotas SET requests=10000').run();assert.equal((await call('/api/session')).status,429);

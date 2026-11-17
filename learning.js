@@ -17,7 +17,8 @@ function buildLearningIndex(notebook){
     const tags=learningTags(record).length?learningTags(record):learningTags(source||{});
     // A deleted source never supplies personal history to later requests.
     const fromBank=['bank','bank-variant'].includes(record.sourceKind)&&/^cmath-dev-\d{4}$/.test(record.bankId||'');
-    if(kind==='practice'&&record.sourceId&&!source&&!fromBank)return;
+    const fromLibrary=['library','library-variant'].includes(record.sourceKind)&&/^lib-[a-f0-9]{24}$/.test(record.libraryId||'');
+    if(kind==='practice'&&record.sourceId&&!source&&!fromBank&&!fromLibrary)return;
     const grade=record.grade||source?.grade||'',term=record.term||source?.term||'';
     const confirmed=kind==='question'&&record.evidenceVerified&&record.answerStatus==='confirmed';
     const numeric=fromBank&&!record.assisted&&['correct','incorrect'].includes(record.resultCheck);
