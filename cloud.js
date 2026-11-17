@@ -1,6 +1,6 @@
 /* Explicit cloud sync. Offline notebook remains authoritative until a successful merge. */
 function cloudSettings() {
-  return `${field('云端接口地址','cloud-endpoint',cfg.cloudEndpoint||'https://api.86518925.xyz','url')}<div class="actions"><button class="secondary" id="cloud-login">打开云端登录</button><button class="primary" id="cloud-sync">合并并同步</button></div><p class="hint">同步为手动触发；同一记录在两台设备同时修改时停止并提示，不覆盖。密钥不会上传。</p>`;
+  return `${field('云端接口地址','cloud-endpoint',cfg.cloudEndpoint||'https://api.86518925.xyz','url')}<div class="actions"><button class="secondary" id="cloud-login">打开云端登录</button><button class="primary" id="cloud-sync">合并并同步</button></div><p class="hint">首次同步建议先导出 JSON 备份。同步为手动触发；同一记录在两台设备同时修改时停止并提示，不覆盖。密钥不会上传。</p>`;
 }
 function cloudRoot() {
   const value=($('#cloud-endpoint')?.value||cfg.cloudEndpoint||'https://api.86518925.xyz').trim();
@@ -45,7 +45,7 @@ function cloudEntries(notebook) {
     // Existing application uses a shared tombstone namespace; preserve its semantics.
     for(const kind of ['question','practice'])result.set(kind+':'+id,{kind,id,payload:{updated},deleted:true});
   }
-  result.set('profile:student',{kind:'profile',id:'student',payload:{stage:cfg.stage||'primary',grade:getStudentProfile().grade,region:getStudentProfile().region,teachingStyle:cfg.teachingStyle||'step',teachingFocus:cfg.teachingFocus||'understanding'},deleted:false});
+  result.set('profile:student',{kind:'profile',id:'student',payload:{stage:cfg.stage||'primary',grade:getStudentProfile().grade,term:getStudentProfile().term||'上',region:getStudentProfile().region,teachingStyle:cfg.teachingStyle||'step',teachingFocus:cfg.teachingFocus||'understanding'},deleted:false});
   return result;
 }
 async function syncCloud() {
@@ -85,7 +85,7 @@ async function syncCloud() {
   }
   if(JSON.stringify(data)!==initial||JSON.stringify(cloudEntries(data).get('profile:student').payload)!==profileInitial)throw Error('同步期间本地内容发生变化，请重试');
   validate(next);await persist(next);
-  if(profile){cfg.stage=profile.stage;cfg.grade=profile.grade;cfg.region=profile.region;cfg.teachingStyle=profile.teachingStyle||'step';cfg.teachingFocus=profile.teachingFocus||'understanding';saveLocalConfig()}
+  if(profile){cfg.stage=profile.stage;cfg.grade=profile.grade;cfg.term=['上','下'].includes(profile.term)?profile.term:getStudentProfile().term;cfg.region=profile.region;cfg.teachingStyle=profile.teachingStyle||'step';cfg.teachingFocus=profile.teachingFocus||'understanding';saveLocalConfig()}
   await cloudSaveState(stateKey,state);
   // Persist progress per accepted record. Conflicts and interruptions never overwrite remote edits.
   for(const [key,entry] of pending) {

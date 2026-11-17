@@ -23,10 +23,11 @@ function baiduSettings() {
     <label class="field"><span>识别服务</span>
       <select id="ocr-provider">
         <option value="baidu" ${(cfg.ocrProvider || 'baidu') === 'baidu' ? 'selected' : ''}>百度高精度 OCR → 校对 → DeepSeek 分析</option>
-        <option value="deepseek" ${cfg.ocrProvider === 'deepseek' ? 'selected' : ''}>DeepSeek 图片转录（备用）</option>
+        <option value="deepseek" ${cfg.ocrProvider === 'deepseek' ? 'selected' : ''}>DeepSeek 视觉转录</option>
       </select>
     </label>
     <label class="field"><span>百度接口</span><select id="ocr-mode"><option value="accurate" ${(cfg.ocrMode||'accurate')==='accurate'?'selected':''}>高精度含位置版（用于恢复行顺序）</option><option value="basic" ${cfg.ocrMode==='basic'?'selected':''}>高精度纯文字版（兼容旧权限）</option></select></label><p class="notice">含位置版需要百度单独开通相应接口权限，额度与费用以百度控制台为准。失败不会自动重复调用。位置只能恢复排版，不能区分印刷、手写和批注。</p>
+    ${field('DeepSeek 图片转录模型（兼容接口可自定义）','ocr-vision-model',cfg.ocrVisionModel||'','text','官方接口默认 deepseek-flash；其他接口默认使用文字模型配置')}
     ${field('OCR 代理完整地址', 'ocr-proxy', cfg.ocrProxy || defaultOCRProxy(), 'url', 'https://ocr.86518925.xyz/api/ocr')}
     ${field('代理访问口令（已支持设备持久保存）', 'ocr-token', getOcrToken(), 'password', '与 Worker 中的 OCR_PROXY_TOKEN 一致')}
     <div id="ocr-test-result" class="result-note" style="margin:6px 0"></div>

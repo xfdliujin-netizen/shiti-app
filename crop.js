@@ -129,7 +129,7 @@ function bindRecognition() {
       recognitionScope = 'crop';
       if (scope.closest('.field')) scope.closest('.field').hidden = true;
       if ($('#scope-note')) $('#scope-note').hidden = true;
-      $('#analyze').textContent = mode === 'image' ? '✧ 识别框内文字（百度 OCR）' : '✧ 整理输入文字';
+      $('#analyze').textContent = mode === 'image' ? '识别框内文字' : '整理文字';
     } else {
       if (scope.closest('.field')) scope.closest('.field').hidden = false;
       scope.querySelector('option[value=full]').disabled = false;
@@ -137,7 +137,7 @@ function bindRecognition() {
         $('#scope-note').hidden = false;
         $('#scope-note').textContent = full ? '整卷模式：多次调用扫描全卷。' : '省量模式：只识别选框内区域。';
       }
-      $('#analyze').textContent = full ? '✧ 逐题识别整卷' : '✧ 只识别框内题目';
+      $('#analyze').textContent = full ? '识别整卷' : '识别框内文字';
     }
     const handler = e => run(e.target, baidu ? recognizeWithBaidu : (full ? recognizePaper : recognizeSelection));
     $('#analyze').onclick = handler;

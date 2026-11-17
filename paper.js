@@ -231,7 +231,7 @@ async function analyzeSelectedItems() {
       if(evidence.status==='confirmed'&&p.questionType==='fill'&&Array.from({length:p.blankCount},(_,i)=>p.blankAnswers?.[i]).some(v=>!String(v||'').trim()))throw Error('请记录每个空的实际作答；孩子确实没写的空请填【未作答】，不确定则切换为无法确认');
       if(/加点|划线|画线|下划线|图中/.test(p.text) && !evidence.visualFeatures.trim()){p.showAnswerExtra=true;throw Error('此题依赖视觉信息，请展开补充加点字、划线范围或图示内容；无法确认时请暂不分析')}
       const canDiagnose=evidence.status==='confirmed'&&Boolean(evidence.answer);
-      const r = await ai(`你只得到人工核对后的文字，没有看到原始试卷图片。学科：${paper.subject}。原题：${JSON.stringify(p.text)}。视觉信息：${JSON.stringify(evidence.visualFeatures)}。作答证据：${JSON.stringify(evidence)}。用户补充（不是孩子作答的替代证据）：${JSON.stringify(paper.mistake)}。原题错字、错误拼音、错误选项照录，不得按正确知识改写题干。括号和横线只是空位，不能推测其中的答案。圈画、订正和老师批改与孩子原始作答不同，不可混用；红勾不能证明标准答案。${canDiagnose?'仅根据已确认作答与标准解法比较，判断 correct/incorrect/unknown；即使答错，也不能断言思考过程，只能给有依据的可能原因。':'孩子作答未确认或已确认未作答：仅讲解题目，不能说孩子答错、选了某项或存在某个错因；status 必须是 unknown，aiVerdict 必须是未判定。'}条件不足或视觉信息无法辨认时明确说明无法确定，不猜测。返回 JSON {"answer":"标准答案或无法确定原因","analysis":"解题步骤；仅有已确认作答时才可比较","status":"correct/incorrect/unknown","comparisonEvidence":"对比依据，无证据则空字符串","reminder":"复习建议，不把可能错因说成事实","aiVerdict":"${canDiagnose?'选择最贴切错因标签，无法判断则未判定':'未判定'}","tags":["知识点"]}。可用错因标签：${JSON.stringify(verdictList)}。`);
+      const r = await ai(`你只得到人工核对后的文字，没有看到原始试卷图片。学科：${paper.subject}。原题：${JSON.stringify(p.text)}。视觉信息：${JSON.stringify(evidence.visualFeatures)}。作答证据：${JSON.stringify(evidence)}。用户补充（不是孩子作答的替代证据）：${JSON.stringify(paper.mistake)}。原题错字、错误拼音、错误选项照录，不得按正确知识改写题干。括号和横线只是空位，不能推测其中的答案。圈画、订正和老师批改与孩子原始作答不同，不可混用；红勾不能证明标准答案。${canDiagnose?'仅根据已确认作答与标准解法比较，判断 correct/incorrect/unknown；即使答错，也不能断言思考过程，只能给有依据的可能原因。':'孩子作答未确认或已确认未作答：仅讲解题目，不能说孩子答错、选了某项或存在某个错因；status 必须是 unknown，aiVerdict 必须是未判定。'}条件不足或视觉信息无法辨认时明确说明无法确定，不猜测。返回 JSON {"answer":"标准答案或无法确定原因","analysis":"解题步骤；仅有已确认作答时才可比较","status":"correct/incorrect/unknown","comparisonEvidence":"对比依据，无证据则空字符串","reminder":"复习建议，不把可能错因说成事实","aiVerdict":"${canDiagnose?'选择最贴切错因标签，无法判断则未判定':'未判定'}","tags":["知识点"]}。可用错因标签：${JSON.stringify(verdictList)}。`, undefined, {learning:{subject:paper.subject,text:p.text,tags:p.tags||[]}});
       if (typeof r.answer !== 'string' || typeof r.analysis !== 'string') throw Error('分析结果不完整');
       const status=canDiagnose&&['correct','incorrect'].includes(r.status)?r.status:'unknown';
       const matchedVerdict = status==='incorrect'&&verdictList.includes(r.aiVerdict) ? r.aiVerdict : '未判定';
@@ -264,6 +264,7 @@ async function saveSelectedItems() {
       created,
       updated: created,
       subject: paper.subject,
+      grade:getStudentProfile().grade,term:getStudentProfile().term,
       questionType:p.questionType||paper.questionType||'other',
       answerDetails:{choices:p.choices||[],blankAnswers:p.blankAnswers||[],blankCount:p.blankCount||0,optionCount:p.optionCount||0},
       source: [paper.source, p.section !== '框选题目' ? p.section : '', p.number !== '1' ? p.number : ''].filter(Boolean).join(' · '),
