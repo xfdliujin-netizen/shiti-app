@@ -1,0 +1,2127 @@
+{
+  "batch": "cmath-pilot-v1",
+  "sourceCommit": "9fa13ef0b2d03f5a18c1ace7001248d3981d65ea",
+  "sourceSha256": "b9c6333a31fd740e7f5b5a71022bd59e00748798a3377364346d280549b25e3b",
+  "license": "CC BY 4.0",
+  "count": 50,
+  "review": "逐题核对题意、补充解析并按算式复算；不是教师签审或江苏教材逐章核验。",
+  "excluded": [
+    {
+      "line": 211,
+      "reason": "分成六块与剩下那块的表述不清"
+    },
+    {
+      "line": 242,
+      "reason": "质量单位与提问个数不一致"
+    },
+    {
+      "line": 262,
+      "reason": "两只熊猫四天56千克，每只每天应为7；原答案14冲突"
+    },
+    {
+      "line": 332,
+      "reason": "相向而行与追及的提问矛盾"
+    },
+    {
+      "line": 346,
+      "reason": "小米与小明的姓名不一致"
+    }
+  ],
+  "items": [
+    {
+      "id": "cmath-dev-0201",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "小猴摘了84个桃子，平均分给6只猴子，每只猴子能吃到几个桃子？",
+      "numericAnswer": "14",
+      "unit": "个",
+      "answer": "14（个）",
+      "analysis": "平均分给6只猴子，用桃子总数除以猴子只数。\n计算：(84 ÷ 6) = 14（个）。",
+      "proof": [
+        "/",
+        84,
+        6
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L201",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0202",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "李师傅4天加工40个零件，照这样计算，今年4月份全月一共可加工多少个零件？",
+      "numericAnswer": "300",
+      "unit": "个",
+      "answer": "300（个）",
+      "analysis": "先求每天加工的零件数；四月有30天，再乘30。\n计算：((40 ÷ 4) × 30) = 300（个）。",
+      "proof": [
+        "*",
+        [
+          "/",
+          40,
+          4
+        ],
+        30
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L202",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0204",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "做一套校服用布3米。66米布最多能做多少套？",
+      "numericAnswer": "22",
+      "unit": "套",
+      "answer": "22（套）",
+      "analysis": "用布的总长度除以每套校服用布的长度。\n计算：(66 ÷ 3) = 22（套）。",
+      "proof": [
+        "/",
+        66,
+        3
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L204",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0206",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "食堂运来一批蔬菜，原计划每天吃45千克，10天可以消费完这批蔬菜，后来根据大家意见，每天比原计划多吃5千克，这批蔬菜可以吃多少天？",
+      "numericAnswer": "9",
+      "unit": "天",
+      "answer": "9（天）",
+      "analysis": "先求这批蔬菜的总量，再除以调整后的每天用量。\n计算：((45 × 10) ÷ (45 + 5)) = 9（天）。",
+      "proof": [
+        "/",
+        [
+          "*",
+          45,
+          10
+        ],
+        [
+          "+",
+          45,
+          5
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L206",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0207",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "mass",
+      "tags": [
+        "质量单位换算"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "菜店运来6吨大白菜，上午卖出3000千克，下午全部卖完．下午卖出大白菜多少千克？",
+      "numericAnswer": "3000",
+      "unit": "千克",
+      "answer": "3000（千克）",
+      "analysis": "先把6吨换算为6000千克，再减去上午卖出的质量。\n计算：(6000 − 3000) = 3000（千克）。",
+      "proof": [
+        "-",
+        6000,
+        3000
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L207",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0208",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "李师傅加工490个零件，前5天共加工了350个零件，照这样计算，这批零件共需要多少天能加工完？",
+      "numericAnswer": "7",
+      "unit": "天",
+      "answer": "7（天）",
+      "analysis": "先求每天加工的数量，再用总数量除以每天加工量；题目问总天数。\n计算：(490 ÷ (350 ÷ 5)) = 7（天）。",
+      "proof": [
+        "/",
+        490,
+        [
+          "/",
+          350,
+          5
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L208",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0209",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "integer",
+      "tags": [
+        "整数四则应用"
+      ],
+      "prerequisites": [],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "“金秋”体育节的检阅方队中，每班36人，某小学有71个班，一共有多少人参加检阅？",
+      "numericAnswer": "2556",
+      "unit": "人",
+      "answer": "2556（人）",
+      "analysis": "每班人数相同，用每班人数乘班级数。\n计算：(36 × 71) = 2556（人）。",
+      "proof": [
+        "*",
+        36,
+        71
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L209",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0210",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 3,
+      "questionType": "application",
+      "text": "小豪家有个书架共5层，每层放36本书，现在要空出两层放碟片，把这些书放入3层中，每层比原来多放多少本？",
+      "numericAnswer": "24",
+      "unit": "本",
+      "answer": "24（本）",
+      "analysis": "先求书的总数，再求改放3层后每层本数，最后减去原来每层本数。\n计算：(((5 × 36) ÷ 3) − 36) = 24（本）。",
+      "proof": [
+        "-",
+        [
+          "/",
+          [
+            "*",
+            5,
+            36
+          ],
+          3
+        ],
+        36
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L210",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0212",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "integer",
+      "tags": [
+        "整数四则应用"
+      ],
+      "prerequisites": [],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "停车场上停放着5辆面包车，停放的轿车数量是面包车的4倍。停车场上一共停放着多少辆轿车和面包车？",
+      "numericAnswer": "25",
+      "unit": "辆",
+      "answer": "25（辆）",
+      "analysis": "先求轿车数量，再加上面包车数量。\n计算：(5 + (5 × 4)) = 25（辆）。",
+      "proof": [
+        "+",
+        5,
+        [
+          "*",
+          5,
+          4
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L212",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0213",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "area",
+      "tags": [
+        "长方形与正方形面积"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "某荔枝园有一块长方形的果园，长16米，宽7米。这块荔枝园的面积是多少平方米？",
+      "numericAnswer": "112",
+      "unit": "平方米",
+      "answer": "112（平方米）",
+      "analysis": "长方形面积等于长乘宽。\n计算：(16 × 7) = 112（平方米）。",
+      "proof": [
+        "*",
+        16,
+        7
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L213",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0214",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "integer",
+      "tags": [
+        "整数四则应用"
+      ],
+      "prerequisites": [],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "王叔叔和他的爸爸、妈妈去风景区游玩。如果风景区的每张门票售价是108元，王叔叔买所有人的门票一共应付多少钱？",
+      "numericAnswer": "324",
+      "unit": "元",
+      "answer": "324（元）",
+      "analysis": "王叔叔和爸爸、妈妈共3人，每人买一张门票。\n计算：(108 × 3) = 324（元）。",
+      "proof": [
+        "*",
+        108,
+        3
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L214",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0216",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "distance",
+      "tags": [
+        "路程、速度与时间"
+      ],
+      "prerequisites": [
+        "unit-rate"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "阿亮7：35从家步行上学，7：44到达学校。他家到学校的距离是306米。阿亮每分钟走多少米？",
+      "numericAnswer": "34",
+      "unit": "米/分钟",
+      "answer": "34（米/分钟）",
+      "analysis": "7时35分到7时44分共9分钟，用路程除以时间求每分钟走的距离。\n计算：(306 ÷ (44 − 35)) = 34（米/分钟）。",
+      "proof": [
+        "/",
+        306,
+        [
+          "-",
+          44,
+          35
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L216",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0217",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "希望小学三年级8个班为地震灾区捐书656本，平均每班捐书多少本？",
+      "numericAnswer": "82",
+      "unit": "本",
+      "answer": "82（本）",
+      "analysis": "用捐书总数除以班级数。\n计算：(656 ÷ 8) = 82（本）。",
+      "proof": [
+        "/",
+        656,
+        8
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L217",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0218",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "distance",
+      "tags": [
+        "路程、速度与时间"
+      ],
+      "prerequisites": [
+        "unit-rate"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "李春从学校放学回家走了20分钟，他平均每分钟走110米，李春家离学校有多远？",
+      "numericAnswer": "2200",
+      "unit": "米",
+      "answer": "2200（米）",
+      "analysis": "路程等于每分钟走的距离乘时间。\n计算：(20 × 110) = 2200（米）。",
+      "proof": [
+        "*",
+        20,
+        110
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L218",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0221",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "王老师在教师节收到138朵花，如果每3朵扎成一束，可以扎几束？",
+      "numericAnswer": "46",
+      "unit": "束",
+      "answer": "46（束）",
+      "analysis": "每3朵扎一束，用花的总朵数除以3。\n计算：(138 ÷ 3) = 46（束）。",
+      "proof": [
+        "/",
+        138,
+        3
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L221",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0222",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "integer",
+      "tags": [
+        "整数四则应用"
+      ],
+      "prerequisites": [],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "刘阳今年6岁，妈妈的年龄是刘阳年龄的5倍，奶奶的年龄又是妈妈年龄的2倍，奶奶今年多少岁？",
+      "numericAnswer": "60",
+      "unit": "岁",
+      "answer": "60（岁）",
+      "analysis": "先求妈妈的年龄，再求奶奶的年龄。\n计算：((6 × 5) × 2) = 60（岁）。",
+      "proof": [
+        "*",
+        [
+          "*",
+          6,
+          5
+        ],
+        2
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L222",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0224",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "integer",
+      "tags": [
+        "整数四则应用"
+      ],
+      "prerequisites": [],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "一套明信片14张，每张售价5元，今天一共卖出52套，一共收入多少元？",
+      "numericAnswer": "3640",
+      "unit": "元",
+      "answer": "3640（元）",
+      "analysis": "先求一套明信片的售价，再乘卖出的套数。\n计算：((14 × 5) × 52) = 3640（元）。",
+      "proof": [
+        "*",
+        [
+          "*",
+          14,
+          5
+        ],
+        52
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L224",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0226",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "兴兴玩具厂生产了408个布娃娃，如果每3个布娃娃装一箱，一共可以装多少箱？",
+      "numericAnswer": "136",
+      "unit": "箱",
+      "answer": "136（箱）",
+      "analysis": "用布娃娃总数除以每箱个数。\n计算：(408 ÷ 3) = 136（箱）。",
+      "proof": [
+        "/",
+        408,
+        3
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L226",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0228",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "distance",
+      "tags": [
+        "路程、速度与时间"
+      ],
+      "prerequisites": [
+        "unit-rate"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "货车平均每小时行87千米，从甲城到乙城行了16小时，甲、乙两城相距多少千米？",
+      "numericAnswer": "1392",
+      "unit": "千米",
+      "answer": "1392（千米）",
+      "analysis": "路程等于速度乘时间。\n计算：(87 × 16) = 1392（千米）。",
+      "proof": [
+        "*",
+        87,
+        16
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L228",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0229",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "integer",
+      "tags": [
+        "整数四则应用"
+      ],
+      "prerequisites": [],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "电影院共有1400个座位。东风小学共有31个班，平均每班有43人，请问这个学校的所有学生都坐下后还剩多少座位？",
+      "numericAnswer": "67",
+      "unit": "个",
+      "answer": "67（个）",
+      "analysis": "先求学生总人数，再用座位总数减去人数。\n计算：(1400 − (31 × 43)) = 67（个）。",
+      "proof": [
+        "-",
+        1400,
+        [
+          "*",
+          31,
+          43
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L229",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0234",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "integer",
+      "tags": [
+        "整数四则应用"
+      ],
+      "prerequisites": [],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "某剧场楼上有16排座位，每排可以坐42人，平均每个座位票价5元，若座位全部坐满，这个剧院可以收入多少元？",
+      "numericAnswer": "3360",
+      "unit": "元",
+      "answer": "3360（元）",
+      "analysis": "先求座位总数，再乘每个座位的票价。\n计算：((16 × 42) × 5) = 3360（元）。",
+      "proof": [
+        "*",
+        [
+          "*",
+          16,
+          42
+        ],
+        5
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L234",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0235",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "area",
+      "tags": [
+        "长方形与正方形面积"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "一块边长为2米的正方形花布，它的面积是多少平方米？",
+      "numericAnswer": "4",
+      "unit": "平方米",
+      "answer": "4（平方米）",
+      "analysis": "正方形面积等于边长乘边长。\n计算：(2 × 2) = 4（平方米）。",
+      "proof": [
+        "*",
+        2,
+        2
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L235",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0238",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "学校食堂运进1240千克食用油，用了8天，还剩40千克，平均每天用多少千克食用油？",
+      "numericAnswer": "150",
+      "unit": "千克",
+      "answer": "150（千克）",
+      "analysis": "先求8天实际用掉的食用油，再除以天数。\n计算：((1240 − 40) ÷ 8) = 150（千克）。",
+      "proof": [
+        "/",
+        [
+          "-",
+          1240,
+          40
+        ],
+        8
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L238",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0243",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "remainder",
+      "tags": [
+        "有余数的实际问题"
+      ],
+      "prerequisites": [
+        "unit-rate"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "一根绳子长25米，剪10米做一根长跳绳，剩下的每2米做一根短跳绳，可以做多少根短跳绳？",
+      "numericAnswer": "7",
+      "unit": "根",
+      "answer": "7（根）",
+      "analysis": "剪去长跳绳后还剩15米，每根短绳2米，只能做完整的7根，还剩1米。\n计算：取整数部分(((25 − 10) ÷ 2)) = 7（根）。",
+      "proof": [
+        "floor",
+        [
+          "/",
+          [
+            "-",
+            25,
+            10
+          ],
+          2
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L243",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0246",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "学校新买来780本图书，分给6个年级的学生，平均每个年级可以分到多少本？",
+      "numericAnswer": "130",
+      "unit": "本",
+      "answer": "130（本）",
+      "analysis": "用图书总数除以年级数。\n计算：(780 ÷ 6) = 130（本）。",
+      "proof": [
+        "/",
+        780,
+        6
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L246",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0253",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "perimeter",
+      "tags": [
+        "长方形与正方形周长"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "小明的爸爸在河边挖了一块长方形菜地，长8米，宽5米．他用篱笆把不靠河边的三面围了起来，至少得用多少米篱笆？",
+      "numericAnswer": "18",
+      "unit": "米",
+      "answer": "18（米）",
+      "analysis": "为了使篱笆最短，让较长的8米边靠河，只围一条长边和两条宽边。\n计算：(8 + (5 × 2)) = 18（米）。",
+      "proof": [
+        "+",
+        8,
+        [
+          "*",
+          5,
+          2
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L253",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0255",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "perimeter",
+      "tags": [
+        "长方形与正方形周长"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "一个长方形运动场，长250米，宽200米，早操时三年级同学绕操场跑了两圈，同学们跑了多少米？",
+      "numericAnswer": "1800",
+      "unit": "米",
+      "answer": "1800（米）",
+      "analysis": "先求长方形运动场一圈的周长，再乘跑的圈数2。\n计算：(((250 + 200) × 2) × 2) = 1800（米）。",
+      "proof": [
+        "*",
+        [
+          "*",
+          [
+            "+",
+            250,
+            200
+          ],
+          2
+        ],
+        2
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L255",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0256",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "perimeter",
+      "tags": [
+        "长方形与正方形周长"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "一块长方形菜地，长6米，宽5米，四周围上篱笆，其中有一面靠墙，篱笆至少长多少米？",
+      "numericAnswer": "16",
+      "unit": "米",
+      "answer": "16（米）",
+      "analysis": "让6米的长边靠墙，篱笆只需一条长边加两条宽边。\n计算：(6 + (5 × 2)) = 16（米）。",
+      "proof": [
+        "+",
+        6,
+        [
+          "*",
+          5,
+          2
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L256",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0257",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "perimeter",
+      "tags": [
+        "长方形与正方形周长"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 3,
+      "questionType": "application",
+      "text": "一根铁丝可以围一个边长10分米的正方形，现在用它来围一个长方形，如果这个长方形的宽是7分米，那么长是多少分米？",
+      "numericAnswer": "13",
+      "unit": "分米",
+      "answer": "13（分米）",
+      "analysis": "铁丝长等于原正方形周长；长方形长与宽的和是周长的一半，再减去宽。\n计算：(((10 × 4) ÷ 2) − 7) = 13（分米）。",
+      "proof": [
+        "-",
+        [
+          "/",
+          [
+            "*",
+            10,
+            4
+          ],
+          2
+        ],
+        7
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L257",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0259",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 3,
+      "sourceGrade": 3,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "有160名学生，每两人用一张桌子，如果把这些桌子平均放在4间教室里，每间教室放多少张桌子？",
+      "numericAnswer": "20",
+      "unit": "张",
+      "answer": "20（张）",
+      "analysis": "先求需要多少张桌子，再平均放到4间教室。\n计算：((160 ÷ 2) ÷ 4) = 20（张）。",
+      "proof": [
+        "/",
+        [
+          "/",
+          160,
+          2
+        ],
+        4
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L259",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0311",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "distance",
+      "tags": [
+        "路程、速度与时间"
+      ],
+      "prerequisites": [
+        "unit-rate"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "一辆汽车从甲地开往乙地，每小时行驶76千米，行驶了7个小时，甲、乙两地的距离是多少千米？",
+      "numericAnswer": "532",
+      "unit": "千米",
+      "answer": "532（千米）",
+      "analysis": "路程等于速度乘时间。\n计算：(76 × 7) = 532（千米）。",
+      "proof": [
+        "*",
+        76,
+        7
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L311",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0313",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "integer",
+      "tags": [
+        "整数四则应用"
+      ],
+      "prerequisites": [],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "莉莉有129张邮票，明明有71张邮票，每张邮票售价2元，莉莉和明明可以卖多少元？",
+      "numericAnswer": "400",
+      "unit": "元",
+      "answer": "400（元）",
+      "analysis": "先合计邮票张数，再乘每张售价。\n计算：((129 + 71) × 2) = 400（元）。",
+      "proof": [
+        "*",
+        [
+          "+",
+          129,
+          71
+        ],
+        2
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L313",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0314",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "distance",
+      "tags": [
+        "路程、速度与时间"
+      ],
+      "prerequisites": [
+        "unit-rate"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "汽车上山的速度为每小时36千米，行了5小时到达山顶，下山时按原路返回只用了4小时。汽车下山时平均每小时行多少千米？",
+      "numericAnswer": "45",
+      "unit": "千米/小时",
+      "answer": "45（千米/小时）",
+      "analysis": "上、下山走同一条路，先求路程，再除以下山用时。\n计算：((36 × 5) ÷ 4) = 45（千米/小时）。",
+      "proof": [
+        "/",
+        [
+          "*",
+          36,
+          5
+        ],
+        4
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L314",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0318",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "decimal",
+      "tags": [
+        "小数加减应用"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic",
+        "decimal"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "妈妈到超市买苹果用去21.76元，买梨用去19.39元，一共用去多少元？",
+      "numericAnswer": "41.15",
+      "unit": "元",
+      "answer": "41.15（元）",
+      "analysis": "小数点对齐，把买苹果和买梨的钱相加。\n计算：(21.76 + 19.39) = 41.15（元）。",
+      "proof": [
+        "+",
+        21.76,
+        19.39
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L318",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0319",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "春节前，工厂后勤工作人员带1000元买桔树，买了13盆桔树，还剩155元，平均每盆桔树的价格是多少元？",
+      "numericAnswer": "65",
+      "unit": "元",
+      "answer": "65（元）",
+      "analysis": "先求实际花费，再除以购买的盆数。\n计算：((1000 − 155) ÷ 13) = 65（元）。",
+      "proof": [
+        "/",
+        [
+          "-",
+          1000,
+          155
+        ],
+        13
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L319",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0320",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "春节快到了，小明准备送给几个好朋友祝福贺卡，他了解到每张贺卡2元，于是他带着买15张贺卡的钱来到商店，发现他想买的这种贺卡每张涨了1元．请帮小明算一算，他所带的钱现在可以买多少张贺卡？",
+      "numericAnswer": "10",
+      "unit": "张",
+      "answer": "10（张）",
+      "analysis": "先求原来带的钱，再求涨价后的每张价格，用总钱数除以新单价。\n计算：((2 × 15) ÷ (2 + 1)) = 10（张）。",
+      "proof": [
+        "/",
+        [
+          "*",
+          2,
+          15
+        ],
+        [
+          "+",
+          2,
+          1
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L320",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0322",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "修路工人要修一条850米长的公路，已经修了19天，还有185米没修，平均每天修了多少米？",
+      "numericAnswer": "35",
+      "unit": "米",
+      "answer": "35（米）",
+      "analysis": "先求已经修好的长度，再除以修路天数。\n计算：((850 − 185) ÷ 19) = 35（米）。",
+      "proof": [
+        "/",
+        [
+          "-",
+          850,
+          185
+        ],
+        19
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L322",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0325",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "王老师带了386元钱，买足球用去了130元，剩下的钱又买了8个篮球，平均每个篮球多少元？",
+      "numericAnswer": "32",
+      "unit": "元",
+      "answer": "32（元）",
+      "analysis": "先扣除买足球的钱，再求每个篮球的价格。\n计算：((386 − 130) ÷ 8) = 32（元）。",
+      "proof": [
+        "/",
+        [
+          "-",
+          386,
+          130
+        ],
+        8
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L325",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0327",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "integer",
+      "tags": [
+        "整数四则应用"
+      ],
+      "prerequisites": [],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "学校举行团体操表演，每行25位学生，一共有36行，参加团体操表演的学生一共有多少位？",
+      "numericAnswer": "900",
+      "unit": "人",
+      "answer": "900（人）",
+      "analysis": "每行人数相同，用每行人数乘行数。\n计算：(25 × 36) = 900（人）。",
+      "proof": [
+        "*",
+        25,
+        36
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L327",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0329",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "average",
+      "tags": [
+        "平均数"
+      ],
+      "prerequisites": [
+        "unit-rate"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "小华的四次跳远成绩分别为141厘米、160厘米、161厘米、162厘米。请你帮小华算出她跳远的平均成绩是多少厘米。",
+      "numericAnswer": "156",
+      "unit": "厘米",
+      "answer": "156（厘米）",
+      "analysis": "先合计四次跳远成绩，再除以次数4。\n计算：((141 + 160 + 161 + 162) ÷ 4) = 156（厘米）。",
+      "proof": [
+        "/",
+        [
+          "+",
+          141,
+          160,
+          161,
+          162
+        ],
+        4
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L329",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0331",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "integer",
+      "tags": [
+        "整数四则应用"
+      ],
+      "prerequisites": [],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "学校买来练习本3640本，分给三年级256本，分给四年级378本，分给五年级444本，分给六年级322本。这四个年级一共分得多少本练习本？",
+      "numericAnswer": "1400",
+      "unit": "本",
+      "answer": "1400（本）",
+      "analysis": "题目问四个年级共分得多少本，把各年级本数相加；3640本是无须使用的信息。\n计算：(256 + 378 + 444 + 322) = 1400（本）。",
+      "proof": [
+        "+",
+        256,
+        378,
+        444,
+        322
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L331",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0333",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "decimal",
+      "tags": [
+        "小数加减应用"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic",
+        "decimal"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "王老师买香蕉用了10.75元，买橘子用了9.7元，他付给售货员25元，应找回多少元？",
+      "numericAnswer": "4.55",
+      "unit": "元",
+      "answer": "4.55（元）",
+      "analysis": "先合计购买水果的花费，再用付出的钱减去花费。\n计算：(25 − (10.75 + 9.7)) = 4.55（元）。",
+      "proof": [
+        "-",
+        25,
+        [
+          "+",
+          10.75,
+          9.7
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L333",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0334",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "integer",
+      "tags": [
+        "整数四则应用"
+      ],
+      "prerequisites": [],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "新华书店运到2车图书，每辆车装125包，每包有80本。新华书店运到图书多少本？",
+      "numericAnswer": "20000",
+      "unit": "本",
+      "answer": "20000（本）",
+      "analysis": "先求两车共有多少包，再乘每包的本数。\n计算：((2 × 125) × 80) = 20000（本）。",
+      "proof": [
+        "*",
+        [
+          "*",
+          2,
+          125
+        ],
+        80
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L334",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0339",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "integer",
+      "tags": [
+        "整数四则应用"
+      ],
+      "prerequisites": [],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "果园里种梨树18行，每行35棵。苹果树25行，每行32棵。果园里共有果树多少棵？",
+      "numericAnswer": "1430",
+      "unit": "棵",
+      "answer": "1430（棵）",
+      "analysis": "分别求梨树和苹果树棵数，再相加。\n计算：((18 × 35) + (25 × 32)) = 1430（棵）。",
+      "proof": [
+        "+",
+        [
+          "*",
+          18,
+          35
+        ],
+        [
+          "*",
+          25,
+          32
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L339",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0340",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "distance",
+      "tags": [
+        "路程、速度与时间"
+      ],
+      "prerequisites": [
+        "unit-rate"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 3,
+      "questionType": "application",
+      "text": "小明和小芳同院，小芳上学每分走50米，12分到学校，小明上学每分比小芳多走10米，小明几分到学校？",
+      "numericAnswer": "10",
+      "unit": "分钟",
+      "answer": "10（分钟）",
+      "analysis": "先按小芳的速度和时间求上学路程，再用路程除以小明的速度。\n计算：((50 × 12) ÷ (50 + 10)) = 10（分钟）。",
+      "proof": [
+        "/",
+        [
+          "*",
+          50,
+          12
+        ],
+        [
+          "+",
+          50,
+          10
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L340",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0341",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 1,
+      "questionType": "application",
+      "text": "张明看一本572页的故事书，如果他每天看22页，需要多少天才能看完？",
+      "numericAnswer": "26",
+      "unit": "天",
+      "answer": "26（天）",
+      "analysis": "用全书页数除以每天看的页数。\n计算：(572 ÷ 22) = 26（天）。",
+      "proof": [
+        "/",
+        572,
+        22
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L341",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0342",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "unit-rate",
+      "tags": [
+        "归一与平均分"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "修一段长960米的公路，修了6天完成了全长的一半，余下的平均每天修80米，修完这段公路一共需要多少天？",
+      "numericAnswer": "12",
+      "unit": "天",
+      "answer": "12（天）",
+      "analysis": "先求剩下的一半路程修完需要的天数，再加上已经修的6天。\n计算：(6 + ((960 ÷ 2) ÷ 80)) = 12（天）。",
+      "proof": [
+        "+",
+        6,
+        [
+          "/",
+          [
+            "/",
+            960,
+            2
+          ],
+          80
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L342",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0344",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "inverse",
+      "tags": [
+        "逆向还原"
+      ],
+      "prerequisites": [
+        "integer"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 3,
+      "questionType": "application",
+      "text": "小明在计算除法时，错将除数36看成63，结果得到商24。请你帮他算一算，正确的商应该是多少？",
+      "numericAnswer": "42",
+      "unit": "",
+      "answer": "42",
+      "analysis": "先用看错后的除数和商还原被除数，再除以正确的除数36。\n计算：((63 × 24) ÷ 36) = 42。",
+      "proof": [
+        "/",
+        [
+          "*",
+          63,
+          24
+        ],
+        36
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L344",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0348",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "remainder",
+      "tags": [
+        "有余数的实际问题"
+      ],
+      "prerequisites": [
+        "unit-rate"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "学校要进行作业展览，一共要展示270件作品，每块展板最多放25件，需要多少块展板？",
+      "numericAnswer": "11",
+      "unit": "块",
+      "answer": "11（块）",
+      "analysis": "10块展板最多放250件，还有20件也需要一块展板，所以向上取整。\n计算：向上取整((270 ÷ 25)) = 11（块）。",
+      "proof": [
+        "ceil",
+        [
+          "/",
+          270,
+          25
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L348",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    },
+    {
+      "id": "cmath-dev-0354",
+      "subject": "数学",
+      "stage": "primary",
+      "grade": 4,
+      "sourceGrade": 4,
+      "term": "通用",
+      "knowledgeId": "distance",
+      "tags": [
+        "路程、速度与时间"
+      ],
+      "prerequisites": [
+        "unit-rate"
+      ],
+      "methods": [
+        "arithmetic"
+      ],
+      "difficulty": 2,
+      "questionType": "application",
+      "text": "南京到北京的公路长840千米，一辆汽车从南京开往北京，每小时行70千米，行11小时后，还剩多少千米？",
+      "numericAnswer": "70",
+      "unit": "千米",
+      "answer": "70（千米）",
+      "analysis": "先求已经行驶的路程，再用总路程减去已行驶路程。\n计算：(840 − (70 × 11)) = 70（千米）。",
+      "proof": [
+        "-",
+        840,
+        [
+          "*",
+          70,
+          11
+        ]
+      ],
+      "source": "CMATH",
+      "originUrl": "https://github.com/XiaoMi/cmath/blob/9fa13ef0b2d03f5a18c1ace7001248d3981d65ea/datasets/cmath_dev.jsonl#L354",
+      "license": "CC BY 4.0",
+      "attribution": "Tianwen Wei, Jian Luan, Wei Liu, Shuang Dong, Bin Wang — CMATH (2023)",
+      "modifications": "补充解析、算式复核、知识点与难度；适用年级为保守映射，未核对江苏具体教材章节。",
+      "reviewStatus": "checked",
+      "reviewMethod": "source-answer-and-arithmetic-proof",
+      "teacherReviewed": false,
+      "batch": "cmath-pilot-v1"
+    }
+  ],
+  "itemsSha256": "dd4c8402d12bd2bd81c0ae2918a0712eefc5cd8cf9b27c8eec0c4d73c4e873eb"
+}

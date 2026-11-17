@@ -61,3 +61,6 @@ node check.cjs
 - D1 免费单库上限 500 MB；图片限制留有元数据和索引余量，但不保证可以存满 200 MiB 图片外加任意题量。定期查看用量，下载 JSON 离线备份。D1 Time Travel 可做补充，不替代离线备份。
 
 参考：https://developers.cloudflare.com/d1/platform/limits/ 、https://developers.cloudflare.com/d1/worker-api/d1-database/ 、https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/
+
+
+独立题库使用额外的 bank_questions / bank_batches 表，网页只读，沿用相同身份校验与每日请求上限。首次安装请另外执行 bank/schema.sql 与 bank/seed.sql；步骤、许可、复算方式和客户端边界见 [题库试点说明](../bank/README.md)。

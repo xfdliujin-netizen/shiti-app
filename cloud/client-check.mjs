@@ -27,7 +27,7 @@ const now=new Date().toISOString();a.data.questions.push({id:'a',number:'001',su
 await a.syncCloud();assert.equal(records.size,2);assert.equal(images.size,1);
 await b.syncCloud();assert.equal(b.data.questions[0].text,'第一题');assert.match(b.data.questions[0].image,/^data:image/);
 const prior=sequence;await a.syncCloud();await b.syncCloud();assert.equal(sequence,prior,'unchanged data must not be rewritten');
-a.cfg.teachingStyle='guiding';a.cfg.teachingFocus='transfer';a.cfg.term='下';await a.syncCloud();await b.syncCloud();assert.equal(b.cfg.teachingStyle,'guiding');assert.equal(b.cfg.teachingFocus,'transfer');assert.equal(b.cfg.term,'下');
+a.cfg.teachingStyle='guiding';a.cfg.teachingFocus='transfer';a.cfg.term='下';a.cfg.knowledgeProgress={area:'introduced'};a.cfg.methodProgress={decimal:'learned'};await a.syncCloud();await b.syncCloud();assert.equal(b.cfg.teachingStyle,'guiding');assert.equal(b.cfg.teachingFocus,'transfer');assert.equal(b.cfg.term,'下');assert.equal(b.cfg.knowledgeProgress.area,'introduced');assert.equal(b.cfg.methodProgress.decimal,'learned');
 b.data.questions[0].text='第二版';await b.syncCloud();await a.syncCloud();assert.equal(a.data.questions[0].text,'第二版');
 a.data.questions[0].text='甲';b.data.questions[0].text='乙';await a.syncCloud();await assert.rejects(()=>b.syncCloud(),/同步冲突/);assert.equal(b.data.questions[0].text,'乙');assert.equal(records.get('question:a').payload.text,'甲');
 const d=client();await d.syncCloud();d.data.questions=[];d.data.deleted.a=new Date().toISOString();await d.syncCloud();

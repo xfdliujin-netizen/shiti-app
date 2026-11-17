@@ -1,3 +1,4 @@
+import {bankRead} from './bank-api.mjs';
 const json = (body, status=200, headers={}) => new Response(JSON.stringify(body), {status, headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers}});
 const fail = (status, message) => { throw Object.assign(new Error(message), {status}); };
 const decode = s => Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')), c=>c.charCodeAt(0));
@@ -44,11 +45,13 @@ export async function handle(request, env) {
     if(!['GET','PUT'].includes(request.method)) fail(405,'不支持此操作');
     if(request.method==='PUT' && origin!==allowed) fail(403,'写入需要可信网页来源');
     const url=new URL(request.url), path=url.pathname;
-    if(!['/api/session','/api/changes','/api/record','/api/image'].includes(path)) fail(404,'接口不存在');
+    if(!['/api/session','/api/changes','/api/record','/api/image','/api/bank','/api/bank/item','/api/bank/items'].includes(path)) fail(404,'接口不存在');
+    if(path.startsWith('/api/bank')&&request.method!=='GET')fail(405,'题库只读，不接受网页写入');
     const write=request.method==='PUT'?1:0, day=new Date().toISOString().slice(0,10);
     const quota=await env.DB.prepare(`INSERT INTO quotas(day,requests,writes) VALUES(?,1,?) ON CONFLICT(day) DO UPDATE SET requests=requests+1,writes=writes+excluded.writes WHERE requests<10000 AND writes+excluded.writes<=2000 RETURNING requests`).bind(day,write).first();
     if(!quota) fail(429,'今日云端请求达到安全上限，本地仍可使用');
     const db=env.DB.withSession?env.DB.withSession('first-primary'):env.DB;
+    if(path.startsWith('/api/bank')){const result=await bankRead(url,db);return json(result.body,result.status,cors)}
     if(path==='/api/session'&&request.method==='GET') return json({ok:true},200,cors);
     if(path==='/api/changes'&&request.method==='GET') {
       const after=Number(url.searchParams.get('after')||0);
