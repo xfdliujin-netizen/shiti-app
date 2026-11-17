@@ -152,7 +152,7 @@ async function recognizeWithBaidu() {
     warnings,
     complete: true
   };
-  items.forEach(p=>{p.verified=false;p.answerStatus='unknown';p.annotation='';p.visualFeatures=''});
+  items.forEach(p=>{p.verified=false;p.answerStatus='confirmed';p.annotation='';p.visualFeatures=''});
   if(/加点|划线|画线|下划线|图中/.test(transcript))paper.warnings.push('本题依赖加点、划线或图示，OCR 文字未保留这些视觉信息，请在视觉信息栏人工补充后再分析。');
   draft = null;
   editingId = null;

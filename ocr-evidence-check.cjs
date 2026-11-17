@@ -12,7 +12,7 @@ const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('nod
    assert.equal(arrangeOCRLines([{words:'A'},{words:')'}]).located,false);
    assert.equal(arrangeOCRLines([{words:'A'},{words:')'}]).text,'A\\n)');
    const q=normalizeOCR({items:[{section:'框选题目',number:'1',text:'选择正确的一项（A）\\nA.原卷错字',studentAnswer:'A'}]})[0];
-   assert.equal(q.verified,false);assert.equal(q.answerStatus,'unknown');
+   assert.equal(q.verified,false);assert.equal(q.answerStatus,'confirmed');q.answerStatus='unknown';
    paper={scope:'crop',subject:'语文',items:[q],warnings:[],mistake:''};q.selected=true;
    assert.throws(()=>selectedPaper(),/核对/);q.verified=true;progress=()=>{};
    let seen;ai=async prompt=>{seen=prompt;return {answer:'B',analysis:'解题步骤',status:'incorrect',aiVerdict:'审题偏差',tags:[]}};

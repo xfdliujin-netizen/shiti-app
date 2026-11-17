@@ -23,8 +23,7 @@ function paperView() {
         <h2>校对识别结果</h2>
         <span class="pill">${p.analyzed ? '✓ 已生成 AI 解析与错因判定' : '待校对 / 分析'}</span>
       </div>
-      ${typeof paperSubjectField==='function'?paperSubjectField():''}
-    ${typeof paperSourceFields==='function'?paperSourceFields():''}
+      ${typeof paperMetadataFields==='function'?paperMetadataFields():''}
       ${paper.image ? `<div id="paper-crop-image-box" style="margin-bottom:10px;background:#f8fafc;padding:8px;border-radius:10px;text-align:center"><img id="paper-crop-img" class="paper-original" src="${paper.image}" alt="框选原图，点击全屏查看" title="点击全屏查看" style="max-height:180px;width:auto;margin:0 auto;display:block;cursor:zoom-in"></div><dialog id="paper-lightbox" class="image-lightbox"><button type="button" class="lightbox-close" id="paper-lightbox-close" aria-label="关闭">×</button><img id="paper-lightbox-img" alt="框选图全屏预览"></dialog>` : ''}
       ${paper.warnings.map(w=>`<p class="result-note">${esc(w)}</p>`).join('')}
       <label class="field"><span>原题（仅题干、印刷选项和空位；请移出手写答案与订正，不修正原卷错字）</span><textarea class="paper-textarea" data-paper="text" data-index="0">${esc(p.text)}</textarea></label>
@@ -46,10 +45,10 @@ function paperView() {
         </div>
       ` : ''}
       ${p.error ? `<p class="result-note" style="color:#dc2626">${esc(p.error)}</p>` : ''}
-      <div class="actions" style="margin-top:14px">
-        ${!p.analyzed ? `<button class="primary" id="paper-analyze-and-save">⚡ AI 分析并直接收录</button>` : ''}
-        <button class="${p.analyzed ? 'primary' : 'secondary'}" id="paper-analyze">${p.analyzed ? '重新 AI 分析' : '仅 AI 分析（先看解析）'}</button>
-        <button class="${p.analyzed ? 'primary' : 'secondary'}" id="paper-save">${p.analyzed ? '✓ 确认收录到错题本' : '不分析，直接收录原题'}</button>
+      <div class="review-submit-actions">
+        <button class="secondary" id="paper-analyze"><span>仅AI分析</span><span>先看解析</span></button>
+        <button class="secondary" id="paper-save"><span>不分析</span><span>直接收录原题</span></button>
+        <button class="primary" id="paper-analyze-and-save"><span>AI分析</span><span>并直接收录</span></button>
       </div>
     </section>`;
   }
@@ -62,8 +61,7 @@ function paperView() {
       <h2>${paper.scope === 'crop' ? '框内原文核对' : '整卷逐题核对'} · ${paper.items.length} 题</h2>
       <span class="pill">${paper.complete ? '转录已返回' : '转录尚未完成'}</span>
     </div>
-    ${typeof paperSourceFields==='function'?paperSourceFields():''}
-    ${typeof paperSubjectField==='function'?paperSubjectField():''}
+    ${typeof paperMetadataFields==='function'?paperMetadataFields():''}
     <p class="result-note">${paper.ocrProvider === 'baidu' ? '请对照裁剪图核对原文。' : `目录发现 ${paper.inventory.length} 个题号；当前转录 ${paper.items.length} 个条目。`}${missing.length ? ' 待核对：' + esc(missing.map(p => p.section + ' / ' + p.number).join('、')) : ''}</p>
     ${paper.warnings.map(w => `<p class="result-note">${esc(w)}</p>`).join('')}
     ${paper.image ? `<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">展开原图对照（默认收起）</summary><a href="${paper.image}" target="_blank" rel="noopener"><img class="paper-original" src="${paper.image}" alt="原始试卷，点击放大"></a></details>` : ''}
@@ -122,7 +120,7 @@ function normalizeOCR(r) {
       uncertainty: typeof p.uncertainty === 'string' ? p.uncertainty : '',
       selected: autoCheck,
       verified: false,
-      answerStatus: 'unknown',
+      answerStatus: 'confirmed',
       annotation: '',
       visualFeatures: '',
       analyzed: false,
@@ -309,6 +307,8 @@ async function saveSelectedItems() {
   return records.length;
 }
 
+async function runPaperAction(event,fn){const button=event.currentTarget||event.target,markup=button.innerHTML;await run(button,fn);if(button.isConnected&&markup!==undefined)button.innerHTML=markup}
+
 function bindPaper() {
   const layout = $('#paper-layout');
   if(layout)layout.onchange = () => { paperLayout = layout.value; };
@@ -345,15 +345,15 @@ function bindPaper() {
   if(typeof bindCaptureOptions==='function')bindCaptureOptions();
 
   if ($('#paper-select-all')) $('#paper-select-all').onclick = () => { const checked = !paper.items.every(p => p.selected); paper.items.forEach(p => p.selected = checked); render(); };
-  if ($('#paper-add')) $('#paper-add').onclick = () => { paper.items.push({ section: '手工补录', number: String(paper.items.length + 1), text: '', studentAnswer: '', answerStatus:'unknown', uncertainty: '手工补录，请填写原文', selected: true, verified: false, analyzed: false, aiVerdict: '薄弱待练', answer: '', analysis: '', reminder: '', tags: [] }); render(); };
+  if ($('#paper-add')) $('#paper-add').onclick = () => { paper.items.push({ section: '手工补录', number: String(paper.items.length + 1), text: '', studentAnswer: '', answerStatus:'confirmed', uncertainty: '手工补录，请填写原文', selected: true, verified: false, analyzed: false, aiVerdict: '薄弱待练', answer: '', analysis: '', reminder: '', tags: [] }); render(); };
 
-  if ($('#paper-analyze')) $('#paper-analyze').onclick = e => run(e.target, async () => {
+  if ($('#paper-analyze')) $('#paper-analyze').onclick = e => runPaperAction(e, async () => {
     const failures = await analyzeSelectedItems();
     render();
     toast(failures ? `${failures} 题分析失败，请检查 DeepSeek 设置后重试` : '✓ AI 分析与错因判定完成，核对无误后点击收录');
   });
 
-  if ($('#paper-save')) $('#paper-save').onclick = e => run(e.target, async () => {
+  if ($('#paper-save')) $('#paper-save').onclick = e => runPaperAction(e, async () => {
     const count = await saveSelectedItems();
     render();
     toast(`✓ 已收录 ${count} 道错题`);
@@ -402,7 +402,7 @@ function bindPaper() {
   if ($('#paper-lightbox-close')) $('#paper-lightbox-close').onclick = () => $('#paper-lightbox').close();
   if ($('#paper-lightbox')) $('#paper-lightbox').onclick = e => { if (e.target === $('#paper-lightbox')) $('#paper-lightbox').close(); };
   if(typeof bindZoomImage==='function')bindZoomImage($('#paper-lightbox'),$('#paper-lightbox-img'));
-if ($('#paper-analyze-and-save')) $('#paper-analyze-and-save').onclick = e => run(e.target, async () => {
+if ($('#paper-analyze-and-save')) $('#paper-analyze-and-save').onclick = e => runPaperAction(e, async () => {
     const failures = await analyzeSelectedItems();
     if (failures) {
       render();

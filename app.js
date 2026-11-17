@@ -834,7 +834,7 @@ function bind(tab) {
       editingId = null;
       draft=null;
       const questionType=selectedCaptureQuestionType(currentSubject);
-      paper={subject:currentSubject,questionType,notebookId:typeof captureNotebookId==='function'?captureNotebookId():'default',source:$('#source')?.value||'',mistake:$('#mistake')?.value||'',image:mode==='image'?image:'',scope:'crop',ocrProvider:'manual',inventory:[],warnings:[],complete:true,items:[{section:'文字录入',number:'1',text:$('#question-text')?.value||'',studentAnswer:'',questionType,answerStatus:'unknown',selected:true,verified:false,analyzed:false,answer:'',analysis:'',reminder:'',tags:[]}]};
+      paper={subject:currentSubject,questionType,notebookId:typeof captureNotebookId==='function'?captureNotebookId():'default',source:$('#source')?.value||'',mistake:$('#mistake')?.value||'',image:mode==='image'?image:'',scope:'crop',ocrProvider:'manual',inventory:[],warnings:[],complete:true,items:[{section:'文字录入',number:'1',text:$('#question-text')?.value||'',studentAnswer:'',questionType,answerStatus:'confirmed',selected:true,verified:false,analyzed:false,answer:'',analysis:'',reminder:'',tags:[]}]};
       openPaperOnRender = true;
       render();
     };

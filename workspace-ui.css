@@ -686,3 +686,24 @@ button.secondary:active:not(:disabled),
 @media (max-width: 767px) {
   .notebook-toolbar .status-stat { min-width: 50px; font-size: 11px; }
 }
+/* v35: consistent form controls and aligned review actions. */
+:root { --form-control-height:48px; }
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]):not([type=color]),select { box-sizing:border-box; height:var(--form-control-height); min-height:var(--form-control-height); line-height:normal; }
+textarea { box-sizing:border-box; min-height:96px; }
+.review-meta-row,.editable-type-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; align-items:stretch; }
+.review-meta-row > .field,.editable-type-grid > .field { display:flex; flex-direction:column; min-width:0; margin:0; gap:6px; }
+.review-meta-row > .field > span,.editable-type-grid > .field > span { min-height:40px; display:flex; align-items:center; line-height:18px; }
+.review-meta-row input,.review-meta-row select,.editable-type-grid input,.editable-type-grid select { width:100%; margin:0; height:var(--form-control-height); min-height:var(--form-control-height); }
+.review-meta-row { margin-bottom:14px; }
+.editable-label { flex-wrap:nowrap; gap:5px; font-size:12px; }
+.editable-label > span { min-width:0; }
+.editable-label small { display:block; font-size:10px; color:var(--muted); font-weight:400; line-height:14px; }
+.editable-label .small-button { min-height:28px; flex-shrink:0; padding:4px !important; font-size:10px !important; }
+#capture-options-editor[open] { display:flex; flex-direction:column; height:min(80dvh,680px); min-height:min(420px,80dvh); overflow:hidden; }
+#capture-options-editor .card-head,#capture-options-editor .actions { flex-shrink:0; }
+#capture-options-rows { flex:1; min-height:0; overflow-y:auto; padding:2px 0; }
+#capture-options-editor .actions { padding-top:12px; }
+#capture-options-editor .capture-option-row input,#capture-options-editor .capture-option-row select { height:var(--form-control-height); min-height:var(--form-control-height); }
+.review-submit-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:16px; }
+.review-submit-actions button { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-width:0; min-height:66px; padding:9px 4px; font-size:13px; line-height:1.4; white-space:nowrap; font-weight:500; }
+@media(max-width:767px){.review-meta-row,.editable-type-grid { gap:10px; }.review-submit-actions { gap:7px; }.review-submit-actions button { font-size:11px; min-height:64px; }.capture-option-row select { width:100px; }}

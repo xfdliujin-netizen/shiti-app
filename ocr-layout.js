@@ -73,6 +73,7 @@ function questionNumber(subject,date,existing,offset=0,profile=typeof getStudent
 function answerReviewFields(p,i) {
   const subject=typeof paper!=='undefined'&&paper?paper.subject:currentSubject;
   ensureAnswerStructure(p,subject);
+  if(!p.answerStatus)p.answerStatus='confirmed';
   const options=[['unknown','无法确认孩子作答（只解题，不判断错因）'],['confirmed','已确认孩子的作答'],['unanswered','已确认未作答']];
   return `<div class="answer-review">${typeof editableTypeFields==='function'?editableTypeFields(p,i,subject):`<label class="field"><span>题型</span><select data-paper="questionType" data-index="${i}">${questionTypeOptions(subject,p.questionType)}</select></label>`}
     ${structuredAnswerFields(p,i)}
