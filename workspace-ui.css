@@ -95,3 +95,13 @@ button.secondary { background:var(--surface); border:1px solid var(--line); colo
 @media(max-width:360px){.capture-head h2 { font-size:17px; }.capture-head .ocr-switch button { font-size:11px; padding:7px 6px; }.editable-type-grid { grid-template-columns:1fr; }}
 .capture-card [data-subj] { padding:7px 12px; font-size:13px; }
 .capture-card #toggle-subj-cfg { padding:6px 8px; font-size:12px; }
+/* v33: four primary sections with local transfer and paper tools. */
+.section-switch { display:inline-flex; align-items:center; justify-content:center; color:var(--text); background:var(--surface-sub); border:1px solid var(--line); border-radius:8px; padding:7px 11px; text-decoration:none; font-size:13px; font-weight:500; white-space:nowrap; vertical-align:middle; }
+.page-head h1 .section-switch { margin-left:10px; letter-spacing:0; }
+.inline-subtitle { font-size:12px; font-weight:400; color:var(--muted); letter-spacing:0; margin-left:8px; white-space:nowrap; }
+.library-head-actions,.workspace-title { display:flex; align-items:center; gap:8px; }
+.library-head-actions button { white-space:nowrap; }
+.shared-libraries-dialog { width:min(1060px,94vw); max-height:90dvh; margin:auto; padding:20px; overflow:auto; border:1px solid var(--line); border-radius:12px; color:var(--text); background:var(--surface); }
+.shared-libraries-dialog > .card { padding:0; border:0 !important; }
+.library-pick { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted); margin-bottom:8px; }
+@media(max-width:767px){.main-nav { grid-template-columns:repeat(4,minmax(0,1fr)); }.notebook-title { flex-wrap:wrap; gap:6px; }.notebook-title .section-switch { font-size:11px; padding:6px 8px; }.page-head:has(.library-head-actions) { flex-wrap:wrap; gap:12px; }.page-head h1 .section-switch { font-size:12px; margin-left:6px; }.page-head:has(.inline-subtitle) { flex-wrap:wrap; gap:12px; }.page-head h1:has(.inline-subtitle) { display:flex; align-items:center; flex-wrap:wrap; gap:4px; }.inline-subtitle { margin-left:4px; }.shared-libraries-dialog { width:96vw; padding:14px; }}

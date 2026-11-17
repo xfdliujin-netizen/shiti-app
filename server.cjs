@@ -1,5 +1,5 @@
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
-const assets=new Set(['index.html','style.css','app.js','paper.js','crop.js','crop-touch.js','modal-scroll.js','baidu.js','cloud.js','ocr-layout.js','learning.js','bank.js','bank-catalog.js','capture-options.js','notebooks.js','libraries.js','workspace-ui.css']);
+const assets=new Set(['index.html','style.css','app.js','paper.js','crop.js','crop-touch.js','modal-scroll.js','baidu.js','cloud.js','ocr-layout.js','learning.js','bank.js','bank-catalog.js','capture-options.js','notebooks.js','library-print.js','libraries.js','workspace-ui.css']);
 const vendorRoot=path.join(__dirname,'vendor/katex');
 function registerVendor(dir){if(!fs.existsSync(dir))return;for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);if(entry.isDirectory())registerVendor(file);else if(/\.(?:js|css|woff2?|ttf)$/.test(file))assets.add(path.relative(__dirname,file).replaceAll('\\','/'))}}
 registerVendor(vendorRoot);

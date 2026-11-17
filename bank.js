@@ -1,4 +1,3 @@
-let practiceSourceMode='mistakes';
 const bankState={items:[],details:new Map(),cursor:'',more:false,key:'',root:''};
 function bankGrade(profile=getStudentProfile()){
   const grades=['一年级','二年级','三年级','四年级','五年级','六年级'];
@@ -40,7 +39,6 @@ function unifiedProfilePrompt(){
 function bindUnifiedProfile(){
   for(const [attr,key]of[['knowledge-progress','knowledgeProgress'],['method-progress','methodProgress']])document.querySelectorAll('[data-'+attr+']').forEach(el=>el.onchange=()=>{const id=el.getAttribute('data-'+attr);cfg[key]={...cfg[key]};if(el.value)cfg[key][id]=el.value;else delete cfg[key][id];saveLocalConfig()});
 }
-function bankSourceTabs(){return `<div class="segmented practice-source-tabs" role="group" aria-label="练习来源"><button type="button" data-practice-source="mistakes" class="${practiceSourceMode==='mistakes'?'active':''}">我的错题</button><a href="#libraries" class="practice-bank-link">从题库选题</a></div>`}
 function bankKey(){return JSON.stringify([bankState.topic||'',bankState.goal||'consolidate',getStudentProfile().grade,cfg.knowledgeProgress||{},cfg.methodProgress||{},cloudRoot()])}
 function bankItemValid(q,detail=false){
   return q&&/^cmath-dev-\d{4}$/.test(q.id)&&q.subject==='数学'&&Number.isInteger(q.grade)&&q.grade>=1&&q.grade<=6&&bankTopic(q.knowledgeId)&&[1,2,3].includes(q.difficulty)&&q.reviewStatus==='checked'&&typeof q.text==='string'&&q.text.length<=4000&&Array.isArray(q.tags)&&q.tags.every(t=>typeof t==='string')&&Array.isArray(q.methods)&&q.methods.every(id=>BANK_METHODS.some(m=>m.id===id))&&Array.isArray(q.prerequisites)&&q.prerequisites.every(id=>bankTopic(id))&&q.license==='CC BY 4.0'&&/^https:\/\/github\.com\/XiaoMi\/cmath\/blob\/[a-f0-9]{40}\/datasets\/cmath_dev\.jsonl#L\d+$/.test(q.originUrl)&&(!detail||typeof q.answer==='string'&&typeof q.analysis==='string'&&typeof q.numericAnswer==='string'&&typeof q.unit==='string');
@@ -59,10 +57,6 @@ async function loadBank(more=false){
   bankState.key=key;bankState.cursor=result.cursor||'';bankState.more=Boolean(result.more);await saveBankCache();
   if(current()==='variants')render();
 }
-function bankView(){
-  const goal=bankState.goal||'consolidate',rows=rankBankItems(bankState.items.filter(q=>bankFits(q,getStudentProfile(),goal)&&(!bankState.topic||q.knowledgeId===bankState.topic)),goal);
-  return `<section class="card"><div class="card-head"><h2>数学题库</h2><span class="pill">首批 50 题</span></div><div class="form-row variant-row"><label class="field"><span>知识点</span><select id="bank-topic"><option value="">已学范围内全部</option>${BANK_TOPICS.map(t=>`<option value="${t.id}" ${bankState.topic===t.id?'selected':''}>${t.label}</option>`).join('')}</select></label><label class="field"><span>练习目标</span><select id="bank-goal"><option value="consolidate" ${goal==='consolidate'?'selected':''}>巩固</option><option value="extend" ${goal==='extend'?'selected':''}>提升</option></select></label></div><div class="actions"><button type="button" class="primary" id="bank-load">读取题库</button><button type="button" class="secondary" id="bank-login">云端登录</button>${bankState.more?'<button type="button" class="secondary" id="bank-more">继续读取</button>':''}</div><p class="hint">按${esc(getStudentProfile().grade)}和已学内容筛选。题目已复算，尚非教师签审；江苏教材章节、学期未逐项核验。读取与原题练习不调用 AI。</p></section><div class="bank-list">${rows.length?rows.map(q=>`<article class="card"><div class="q-meta"><span>建议${q.grade}年级</span><span>${['','基础','巩固','提升'][q.difficulty]}</span><span>${esc(q.tags.join(' · '))}</span></div><p class="prose">${esc(q.text)}</p><div class="actions"><button type="button" class="primary" data-bank-start="${q.id}">开始练习</button><button type="button" class="secondary" data-bank-variant="${q.id}">AI 变式（1题）</button><a class="text-button" href="${esc(q.originUrl)}" target="_blank" rel="noopener">CMATH · 来源</a></div><small class="muted">CC BY 4.0 · 解析与标签已补充</small></article>`).join(''):'<div class="card empty">点击“读取题库”加载；若当前没有合适题目，可调整知识点、已学内容或继续读取下一页。</div>'}</div><div id="exercise">${practice?exercise():''}</div><details class="bank-history"><summary>题库练习记录（${data.practices.filter(p=>['bank','bank-variant'].includes(p.sourceKind)).length}）</summary>${data.practices.filter(p=>['bank','bank-variant'].includes(p.sourceKind)).slice(-10).reverse().map(p=>`<div class="learning-row"><strong>${esc(p.text)}</strong><span>作答：${esc(p.response)} · ${p.resultCheck==='correct'?'数值一致':p.resultCheck==='incorrect'?'数值不一致':esc(p.aiStatus||'尚未核对结果')} · 自评：${esc(p.rating)}</span></div>`).join('')}</details>`;
-}
 async function startBankPractice(id){
   const root=cloudRoot();let q=bankState.root===root?bankState.details.get(id):null;
   if(!q){q=(await(await cloudRequest(root,'/api/bank/item?id='+encodeURIComponent(id))).json()).item;if(!bankItemValid(q,true))throw Error('题目详情不完整，未采用');bankState.details.set(id,q);bankState.root=root;await saveBankCache()}
@@ -74,18 +68,6 @@ async function makeBankVariant(id){
   const r=await ai(`围绕这道已复算的数学母题生成1道新练习，改变情境或数值，保留考点、条件充分。练习目标：${bankState.goal==='extend'?'提升':'巩固'}。原题：${q.text}。参考解法：${q.analysis}。返回 JSON {"items":[{"text":"完整题干","answer":"答案","analysis":"解析"}]}。`,undefined,{learning:{subject:'数学',text:q.text,tags:source.tags}});
   if(!Array.isArray(r.items)||r.items.length!==1||r.items.some(i=>typeof i.text!=='string'||!i.text||typeof i.answer!=='string'||!i.answer||typeof i.analysis!=='string'||!i.analysis))throw Error('AI 变式不完整，保留原题练习');
   practice={...practice,sourceKind:'bank-variant',grade:profile.grade,term:profile.term,items:r.items};render();$('#exercise')?.scrollIntoView({behavior:'smooth'});
-}
-async function buildBankExam(){
-  if(!Number.isInteger(examCount)||examCount<1||examCount>10)throw Error('题库组卷每次最多10题');
-  const key=bankKey();if(bankState.key!==key){await loadBank(false)}
-  for(let page=0;page<4&&bankState.more&&bankState.items.filter(q=>bankFits(q,getStudentProfile(),bankState.goal||'consolidate')&&(!bankState.topic||q.knowledgeId===bankState.topic)).length<examCount;page++)await loadBank(true);
-  const selected=rankBankItems(bankState.items.filter(q=>bankFits(q,getStudentProfile(),bankState.goal||'consolidate')&&(!bankState.topic||q.knowledgeId===bankState.topic)),bankState.goal||'consolidate').slice(0,examCount);
-  if(selected.length<examCount)throw Error(`当前已学范围只有 ${selected.length} 道合适原题，未凑数；请减少题量或调整知识点`);
-  const result=await(await cloudRequest(cloudRoot(),'/api/bank/items?ids='+selected.map(q=>encodeURIComponent(q.id)).join(','))).json();
-  if(!Array.isArray(result.items)||result.items.length!==examCount||!result.items.every(q=>bankItemValid(q,true)&&bankFits(q,getStudentProfile(),bankState.goal||'consolidate')))throw Error('题库详情不完整，未生成试卷');
-  const detail=new Map(result.items.map(q=>[q.id,q]));
-  examSheet={title:`拾题 · ${getStudentProfile().grade}数学题库练习卷`,created:new Date().toLocaleDateString('zh-CN'),items:selected.map(q=>({...detail.get(q.id),source:'CMATH · '+q.id}))};
-  examShowAnswers=false;render();$('#exam-area')?.scrollIntoView({behavior:'smooth'});
 }
 function numericFraction(text){
   if(!/^[+-]?\d{1,12}(?:\.\d{1,8})?(?:\/\d{1,12})?$/.test(text))return null;
@@ -107,7 +89,6 @@ function checkBankNumber(response,expected,unit){
 }
 function bindBank(){
   document.querySelectorAll('[id^="response-"]').forEach(el=>el.oninput=()=>{const i=Number(el.id.slice(9)),p=practice?.items[i];if(!p||p.saved||el.value===p.response)return;if(p.revealed)p.answerViewed=true;p.response=el.value;p.aiStatus='';p.aiFeedback='';p.resultCheck='';p.checkFeedback='';p.suggestedRating='';p.revealed=false;el.closest('.practice-card')?.querySelectorAll('.ai-eval-box,.bank-check-feedback').forEach(node=>node.remove());$('#solution-'+i)?.classList.add('hidden')});
-  document.querySelectorAll('[data-practice-source]').forEach(b=>b.onclick=()=>{practiceSourceMode=b.dataset.practiceSource;render()});
   if($('#bank-topic'))$('#bank-topic').onchange=e=>{bankState.topic=e.target.value;bankState.cursor='';bankState.more=false;render()};
   if($('#bank-goal'))$('#bank-goal').onchange=e=>{bankState.goal=e.target.value;render()};
   if($('#bank-load'))$('#bank-load').onclick=e=>run(e.target,()=>loadBank(false));

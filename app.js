@@ -57,7 +57,8 @@ const paths = [
   '<circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/>'
 ];
 paths.splice(2,0,'<path d="M4 4h16v16H4z"/><path d="M8 4v16M4 9h16M12 13h4M12 16h4"/>');
-const tabs = [['capture', '录题'], ['notebook', '错题本'], ['libraries','题库'], ['variants', '举一反三'], ['exam', '试卷'], ['settings', '设置']];
+paths.splice(3,2);
+const tabs = [['capture', '录题'], ['notebook', '错题本'], ['libraries','题库'], ['settings', '设置']];
 
 let data = { version: 1, questions: [], practices: [], deleted: {} },
     cfg = readConfig(),
@@ -215,7 +216,7 @@ function toast(s) {
 function uid() { return generateId(); }
 function stamp() { return new Date().toISOString(); }
 function date(s) { return new Date(s).toLocaleDateString('zh-CN'); }
-function current() { const h = location.hash.slice(1); if (h === 'practice') return 'variants'; return tabs.some(t => t[0] === h) ? h : 'capture'; }
+function current() { const h = location.hash.slice(1); if (h === 'practice') return 'variants'; return [...tabs.map(t=>t[0]),'variants','exam'].includes(h) ? h : 'capture'; }
 function opts(selected) { return subjects.map(s => `<option ${s === selected ? 'selected' : ''}>${s}</option>`).join(''); }
 function field(label, id, value = '', type = 'text', placeholder = '') {
   return `<label class="field"><span>${label}</span><input id="${id}" type="${type}" value="${esc(value)}" placeholder="${placeholder}"></label>`;
@@ -257,13 +258,13 @@ function renderSubjectConfigModal() {
 
 function render() {
   injectCustomStyles();
-  const tab = current();
+  const tab = current(),parentTab=tab==='variants'?'notebook':tab==='exam'?'libraries':tab;
   const paperWasOpen = !!document.getElementById('paper-dialog')?.open;
   const p = getStudentProfile();
   if ($('#nav')) {
-    $('#nav').innerHTML = tabs.map((t, i) => `<a href="#${t[0]}" class="${tab === t[0] ? 'active' : ''}" ${tab === t[0] ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${paths[i]}</svg><span>${t[1]}</span></a>`).join('');
+    $('#nav').innerHTML = tabs.map((t, i) => `<a href="#${t[0]}" class="${parentTab === t[0] ? 'active' : ''}" ${parentTab === t[0] ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${paths[i]}</svg><span>${t[1]}</span></a>`).join('');
   }
-  if ($('#breadcrumb')) $('#breadcrumb').textContent = `${p.stageName}（${p.grade}） / ` + tabs.find(t => t[0] === tab)[1];
+  if ($('#breadcrumb')) $('#breadcrumb').textContent = `${p.stageName}（${p.grade}） / ` + tabs.find(t => t[0] === parentTab)[1];
   const mobileBar = '';
   $('#main').innerHTML = mobileBar + ({ capture, notebook, variants: variantsPage, libraries:librariesPage, exam: examPage, settings })[tab]();
   bind(tab);
@@ -386,7 +387,7 @@ function notebook() {
   const nbUnmastered = bookQuestions.filter(q => !q.mastered).length;
   const nbMastered = nbTotal - nbUnmastered;
   return renderStageBanner() +
-    `<div class="page-head notebook-head"><div class="notebook-title"><h1>错题本</h1><button class="secondary" id="sample">体验示例题</button></div></div>` +
+    `<div class="page-head notebook-head"><div class="notebook-title"><h1>错题本</h1><a href="#variants" class="section-switch">举一反三</a><button class="secondary" id="sample">体验示例题</button></div></div>` +
     (typeof notebooksPanel==='function'?notebooksPanel():'') +
     `<div class="notebook-status" role="group" aria-label="掌握状态筛选">${[['all','累计错题',nbTotal],['unmastered','待巩固',nbUnmastered],['mastered','已掌握',nbMastered]].map(([value,label,count])=>`<button type="button" data-status="${value}" class="status-stat ${notebookStatus===value?'active':''}" aria-pressed="${notebookStatus===value}"><span>${label}</span><b>${count}</b></button>`).join('')}</div>` +
     `<input class="search" id="search" aria-label="搜索错题" placeholder="⌕ 搜索题干、编号、知识点、错因标签…" value="${esc(query)}">` +
@@ -426,7 +427,6 @@ function getPracticeSubjectOptions() {
 }
 
 function variantsPage() {
-if(typeof bankSourceTabs==='function'&&practiceSourceMode==='bank')return heading('TRANSFER','举一反三','')+bankSourceTabs()+bankView();
 const p = getStudentProfile();
 const subjList = getPracticeSubjectOptions();
 if (!subjList.includes(practiceSubject)) practiceSubject = '全部';
@@ -439,12 +439,8 @@ const filteredQuestions = data.questions
 .sort((a, b) => b.created.localeCompare(a.created));
 
 return renderStageBanner() +
-heading('TRANSFER & GROW', '举一反三', `紧扣考纲，举一反三检验掌握情况。`) + (typeof bankSourceTabs==='function'?bankSourceTabs():'') + `
+heading('TRANSFER & GROW', '举一反三 <span class="inline-subtitle">AI 变式 + 智能批改</span>', '', '<a href="#notebook" class="section-switch">返回错题本</a>') + `
 <section class="card">
-<div class="card-head">
-<h2>开始举一反三（单题突破）</h2>
-<span class="pill">✧ AI 变式 + 智能批改</span>
-</div>
 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
 <span style="font-size:13px;font-weight:600;color:var(--muted)">科目：</span>
 ${subjList.map(s => `<button type="button" class="chip ${practiceSubject === s? 'active': ''}" data-prac-subj="${s}" style="padding:5px 12px;font-size:13px">${s}</button>`).join('')}
@@ -471,7 +467,7 @@ ${filteredQuestions.map(q => `<option value="${esc(q.id)}" ${q.id === selectedPr
 </div>
 </section>
 
-<div id="exercise">${practice? exercise(): ''}</div>
+<div id="exercise">${practice&&!['bank','bank-variant','library','library-variant'].includes(practice.sourceKind)?exercise():''}</div>
 
 <div class="section-title"><h2>练习记录</h2><span class="text-button">${data.practices.length} 次练习</span></div>
 ${data.practices.slice().reverse().slice(0, 20).map(p => `<div class="card"><div class="q-meta"><span>${date(p.created)}</span><span>原题 #${esc(p.number)}</span>${p.aiStatus? `<span class="ai-verdict-chip ${p.aiStatus.includes('正确') &&!p.aiStatus.includes('部分')? 'good': 'bad'}">🤖 ${esc(p.aiStatus)}</span>`: ''}<span>${esc(p.rating)}</span></div><p class="prose">${esc(p.text)}</p><details><summary>查看作答与 AI 批改解析</summary><p class="prose">我的作答：${esc(p.response || '未填写')}${p.aiFeedback? `\n\n🤖 AI 点评：${esc(p.aiFeedback)}`: ''}\n\n答案：${esc(p.answer)}\n\n解析：${esc(p.analysis)}</p></details></div>`).join('') || '<div class="empty">练习后，你的作答、AI 判定和自评会保存在这里。</div>'}`;
@@ -481,6 +477,7 @@ ${data.practices.slice().reverse().slice(0, 20).map(p => `<div class="card"><div
 function practicePage() { return variantsPage();}
 
 function examPage() {
+if(!['original','ai'].includes(examMode))examMode='original';
 const p = getStudentProfile();
 const examSubjList = [...new Set([...getQuickSubjects(),...data.questions.map(q=>q.subject).filter(Boolean)])];
 if (!examSubjList.includes(examSubject)) examSubject = examSubjList[0] || '语文';
@@ -490,7 +487,7 @@ if (!countOptions.includes(examCount)) examCount = 5;
 const insufficient=examMode==='original'&&available<examCount;
 
 return renderStageBanner() +
-`<div class="page-head exam-page-head"><h1>整理成试卷</h1><span class="pill exam-print-hint">支持打印 / 存 PDF</span></div>` + `
+`<div class="page-head exam-page-head"><div class="workspace-title"><a href="#libraries" class="section-switch">题库</a><h1>整理成试卷</h1></div><span class="pill exam-print-hint">支持打印 / 存 PDF</span></div>` + `
 <section class="card" id="exam-builder" style="border:1.5px solid rgba(0,122,255,0.2)">
 <div class="card-head">
 <h2>📄 整理成试卷（周测 / 考前巩固）</h2>
@@ -498,14 +495,12 @@ return renderStageBanner() +
 <div class="segmented exam-source-tabs" style="margin-bottom:12px">
 <button type="button" data-exam-mode="original" class="${examMode === 'original'? 'active': ''}">错题重练</button>
 <button type="button" data-exam-mode="ai" class="${examMode === 'ai'? 'active': ''}">AI 扩展</button>
-${typeof buildBankExam==='function'?`<button type="button" data-exam-mode="bank" class="${examMode==='bank'?'active':''}">题库组卷</button>`:''}
 </div>
 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
 <span style="font-size:13px;font-weight:600;color:var(--muted)">试卷科目：</span>
-${(examMode==='bank'?['数学']:examSubjList).map(s => `<button type="button" class="chip ${examSubject === s? 'active': ''}" data-exam-subj="${s}" style="padding:5px 12px;font-size:13px">${s}</button>`).join('')}
+${examSubjList.map(s => `<button type="button" class="chip ${examSubject === s? 'active': ''}" data-exam-subj="${s}" style="padding:5px 12px;font-size:13px">${s}</button>`).join('')}
 </div>
 <div class="form-row">
-${examMode==='bank'?`<label class="field"><span>知识点</span><select id="exam-bank-topic"><option value="">已学范围内全部</option>${BANK_TOPICS.map(t=>`<option value="${t.id}" ${bankState.topic===t.id?'selected':''}>${t.label}</option>`).join('')}</select></label>`:`
 <label class="field">
 <span>选题范围</span>
 <select id="exam-scope">
@@ -513,7 +508,6 @@ ${examMode==='bank'?`<label class="field"><span>知识点</span><select id="exam
 <option value="all" ${examScope === 'all'? 'selected': ''}>全部错题（含已掌握）</option>
 </select>
 </label>
-`}
 <label class="field">
 <span>目标题量</span>
 <select id="exam-count">
@@ -521,8 +515,7 @@ ${countOptions.map(n => `<option value="${n}" ${examCount === n? 'selected': ''}
 </select>
 </label>
 </div>
-${examMode==='bank'?`<label class="field"><span>练习目标</span><select id="exam-bank-goal"><option value="consolidate" ${bankState.goal!=='extend'?'selected':''}>巩固</option><option value="extend" ${bankState.goal==='extend'?'selected':''}>提升</option></select></label>`:''}
-<p class="notice" id="exam-availability">${examMode==='bank'?'从独立题库按已学范围选 '+examCount+' 道已复算题目，不调用 AI；可用题不足时提示，不重复凑数。':'当前范围可用原题 '+available+' 道，目标题量 '+examCount+' 道。'+(insufficient?'原题不足，请减少题量，或切换 AI 扩展生成新题。':examMode==='ai'?'将围绕母题生成指定数量的新题。':'')}</p>
+<p class="notice" id="exam-availability">当前范围可用原题 ${available} 道，目标题量 ${examCount} 道。${insufficient?'原题不足，请减少题量，或切换 AI 扩展生成新题。':examMode==='ai'?'将围绕母题生成指定数量的新题。':''}</p>
 ${insufficient&&available?`<button type="button" class="secondary" id="exam-use-ai">切换 AI 扩展，生成 ${[3,5,8,10].includes(examCount)?examCount:5} 道新题</button>`:''}
 <button class="primary" id="build-exam" ${insufficient?'disabled':''}>${insufficient?'原题不足（'+available+'/'+examCount+'）':'生成 '+examCount+' 道题'}</button>
 </section>
@@ -1047,8 +1040,8 @@ function bindPractice() {
   });
 
   document.querySelectorAll('[data-exam-mode]').forEach(b => b.onclick = () => {
+    if(!['original','ai'].includes(b.dataset.examMode))return;
     examMode = b.dataset.examMode;
-    if(examMode==='bank')examSubject='数学';
     examCount = 5;
     examSheet=null;
     render();
@@ -1060,12 +1053,9 @@ function bindPractice() {
   });
   if ($('#exam-scope')) $('#exam-scope').onchange = e => { examScope = e.target.value;examSheet=null;render(); };
   if ($('#exam-count')) $('#exam-count').onchange = e => { examCount = Number(e.target.value);examSheet=null;render(); };
-  if($('#exam-bank-topic'))$('#exam-bank-topic').onchange=e=>{bankState.topic=e.target.value;examSheet=null;render()};
-  if($('#exam-bank-goal'))$('#exam-bank-goal').onchange=e=>{bankState.goal=e.target.value;examSheet=null;render()};
   if ($('#exam-use-ai')) $('#exam-use-ai').onclick=()=>{examMode='ai';if(![3,5,8,10].includes(examCount))examCount=5;examSheet=null;render()};
 
   if ($('#build-exam')) $('#build-exam').onclick = e => run(e.target, async () => {
-    if(examMode==='bank'){await buildBankExam();return}
     let pool = data.questions.filter(q => q.subject === examSubject && (examScope !== 'unmastered' || !q.mastered));
     if (!pool.length) throw Error(examScope === 'unmastered' ? '本科目暂无待巩固错题，请切换科目或选择全部错题' : '本科目暂无可用错题，请先录题或切换科目');
     if(examMode==='original'&&pool.length<examCount)throw Error(`当前只有 ${pool.length} 道原题，无法整理为 ${examCount} 道；请减少题量或切换 AI 扩展`);
