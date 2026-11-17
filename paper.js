@@ -23,8 +23,8 @@ function paperView() {
         <h2>校对识别结果</h2>
         <span class="pill">${p.analyzed ? '✓ 已生成 AI 解析与错因判定' : '待校对 / 分析'}</span>
       </div>
-      ${typeof paperNotebookField==='function'?paperNotebookField():''}
-      ${typeof paperSourceFields==='function'?paperSourceFields():''}
+      ${typeof paperSubjectField==='function'?paperSubjectField():''}
+    ${typeof paperSourceFields==='function'?paperSourceFields():''}
       ${paper.image ? `<div id="paper-crop-image-box" style="margin-bottom:10px;background:#f8fafc;padding:8px;border-radius:10px;text-align:center"><img id="paper-crop-img" class="paper-original" src="${paper.image}" alt="框选原图，点击全屏查看" title="点击全屏查看" style="max-height:180px;width:auto;margin:0 auto;display:block;cursor:zoom-in"></div><dialog id="paper-lightbox" class="image-lightbox"><button type="button" class="lightbox-close" id="paper-lightbox-close" aria-label="关闭">×</button><img id="paper-lightbox-img" alt="框选图全屏预览"></dialog>` : ''}
       ${paper.warnings.map(w=>`<p class="result-note">${esc(w)}</p>`).join('')}
       <label class="field"><span>原题（仅题干、印刷选项和空位；请移出手写答案与订正，不修正原卷错字）</span><textarea class="paper-textarea" data-paper="text" data-index="0">${esc(p.text)}</textarea></label>
@@ -63,6 +63,7 @@ function paperView() {
       <span class="pill">${paper.complete ? '转录已返回' : '转录尚未完成'}</span>
     </div>
     ${typeof paperSourceFields==='function'?paperSourceFields():''}
+    ${typeof paperSubjectField==='function'?paperSubjectField():''}
     <p class="result-note">${paper.ocrProvider === 'baidu' ? '请对照裁剪图核对原文。' : `目录发现 ${paper.inventory.length} 个题号；当前转录 ${paper.items.length} 个条目。`}${missing.length ? ' 待核对：' + esc(missing.map(p => p.section + ' / ' + p.number).join('、')) : ''}</p>
     ${paper.warnings.map(w => `<p class="result-note">${esc(w)}</p>`).join('')}
     ${paper.image ? `<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">展开原图对照（默认收起）</summary><a href="${paper.image}" target="_blank" rel="noopener"><img class="paper-original" src="${paper.image}" alt="原始试卷，点击放大"></a></details>` : ''}

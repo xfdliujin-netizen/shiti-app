@@ -308,6 +308,11 @@ function cards(qs) {
     : '<div class="card empty"><b>还没有符合条件的错题记录</b>拍一张照片，或切换筛选条件查看其他题目。</div>';
 }
 
+function workspaceSwitch(group,active){
+  const entries=group==='notebook'?[['notebook','错题本'],['variants','举一反三']]:[['libraries','题库'],['exam','试卷']];
+  return `<div class="workspace-header"><h1 class="visually-hidden">${entries.find(([id])=>id===active)[1]}</h1><nav class="workspace-tabs" aria-label="${group==='notebook'?'错题与练习':'题库与试卷'}">${entries.map(([id,label])=>`<a href="#${id}" class="${id===active?'active':''}" ${id===active?'aria-current="page"':''}>${label}</a>`).join('')}</nav></div>`;
+}
+
 function capture() {
   const quickSubjects = getQuickSubjects();
   const displaySubjects = quickSubjects.includes(currentSubject) ? quickSubjects : [...quickSubjects, currentSubject];
@@ -322,15 +327,7 @@ function capture() {
         <div class="ocr-switch" role="group" aria-label="图片识别服务"><button type="button" data-ocr-provider="baidu" aria-pressed="${hasBaidu}" class="${hasBaidu?'active':''}">百度 OCR</button><button type="button" data-ocr-provider="deepseek" aria-pressed="${!hasBaidu}" class="${!hasBaidu?'active':''}">DeepSeek</button></div>
       </div>
       
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-        <span style="font-size:14px;font-weight:600;color:var(--muted)">科目：</span>
-        ${displaySubjects.map(s => `<button type="button" class="chip ${currentSubject === s ? 'active' : ''}" data-subj="${s}">${s}</button>`).join('')}
-        <button type="button" class="chip-gear" id="toggle-subj-cfg" title="自定义常用科目">⚙️ 科目</button>
-        <select id="subject" hidden>${opts(currentSubject)}</select>
-      </div>
-
-      ${renderSubjectConfigModal()}
-      ${typeof captureNotebookField==='function'?captureNotebookField():''}
+      <select id="subject" hidden>${opts(currentSubject)}</select>
       <div id="capture-input">
         ${mode === 'image'
           ? (image ? '<input id="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>'+cView : '<label class="upload" id="drop"><input id="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden><span class="upload-icon">↥</span><b>点击拍照或选择试卷图片</b><small>单指框选，双指缩放和旋转</small></label>')
@@ -372,50 +369,39 @@ function draftForm() {
   </dialog>`;
 }
 
-function notebook() {
-  const quickSubjects = getQuickSubjects();
-  const displaySubjects = (subjects.includes(filter) && !quickSubjects.includes(filter))
-    ? [...quickSubjects, filter]
-    : quickSubjects;
-
-  const usedVerdicts = [...new Set(data.questions.map(q => inferAiVerdict(q)))];
-  const verdictOptions = ['全部', ...aiVerdictTags.filter(v => usedVerdicts.includes(v) || ['概念混淆', '审题偏差', '计算粗心', '薄弱待练'].includes(v))];
-
-  if(typeof activeNotebook!=='undefined'&&activeNotebook!=='all'&&!notebookList().some(b=>b.id===activeNotebook))activeNotebook='all';
-  const bookQuestions = data.questions.filter(q => typeof activeNotebook==='undefined'||activeNotebook==='all'||questionNotebook(q)===activeNotebook);
-  const nbTotal = bookQuestions.length;
-  const nbUnmastered = bookQuestions.filter(q => !q.mastered).length;
-  const nbMastered = nbTotal - nbUnmastered;
-  return renderStageBanner() +
-    `<div class="page-head notebook-head"><div class="notebook-title"><h1>错题本</h1><a href="#variants" class="section-switch">举一反三</a><button class="secondary" id="sample">体验示例题</button></div></div>` +
-    (typeof notebooksPanel==='function'?notebooksPanel():'') +
-    `<div class="notebook-status" role="group" aria-label="掌握状态筛选">${[['all','累计错题',nbTotal],['unmastered','待巩固',nbUnmastered],['mastered','已掌握',nbMastered]].map(([value,label,count])=>`<button type="button" data-status="${value}" class="status-stat ${notebookStatus===value?'active':''}" aria-pressed="${notebookStatus===value}"><span>${label}</span><b>${count}</b></button>`).join('')}</div>` +
-    `<input class="search" id="search" aria-label="搜索错题" placeholder="⌕ 搜索题干、编号、知识点、错因标签…" value="${esc(query)}">` +
-    `<div class="filters" style="align-items:center">
-      ${['全部', ...displaySubjects].map(s => `<button class="chip ${filter === s ? 'active' : ''}" data-filter="${s}">${s}</button>`).join('')}
-      <button type="button" class="chip-gear" id="toggle-subj-cfg" title="添加或管理显示的科目">⚙️ 科目</button>
-    </div>` +
-    renderSubjectConfigModal() +
-    `<div class="sub-filter-bar">
-      <span style="font-size:12px;font-weight:700;color:var(--muted)">🤖 AI 判定标签：</span>
-      ${verdictOptions.map(v => `<button type="button" class="chip ${aiFilter === v ? 'active' : ''}" data-ai-filter="${v}" style="padding:4px 10px;font-size:12px">${v}</button>`).join('')}
-    </div>` +
-    `<div id="question-list">${filtered()}</div>`;
+let notebookFiltersOpen=false,notebookPeriod='',notebookType='',notebookTag='';
+function notebookTypeLabel(q){return q.questionTypeName||QUESTION_TYPE_NAMES[q.questionType]||'未设置'}
+function notebookExtraMatch(q){return (!notebookPeriod||JSON.stringify([q.grade||'',q.term||''])===notebookPeriod)&&(!notebookType||notebookTypeLabel(q)===notebookType)&&(!notebookTag||(q.tags||[]).includes(notebookTag))}
+function notebook(){
+  if(typeof activeNotebook!=='undefined')activeNotebook='all';
+  const detail=filter!=='全部',scope=data.questions.filter(q=>!detail||q.subject===filter),shown=filteredQuestions(),total=scope.length,pending=scope.filter(q=>!q.mastered).length;
+  const toolbar=`<div class="notebook-toolbar"><input class="search" id="search" aria-label="搜索错题" placeholder="搜索题目、编号、知识点…" value="${esc(query)}"><div class="notebook-status" role="group" aria-label="掌握状态筛选">${[['all','累计错题',total],['unmastered','待巩固',pending],['mastered','已掌握',total-pending]].map(([value,label,count])=>`<button type="button" data-status="${value}" class="status-stat ${notebookStatus===value?'active':''}" aria-pressed="${notebookStatus===value}"><span>${label}</span><b>${count}</b></button>`).join('')}</div></div>`;
+  const periods=[...new Set(scope.map(q=>JSON.stringify([q.grade||'',q.term||''])))],types=[...new Set(scope.map(notebookTypeLabel))],tags=[...new Set(scope.flatMap(q=>q.tags||[]))].sort();
+  const facets=`<div class="notebook-facets" ${notebookFiltersOpen?'':'hidden'}><label class="field"><span>年级／学期</span><select id="notebook-period"><option value="">全部年级／学期</option>${periods.map(v=>{const [g,t]=JSON.parse(v);return `<option value="${esc(v)}" ${v===notebookPeriod?'selected':''}>${esc(g||'年级未设置')}${t?'（'+esc(t)+'）':''}</option>`}).join('')}</select></label><label class="field"><span>题型</span><select id="notebook-type"><option value="">全部题型</option>${types.map(v=>`<option value="${esc(v)}" ${v===notebookType?'selected':''}>${esc(v)}</option>`).join('')}</select></label><label class="field"><span>知识点</span><select id="notebook-tag"><option value="">全部知识点</option>${tags.map(v=>`<option value="${esc(v)}" ${v===notebookTag?'selected':''}>${esc(v)}</option>`).join('')}</select></label><label class="field"><span>错因</span><select id="notebook-verdict"><option value="全部">全部错因</option>${[...new Set(scope.map(inferAiVerdict))].map(v=>`<option value="${esc(v)}" ${v===aiFilter?'selected':''}>${esc(v)}</option>`).join('')}</select></label><button type="button" class="text-button" id="notebook-reset-filters">清除筛选</button></div>`;
+  const subjectList=[...new Set([...getQuickSubjects(),...data.questions.map(q=>q.subject)])];
+  return workspaceSwitch('notebook','notebook')+(detail?`<div class="subject-detail-head"><button type="button" class="text-button" id="notebook-back">← 科目列表</button><h2>${esc(filter)}错题本</h2><a href="#capture" class="primary subject-add">＋ 录题</a></div>`:'')+toolbar+(detail?`<div class="notebook-actions"><button type="button" class="secondary" id="notebook-toggle-filters" aria-expanded="${notebookFiltersOpen}">筛选${notebookPeriod||notebookType||notebookTag||aiFilter!=='全部'?' · 已启用':''} ▾</button><button type="button" class="secondary" id="notebook-print">导出打印</button></div>`+facets+`<div class="section-title"><h2>题目</h2><span class="muted">${shown.length} 题</span></div>`+cards(shown):`<div class="subject-notebook-list">${subjectList.map((subject,i)=>{const n=shown.filter(q=>q.subject===subject).length;return `<button type="button" class="subject-notebook-card" data-notebook-subject="${subject}"><span class="subject-book-icon tone-${i%4}">▤</span><span class="subject-book-copy"><strong>${subject}错题本</strong><small>${n} 道错题</small></span><span class="subject-book-arrow">›</span></button>`}).join('')}</div>${query?'<div class="section-title"><h2>搜索结果</h2></div>'+cards(shown):''}`);
+}
+function bindNotebookWorkspace(){
+  document.querySelectorAll('[data-notebook-subject]').forEach(el=>el.onclick=()=>{filter=el.dataset.notebookSubject;currentSubject=filter;cfg.lastSubject=filter;saveLocalConfig();notebookPeriod=notebookType=notebookTag='';aiFilter='全部';render()});
+  if($('#notebook-back'))$('#notebook-back').onclick=()=>{filter='全部';notebookPeriod=notebookType=notebookTag='';aiFilter='全部';render()};
+  if($('#notebook-toggle-filters'))$('#notebook-toggle-filters').onclick=()=>{notebookFiltersOpen=!notebookFiltersOpen;render()};
+  for(const [id,set]of[['period',v=>notebookPeriod=v],['type',v=>notebookType=v],['tag',v=>notebookTag=v],['verdict',v=>aiFilter=v]])if($('#notebook-'+id))$('#notebook-'+id).onchange=e=>{set(e.target.value);render()};
+  if($('#notebook-reset-filters'))$('#notebook-reset-filters').onclick=()=>{notebookPeriod=notebookType=notebookTag='';aiFilter='全部';render()};
+  if($('#notebook-print'))$('#notebook-print').onclick=e=>run(e.target,()=>{const items=filteredQuestions();if(!items.length||items.length>100)throw Error('请筛选1～100道题后打印');const sheet={title:filter+'错题练习',items:items.map(q=>({...q,printReviewed:Boolean(q.evidenceVerified),source:q.source||'个人错题记录',license:'来源许可待核对',originUrl:''}))};launchLibraryPrint(libraryPrintHtml(sheet))});
 }
 
-function filtered() {
-  return cards(
-    data.questions
+function filtered() {return cards(filteredQuestions())}
+function filteredQuestions() {
+  return data.questions
       .filter(q => {
         const matchSubj = (filter === '全部' || q.subject === filter) && (notebookStatus==='all' || (notebookStatus==='mastered'?q.mastered:!q.mastered));
         const verdict = inferAiVerdict(q);
         const matchAi = aiFilter === '全部' || verdict === aiFilter;
         const matchQuery = [q.text, q.number, verdict, ...(q.tags || [])].join(' ').toLowerCase().includes(query.toLowerCase());
         const matchBook=typeof questionNotebook!=='function'||activeNotebook==='all'||questionNotebook(q)===activeNotebook;
-        return matchBook && matchSubj && matchAi && matchQuery;
+        return matchBook && matchSubj && matchAi && matchQuery && notebookExtraMatch(q);
       })
-      .sort((a, b) => b.created.localeCompare(a.created))
-  );
+      .sort((a, b) => b.created.localeCompare(a.created));
 }
 
 function getPracticeSubjectOptions() {
@@ -439,7 +425,7 @@ const filteredQuestions = data.questions
 .sort((a, b) => b.created.localeCompare(a.created));
 
 return renderStageBanner() +
-heading('TRANSFER & GROW', '举一反三 <span class="inline-subtitle">AI 变式 + 智能批改</span>', '', '<a href="#notebook" class="section-switch">返回错题本</a>') + `
+workspaceSwitch('notebook','variants') + '<div class="workspace-caption">AI 变式 + 智能批改</div>' + `
 <section class="card">
 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
 <span style="font-size:13px;font-weight:600;color:var(--muted)">科目：</span>
@@ -487,19 +473,18 @@ if (!countOptions.includes(examCount)) examCount = 5;
 const insufficient=examMode==='original'&&available<examCount;
 
 return renderStageBanner() +
-`<div class="page-head exam-page-head"><div class="workspace-title"><a href="#libraries" class="section-switch">题库</a><h1>整理成试卷</h1></div><span class="pill exam-print-hint">支持打印 / 存 PDF</span></div>` + `
-<section class="card" id="exam-builder" style="border:1.5px solid rgba(0,122,255,0.2)">
-<div class="card-head">
-<h2>📄 整理成试卷（周测 / 考前巩固）</h2>
-</div>
-<div class="segmented exam-source-tabs" style="margin-bottom:12px">
+workspaceSwitch('libraries','exam') + `
+<section class="card" id="exam-builder">
+<div class="exam-mode-row"><div class="segmented exam-source-tabs">
 <button type="button" data-exam-mode="original" class="${examMode === 'original'? 'active': ''}">错题重练</button>
 <button type="button" data-exam-mode="ai" class="${examMode === 'ai'? 'active': ''}">AI 扩展</button>
-</div>
+</div><span class="pill exam-print-hint">支持打印 / 存 PDF</span></div>
 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
 <span style="font-size:13px;font-weight:600;color:var(--muted)">试卷科目：</span>
 ${examSubjList.map(s => `<button type="button" class="chip ${examSubject === s? 'active': ''}" data-exam-subj="${s}" style="padding:5px 12px;font-size:13px">${s}</button>`).join('')}
+<button type="button" class="chip-gear" id="toggle-subj-cfg" title="添加或管理试卷科目">＋ 科目</button>
 </div>
+${renderSubjectConfigModal()}
 <div class="form-row">
 <label class="field">
 <span>选题范围</span>
@@ -820,7 +805,7 @@ function bindSubjectConfigEvents() {
 function bind(tab) {
   bindOpen();
   bindSubjectConfigEvents();
-  if(typeof bindNotebooks==='function')bindNotebooks();
+  if(tab==='notebook')bindNotebookWorkspace();
   if(tab==='libraries'){bindLibraries();bindPractice()}
   if (tab === 'capture') {
     recognitionScope='crop';
@@ -894,7 +879,7 @@ function bind(tab) {
     });
   }
   if (tab === 'notebook') {
-    $('#search').oninput = e => { query = e.target.value; $('#question-list').innerHTML = filtered(); bindOpen(); };
+    $('#search').oninput = e => {const pos=e.target.selectionStart;query=e.target.value;render();$('#search').focus();$('#search').setSelectionRange(pos,pos)};
     document.querySelectorAll('[data-status]').forEach(b=>b.onclick=()=>{notebookStatus=b.dataset.status;render()});
     document.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => { filter = b.dataset.filter; render(); });
     document.querySelectorAll('[data-ai-filter]').forEach(b => b.onclick = () => { aiFilter = b.dataset.aiFilter; render(); });
@@ -903,13 +888,7 @@ function bind(tab) {
       location.hash = 'exam';
       render();
     };
-    $('#sample').onclick = e => run(e.target, async () => {
-      if (data.questions.some(q => q.source === '应用示例')) throw Error('示例题已存在');
-      let id = uid(), now = stamp();
-      await persist({ ...data, questions: [...data.questions, { id, number: questionNumber('数学',new Date(),data.questions),grade:getStudentProfile().grade,term:getStudentProfile().term,isExample:true, created: now, updated: now, subject: '数学', aiVerdict: '概念混淆', source: '应用示例', text: '一个长方形花坛，长是 12 米，宽比长短 4 米。这个花坛的周长是多少米？', mistake: '直接用 (12 + 4) × 2 = 32（米），把“宽比长短 4 米”当成了宽是 4 米。', answer: '40 米', analysis: '1. 先求宽：12 − 4 = 8（米）。\n2. 再根据长方形周长公式 =（长 + 宽）× 2，得 (12 + 8) × 2 = 40（米）。', reminder: '遇到“比……短/少”的条件，一定要先算出实际的宽，再代入周长公式。', tags: ['长方形周长', '审题与两步应用题'], mastered: false }] });
-      render();
-      toast('已添加示例题，可在详情中删除');
-    });
+
   }
   if (tab === 'settings') bindSettings();
   if (tab === 'variants' || tab === 'exam') bindPractice();
@@ -943,7 +922,6 @@ function openQuestion(id) {
       <button type="button" class="secondary" id="ai-diagnose-btn" style="padding:4px 10px;font-size:12px">✧ AI 重新诊断错因</button>
     </div>
 
-    ${typeof notebookOptions==='function'?`<label class="paper-destination"><span>移动到错题本</span><select id="detail-notebook" data-id="${esc(q.id)}">${notebookOptions(questionNotebook(q))}</select></label>`:''}
     <p class="prose">${esc(q.text)}</p>
     ${q.questionType?`<p class="result-note">题型：${esc(q.questionTypeName||QUESTION_TYPE_NAMES[q.questionType]||'其他题型')}</p>`:''}
     <p class="result-note">作答证据：${q.evidenceVerified&&q.answerStatus==='confirmed'?'已人工核对孩子作答':q.answerStatus==='unanswered'?'已确认未作答':'未确认；不能据此诊断孩子错因'}</p>
@@ -959,7 +937,6 @@ function openQuestion(id) {
       <button class="secondary danger" id="delete-q">删除</button>
     </div>`;
   $('#detail').showModal();
-  if(typeof bindNotebooks==='function')bindNotebooks();
   $('#detail').onclick = e => { if (e.target === $('#detail')) $('#detail').close(); };
   $('#close-detail').onclick = () => $('#detail').close();
 
