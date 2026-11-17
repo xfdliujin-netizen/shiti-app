@@ -21,21 +21,26 @@ function buildLearningIndex(notebook){
     const grade=record.grade||source?.grade||'',term=record.term||source?.term||'';
     const confirmed=kind==='question'&&record.evidenceVerified&&record.answerStatus==='confirmed';
     const numeric=fromBank&&!record.assisted&&['correct','incorrect'].includes(record.resultCheck);
-    const status=kind==='question'?(confirmed?record.diagnosisStatus:'unknown'):record.assisted?'unknown':numeric?record.resultCheck:({'回答正确':'correct','回答错误':'incorrect','部分正确':'partial'})[record.aiStatus]||'unknown';
+    const aiStatus=({'回答正确':'correct','回答错误':'incorrect','部分正确':'partial'})[record.aiStatus]||'unknown';
+    const status=kind==='question'?(confirmed?record.diagnosisStatus:'unknown'):record.assisted?'unknown':aiStatus!=='unknown'?aiStatus:numeric?record.resultCheck:'unknown';
     const timestamp=Date.parse(record.created),when=Number.isFinite(timestamp)?new Date(timestamp).toISOString():'';
     for(const tag of tags){const g=groupFor(subject,grade,term,tag);
       if(kind==='question'&&status==='correct')g.originalCorrect++;
       if(kind==='question'&&status==='incorrect')g.originalIncorrect++;
       if(kind==='question'&&status==='incorrect'&&['概念混淆','审题偏差','计算粗心','知识盲区','书写规范','思路受阻'].includes(record.aiVerdict))g.mistakes[record.aiVerdict]=(g.mistakes[record.aiVerdict]||0)+1;
-      if(kind==='practice'&&status==='correct'){if(numeric)g.resultCorrect++;else g.practiceCorrect++}
-      if(kind==='practice'&&status==='incorrect'){if(numeric)g.resultIncorrect++;else g.practiceIncorrect++}
-      if(kind==='practice'&&status==='partial')g.practicePartial++;
+      if(kind==='practice'&&!record.assisted){
+        if(numeric&&record.resultCheck==='correct')g.resultCorrect++;
+        if(numeric&&record.resultCheck==='incorrect')g.resultIncorrect++;
+        if(aiStatus==='correct')g.practiceCorrect++;
+        if(aiStatus==='incorrect')g.practiceIncorrect++;
+        if(aiStatus==='partial')g.practicePartial++;
+      }
       if(kind==='practice'&&record.assisted)g.assisted++;
       if(kind==='practice'&&record.rating)g.selfRatings++;
       if(when>g.last)g.last=when;
       if(status!=='unknown'&&when)g.events.push({when,status});
     }
-    if(status!=='unknown')examples.push({id:record.id,sourceId:record.sourceId||record.id,subject,grade,term,tags,kind,status,numeric:Boolean(numeric),created:when,text:record.text||'',response:kind==='question'?record.studentAnswer:record.response});
+    if(status!=='unknown')examples.push({id:record.id,sourceId:record.sourceId||record.id,subject,grade,term,tags,kind,status,numeric:Boolean(numeric&&aiStatus==='unknown'),created:when,text:record.text||'',response:kind==='question'?record.studentAnswer:record.response});
   }
   for(const q of questions.values())add(q,null,'question');
   for(const p of notebook.practices||[])add(p,questions.get(p.sourceId),'practice');
