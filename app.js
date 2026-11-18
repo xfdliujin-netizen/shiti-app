@@ -443,7 +443,7 @@ function notebook(){
       </div></div>
     </div>`;
   const subjectList=[...new Set([...getQuickSubjects(),...data.questions.map(q=>q.subject)])];
-  return workspaceSwitch('notebook','notebook')+(detail?`<div class="subject-detail-head"><button type="button" class="text-button" id="notebook-back">← 科目列表</button><h2>${esc(filter)}错题本</h2><a href="#capture" class="primary subject-add">＋ 录题</a></div>`:'')+toolbar+tools+(detail?facets+`<div class="section-title"><h2>题目</h2><span class="muted">${shown.length} 题</span></div>`+cards(shown):`<div class="subject-notebook-list">${subjectList.map((subject,i)=>{const n=shown.filter(q=>q.subject===subject).length;return `<button type="button" class="subject-notebook-card" data-notebook-subject="${subject}"><span class="subject-book-icon tone-${i%4}">▤</span><span class="subject-book-copy"><strong>${subject}错题本</strong><small>${n} 道错题</small></span><span class="subject-book-arrow">›</span></button>`}).join('')}</div>${query?'<div class="section-title"><h2>搜索结果</h2></div>'+cards(shown):''}`);
+  return workspaceSwitch('notebook','notebook')+(detail?`<div class="subject-detail-head"><button type="button" class="text-button" id="notebook-back">← 科目列表</button><h2>${esc(filter)}错题本</h2><a href="#capture" class="primary subject-add">＋ 录题</a></div>`:'')+toolbar+tools+(detail?facets+notebookPrintOptions()+`<div class="section-title"><h2>题目</h2><span class="muted">${shown.length} 题</span></div>`+cards(shown):`<div class="subject-notebook-list">${subjectList.map((subject,i)=>{const n=shown.filter(q=>q.subject===subject).length;return `<button type="button" class="subject-notebook-card" data-notebook-subject="${subject}"><span class="subject-book-icon tone-${i%4}">▤</span><span class="subject-book-copy"><strong>${subject}错题本</strong><small>${n} 道错题</small></span><span class="subject-book-arrow">›</span></button>`}).join('')}</div>${query?'<div class="section-title"><h2>搜索结果</h2></div>'+cards(shown):''}`);
 }
 function bindNotebookWorkspace(){
   document.querySelectorAll('[data-notebook-subject]').forEach(button => {
@@ -496,7 +496,54 @@ function bindNotebookWorkspace(){
     render();
     $('#notebook-reset-filters')?.focus();
   };
-  if($('#notebook-print'))$('#notebook-print').onclick=e=>run(e.target,()=>{const items=filteredQuestions();if(!items.length||items.length>100)throw Error('请筛选1～100道题后打印');const sheet={title:filter+'错题练习',items:items.map(q=>({...q,printReviewed:Boolean(q.evidenceVerified),source:q.source||'个人错题记录',license:'来源许可待核对',originUrl:''}))};launchLibraryPrint(libraryPrintHtml(sheet))});
+  bindNotebookPrint();
+}
+
+function notebookPrintOptions() {
+  return `<dialog id="notebook-print-options" class="compact-dialog">
+    <div class="card-head"><h2>导出打印</h2>
+      <button type="button" class="dialog-x" id="notebook-print-close" aria-label="关闭">×</button>
+    </div>
+    <label class="field"><span>打印内容</span><select id="notebook-print-mode">
+      <option value="questions">仅题目</option>
+      <option value="both">题目和答案解析（答案另页）</option>
+      <option value="answers">仅答案解析</option>
+    </select></label>
+    <p class="hint" id="notebook-print-count"></p>
+    <p class="hint">题目下方附保存的原题图片，保留图上的手写痕迹。</p>
+    <button type="button" class="primary" id="notebook-print-confirm">打印／存 PDF</button>
+  </dialog>`;
+}
+
+function bindNotebookPrint() {
+  const button = $('#notebook-print');
+  const dialog = $('#notebook-print-options');
+  if (!button || !dialog) return;
+  const mode = $('#notebook-print-mode');
+  const getItems = () => {
+    const items = filteredQuestions();
+    if (!items.length || items.length > 100) throw Error('请筛选 1～100 道题后打印');
+    return items;
+  };
+  button.onclick = event => run(event.currentTarget, () => {
+    $('#notebook-print-count').textContent = '当前筛选 ' + getItems().length + ' 道题';
+    mode.value = 'questions';
+    dialog.showModal();
+  });
+  $('#notebook-print-close').onclick = () => dialog.close();
+  $('#notebook-print-confirm').onclick = event => run(event.currentTarget, () => {
+    const items = getItems().map(q => ({
+      ...q,
+      printReviewed: Boolean(q.evidenceVerified),
+      source: q.source || '个人错题记录',
+      license: '来源许可待核对',
+      originUrl: ''
+    }));
+    const output = mode.value === 'answers' ? 'only' : mode.value === 'both';
+    const html = libraryPrintHtml({ title: filter + '错题练习', items }, output);
+    dialog.close();
+    launchLibraryPrint(html);
+  });
 }
 
 function filtered() {return cards(filteredQuestions())}
