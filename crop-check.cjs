@@ -17,6 +17,13 @@ vm.runInContext(`(async()=>{
   let count=0;ai=async(prompt,src,opts)=>{count++;assert.equal(src,cropped);assert.ok(!prompt.includes('ORIGINAL_FULL_IMAGE'));assert.equal(opts.ocr,true);assert.equal(opts.maxTokens,4000);assert.match(prompt,/suggestedQuestionType/);return {items:[{section:'三',number:'2',text:wrong,studentAnswer:'错别自',uncertainty:'',suggestedQuestionType:'fill'}]}};render=()=>{};
   await recognizeSelection();assert.equal(count,1);assert.equal(paper.image,cropped);assert.equal(paper.items[0].text,wrong);assert.equal(paper.scope,'crop');assert.equal(paper.items[0].analyzed,false);assert.equal(paper.items[0].questionType,'fill');assert.equal(paper.items[0].verified,false);assert.equal(paper.items[0].ocrStudentAnswer,'错别自');assert.equal(paper.items[0].studentAnswer,'');ensureAnswerStructure(paper.items[0],'语文');assert.equal(paper.items[0].blankCount,2);
   const sample={section:'一',number:'1',text:'原题',suggestedQuestionType:'choice'};assert.equal(normalizeOCR({items:[sample]},'语文')[0].questionType,'choice');assert.equal(normalizeOCR({items:[sample]})[0].questionType,undefined);assert.equal(normalizeOCR({items:[{...sample,suggestedQuestionType:'calculation'}]},'语文')[0].questionType,undefined);
+  const prefill=(type,raw,extra={})=>normalizeOCR({items:[{...sample,suggestedQuestionType:type,studentAnswer:raw,...extra}]},'语文')[0];
+  assert.deepEqual(prefill('fill','20；130').blankAnswers,['20','130']);
+  assert.deepEqual(prefill('fill','130',{blankAnswers:[null,'130']}).blankAnswers,['','130']);
+  assert.deepEqual(prefill('fill','20；；130').blankAnswers,[]);
+  assert.equal(prefill('choice','（Ｂ、Ｄ）').studentAnswer,'B、D');
+  assert.equal(prefill('choice','选项不清楚').studentAnswer,'');
+  assert.equal(prefill('judge','×').studentAnswer,'×');
   recordUsage({prompt_tokens:250,completion_tokens:80,total_tokens:330});recordUsage(null);assert.match(usageText(),/330/);assert.match(usageText(),/部分用量未知/);
   console.log('Passed: rotation bounds, crop constraints/pixels, missing-selection rejection, literal typo preservation, single-request cropped-only OCR, deferred analysis, usage aggregation.');
 })().catch(e=>{console.error(e);globalThis.failed=true})`,ctx);

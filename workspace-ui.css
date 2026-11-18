@@ -832,3 +832,27 @@ dialog > #toast:not([popover]) {
 @media(prefers-reduced-motion:reduce) {
   .notebook-facet-disclosure,.filter-chevron { transition:none; }
 }
+
+dialog.print-preview[open] {
+  display:flex;
+  flex-direction:column;
+  width:min(940px, 96vw);
+  max-width:96vw;
+  height:90dvh;
+  max-height:90dvh;
+  margin:auto;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:var(--surface);
+  color:var(--text);
+}
+.print-preview-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding-bottom:8px; }
+.print-preview-toolbar strong { margin-right:auto; }
+.print-preview-toolbar button { min-height:38px; font-size:12px; padding:4px 8px; }
+.print-preview iframe { flex:1; min-height:0; width:100%; border:1px solid var(--line); border-radius:8px; background:white; }
+.print-preview > .hint { margin:6px 0 0; }
+.subject-picker { flex-wrap:wrap; max-width:100%; }
+.subject-picker .subject-config-trigger { font-weight:650; }
+.notebook-facets .notebook-grade-bar { margin:0; }
+.notebook-actions { display:flex; gap:8px; }

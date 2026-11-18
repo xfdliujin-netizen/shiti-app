@@ -422,20 +422,21 @@ function notebook(){
   const periods=[...new Set(data.questions.filter(q=>!detail||q.subject===filter).map(q=>JSON.stringify([q.grade||'',q.term||''])))],types=[...new Set(scope.map(notebookTypeLabel))],tags=[...new Set(scope.flatMap(q=>q.tags||[]))].sort();
   if (notebookPeriod && notebookPeriod !== 'profile' && !periods.includes(notebookPeriod)) periods.push(notebookPeriod);
   const periodSelect = `<select id="notebook-period" aria-label="年级／学期">
-    <option value="profile" ${notebookPeriod==='profile'?'selected':''}>${esc(compactNotebookPeriod(profile.grade, profile.term))}（跟随设置）</option>
+    <option value="profile" ${notebookPeriod==='profile'?'selected':''}>${esc(compactNotebookPeriod(profile.grade, profile.term))}</option>
     <option value="" ${!notebookPeriod?'selected':''}>全部年级／学期</option>
     ${periods.map(value => {
       const [grade, term] = JSON.parse(value);
       return `<option value="${esc(value)}" ${value===notebookPeriod?'selected':''}>${esc(compactNotebookPeriod(grade, term))}</option>`;
     }).join('')}
   </select>`;
-  const tools = `<div class="notebook-grade-bar"><label for="notebook-period">年级／学期</label>${periodSelect}
-    ${detail ? '<button type="button" class="secondary" id="notebook-print">导出打印</button>' : ''}
-  </div>`;
-  const count = notebookTypes.size + notebookTags.size + Number(aiFilter!=='全部');
-  const facets = `<div class="notebook-actions"><button type="button" class="secondary" id="notebook-toggle-filters" aria-expanded="${notebookFiltersOpen}" aria-controls="notebook-facet-panel">筛选${count ? ' · '+count : ''} <span class="filter-chevron" aria-hidden="true">▾</span></button></div>
+  const tools = detail ? '' : `<div class="notebook-grade-bar"><label for="notebook-period">年级／学期</label>${periodSelect}</div>`;
+  const count = notebookTypes.size + notebookTags.size + Number(aiFilter !== '全部') + Number(notebookPeriod !== 'profile');
+  const facets = `<div class="notebook-actions">
+    <button type="button" class="secondary" id="notebook-toggle-filters" aria-expanded="${notebookFiltersOpen}" aria-controls="notebook-facet-panel">筛选${count ? ' · '+count : ''} <span class="filter-chevron" aria-hidden="true">▾</span></button>
+    <button type="button" class="secondary" id="notebook-print">导出打印</button>
+  </div>
     <div class="notebook-facet-disclosure" id="notebook-facet-panel" ${notebookFiltersOpen?'data-expanded':'inert'}>
-      <div class="notebook-facet-inner"><div class="notebook-facets">
+      <div class="notebook-facet-inner"><div class="notebook-facets"><div class="notebook-grade-bar"><label for="notebook-period">年级／学期</label>${periodSelect}</div>
         ${notebookFilterRow('题型','type',types,notebookTypes)}
         ${notebookFilterRow('知识点','tag',tags,notebookTags)}
         ${notebookFilterRow('错因','verdict',['全部',...new Set(scope.map(inferAiVerdict).filter(v=>v!=='全部'))],new Set([aiFilter]))}
@@ -561,25 +562,17 @@ function filteredQuestions() {
       .sort((a, b) => b.created.localeCompare(a.created));
 }
 
-function getPracticeSubjectOptions() {
-  const quick = getQuickSubjects();
-  if (practiceSubject !== '全部' && subjects.includes(practiceSubject) && !quick.includes(practiceSubject)) {
-    return ['全部', ...quick, practiceSubject];
-  }
-  return ['全部', ...quick];
-}
-
-function subjectPicker(id, label, values, currentSubject) {
-  return `<label class="subject-picker"><span>${label}</span><select id="${id}">
-    ${values.map(value => `<option value="${esc(value)}" ${value === currentSubject ? 'selected' : ''}>${esc(value)}</option>`).join('')}
-    <option value="configure">管理常用科目…</option>
-  </select></label>`;
+function subjectPicker(group, values, selected) {
+  return `<div class="subject-picker">
+    <button type="button" class="secondary subject-config-trigger" id="toggle-subj-cfg" aria-expanded="${showSubjectConfig}" aria-label="科目，编辑显示的科目">科目</button>
+    ${values.map(value => `<button type="button" class="chip ${value === selected ? 'active' : ''}" data-${group}-subj="${esc(value)}" aria-pressed="${value === selected}">${esc(value)}</button>`).join('')}
+  </div>`;
 }
 
 function variantsPage() {
 const p = getStudentProfile();
-const subjList = getPracticeSubjectOptions();
-if (!subjList.includes(practiceSubject)) practiceSubject = '全部';
+const subjList = getQuickSubjects();
+if (!subjList.includes(practiceSubject)) practiceSubject = subjList[0] || '语文';
 
 const usedVerdicts = [...new Set(data.questions.map(q => inferAiVerdict(q)))];
 const pracVerdictOptions = ['全部',...aiVerdictTags.filter(v => usedVerdicts.includes(v) || ['概念混淆', '审题偏差', '计算粗心', '薄弱待练'].includes(v))];
@@ -591,7 +584,7 @@ const filteredQuestions = data.questions
 return renderStageBanner() +
 workspaceSwitch('notebook','variants') + '<div class="workspace-caption">AI 变式 + 智能批改</div>' + `
 <section class="card">
-${subjectPicker('practice-subject', '科目', subjList, practiceSubject)}
+${subjectPicker('prac', subjList, practiceSubject)}
 ${renderSubjectConfigModal()}
 <div class="sub-filter-bar" style="margin-top:4px;margin-bottom:12px">
 <details class="practice-filter-help"><summary aria-label="查看筛选说明">!</summary><span>按 AI 判定标签筛选错题</span></details>
@@ -625,7 +618,7 @@ function practicePage() { return variantsPage();}
 function examPage() {
 if(!['original','ai'].includes(examMode))examMode='original';
 const p = getStudentProfile();
-const examSubjList = [...new Set([...getQuickSubjects(),...data.questions.map(q=>q.subject).filter(Boolean)])];
+const examSubjList = getQuickSubjects();
 if (!examSubjList.includes(examSubject)) examSubject = examSubjList[0] || '语文';
 const available=data.questions.filter(q=>q.subject===examSubject&&(examScope!=='unmastered'||!q.mastered)).length;
 const countOptions = examMode === 'original'? [...new Set([...(available>0&&available<5?[available]:[]),5,10,15,20])]: [3, 5, 8, 10];
@@ -639,7 +632,7 @@ workspaceSwitch('libraries','exam') + `
 <button type="button" data-exam-mode="original" class="${examMode === 'original'? 'active': ''}">错题重练</button>
 <button type="button" data-exam-mode="ai" class="${examMode === 'ai'? 'active': ''}">AI 扩展</button>
 </div><span class="pill exam-print-hint">支持打印 / 存 PDF</span></div>
-${subjectPicker('exam-subject', '试卷科目', examSubjList, examSubject)}
+${subjectPicker('exam', examSubjList, examSubject)}
 ${renderSubjectConfigModal()}
 <div class="form-row">
 <label class="field">
@@ -1155,18 +1148,12 @@ function openQuestion(id) {
 
 function bindPractice() {
   if(typeof bindBank==='function')bindBank();
-  for (const [id, setSubject] of [
-    ['practice-subject', value => { practiceSubject = value; selectedPracticeId = ''; }],
-    ['exam-subject', value => { examSubject = value; examSheet = null; }]
-  ]) {
-    const picker = $('#' + id);
-    if (picker) picker.onchange = event => {
-      if (event.target.value === 'configure') showSubjectConfig = !showSubjectConfig;
-      else setSubject(event.target.value);
-      render();
-      $('#' + id)?.focus();
-    };
-  }
+  document.querySelectorAll('[data-prac-subj]').forEach(button => {
+    button.onclick = () => { practiceSubject = button.dataset.pracSubj; selectedPracticeId = ''; render(); };
+  });
+  document.querySelectorAll('[data-exam-subj]').forEach(button => {
+    button.onclick = () => { examSubject = button.dataset.examSubj; examSheet = null; render(); };
+  });
   document.querySelectorAll('[data-prac-ai]').forEach(b => b.onclick = () => {
     practiceAiFilter = b.dataset.pracAi;
     render();
@@ -1255,16 +1242,9 @@ function bindPractice() {
     render();
   };
   if ($('#print-exam')) $('#print-exam').onclick = () => {
-    const area = $('#printable-exam');
-    if (!area) return;
-    const prof = getStudentProfile();
-    const w = window.open('', '_blank');
-    if (!w) {
-      window.print();
-      return;
-    }
-    w.document.write(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${esc(examSheet.title)}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:#111;padding:24px 32px;max-width:800px;margin:0 auto;line-height:1.65}h2{margin:0 0 6px;font-size:20px}.meta{color:#555;font-size:13px;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:18px}.q{margin-bottom:18px;page-break-inside:avoid}.q-title{font-weight:700;font-size:14px;margin-bottom:4px}.q-text{white-space:pre-wrap;font-size:15px}.space{height:64px;border-bottom:1px dashed #ccc;margin-top:6px}.ans-section{page-break-before:always;margin-top:24px;border-top:2px solid #111;padding-top:14px}.ans-item{margin-bottom:12px;font-size:13px;white-space:pre-wrap}img{max-width:100%;max-height:200px;margin-top:6px}@media print{body{padding:0}}</style></head><body><h2>${esc(examSheet.title)}</h2><div class="meta">学段：${esc(prof.stageName)}${esc(prof.grade)} \x26nbsp;|\x26nbsp; 日期：${esc(examSheet.created)} \x26nbsp;|\x26nbsp; 共 ${examSheet.items.length} 题 \x26nbsp;|\x26nbsp; 姓名：____________ \x26nbsp;|\x26nbsp; 得分：________</div>${examSheet.items.map((item, i) => `<div class="q"><div class="q-title">${i + 1}. [${esc(item.subject)}]</div><div class="q-text">${esc(item.text)}</div>${item.image ? `<img src="${item.image}">` : ''}<div class="space"></div></div>`).join('')}${examShowAnswers ? `<div class="ans-section"><h3>参考答案与解析</h3>${examSheet.items.map((item, i) => `<div class="ans-item"><strong>${i + 1}. 答案：</strong>${esc(item.answer)}\n<strong>解析：</strong>${esc(item.analysis)}</div>`).join('')}</div>` : ''}<script>window.onload=()=>{setTimeout(()=>window.print(),200);};<\/script>${typeof bankAttribution==='function'?bankAttribution(examSheet.items):''}</body></html>`);
-    w.document.close();
+    if (!examSheet) return;
+    const sheet = { ...examSheet, items: examSheet.items.map(item => ({ ...item, printReviewed: true })) };
+    launchLibraryPrint(libraryPrintHtml(sheet, examShowAnswers));
   };
 
   document.querySelectorAll('[data-ai-judge]').forEach(b => b.onclick = () => run(b, async () => {

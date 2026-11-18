@@ -8,7 +8,7 @@ function deepSeekOCRSchema(subject) {
     .map(kind => kind + '（' + QUESTION_TYPE_NAMES[kind] + '）').join('、');
   return OCR_SCHEMA.replace('"uncertainty":', '"suggestedQuestionType":"","uncertainty":')
     + ' 每题按纸面要求建议一个题型，仅填代码：' + allowed
-    + '。混合题、看不清或无法确定时填空字符串。题型仅用于校对表单，不要解题或推测作答。';
+    + '。混合题、看不清或无法确定时填空字符串。填空题另返回 blankAnswers 数组，按空位顺序逐字记录孩子写的内容，位置明确但空白或看不清用 null，无法匹配空位则省略数组。选择题的 studentAnswer 只写实际选项字母，判断题照录实际标记。不要解题或推测作答。';
 }
 
 function getVerdictTagOptions(selected) {
@@ -113,6 +113,40 @@ function paperKey(p) {
   return (p.section + '|' + p.number).replace(/[\s、.．：:（）()]/g, '');
 }
 
+function prefillOCRAnswer(item, response, subject) {
+  const raw = item.ocrStudentAnswer || item.studentAnswer;
+  if (item.questionType === 'fill') {
+    const parts = response.blankAnswers;
+    if (Array.isArray(parts) && parts.length > 0 && parts.length <= 20
+        && parts.every(answer => answer === null || typeof answer === 'string')) {
+      item.blankAnswers = parts.map(answer => answer ?? '');
+      item.blankCount = parts.length;
+    } else {
+      // A semicolon or a separate line can delimit complete answers. Commas may be part of an answer.
+      const numbered = [...raw.matchAll(/^第\s*(\d+)\s*空\s*[：:]\s*(.*)$/gm)];
+      const lines = raw.trim().split(/[;；\n]/).map(answer => answer.trim());
+      if (numbered.length && numbered.every((match, i) => Number(match[1]) === i + 1 && match[2].trim())
+          && numbered.length === raw.trim().split('\n').length && numbered.length <= 20) {
+        item.blankAnswers = numbered.map(match => match[2].trim());
+        item.blankCount = numbered.length;
+      } else if (lines.length > 1 && lines.length <= 20 && lines.every(answer => answer && !/^第\s*\d+\s*空/.test(answer))) {
+        item.blankAnswers = lines;
+        item.blankCount = lines.length;
+      } else if (lines.length === 1 && lines[0] && (item.text.match(/_{2,}|[（(]\s*[）)]/g) || []).length === 1) {
+        item.blankAnswers = lines;
+        item.blankCount = 1;
+      }
+    }
+  } else if (item.questionType === 'choice') {
+    const letters = raw.trim().replace(/^[（(]\s*|\s*[）)]$/g, '').replace(/[Ａ-Ｈａ-ｈ]/g, char => String.fromCharCode(char.charCodeAt(0) - 0xfee0)).toUpperCase();
+    if (/^[A-H](?:[\s、,，/;；]*[A-H])*$/.test(letters)) {
+      item.choices = [...new Set(letters.match(/[A-H]/g))];
+    }
+  }
+  ensureAnswerStructure(item, subject);
+  updateStructuredAnswer(item);
+}
+
 function normalizeOCR(r, suggestionSubject) {
   if (!Array.isArray(r.items)) throw Error('模型没有返回逐题列表，未采用此结果，请重试');
   return r.items.map(p => {
@@ -125,7 +159,7 @@ function normalizeOCR(r, suggestionSubject) {
       ? p.suggestedQuestionType : null;
     const transcribedAnswer = typeof p.studentAnswer === 'string' ? p.studentAnswer : '';
     const needsStructuredAnswer = suggestedType === 'choice' || suggestedType === 'fill';
-    return {
+    const item = {
       section: p.section.trim(),
       number: p.number.trim(),
       text: p.text,
@@ -145,6 +179,8 @@ function normalizeOCR(r, suggestionSubject) {
       reminder: '',
       tags: []
     };
+    if (needsStructuredAnswer) prefillOCRAnswer(item, p, suggestionSubject);
+    return item;
   });
 }
 

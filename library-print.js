@@ -18,13 +18,51 @@ function libraryPrintHtml(sheet,includeAnswers=false,baseUrl=location.href){
   const mathCss=new URL('vendor/katex/katex.min.css',baseUrl).href;
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${esc(sheet.title)}${answersOnly ? " · 答案解析" : ""}</title><link rel="stylesheet" href="${esc(mathCss)}"><style>@page{size:A4;margin:15mm}body{font:15px/1.75 -apple-system,BlinkMacSystemFont,"Microsoft YaHei",sans-serif;color:#111;background:#fff;max-width:800px;margin:24px auto;padding:0 18px}h1{font-size:22px;margin:0 0 8px}h2{font-size:15px;margin:0}.sheet-meta{border-bottom:2px solid #111;padding-bottom:12px}.q{margin:24px 0;break-inside:avoid}.q-text,.answer{white-space:pre-wrap;overflow-wrap:anywhere}.question-image{display:block;max-width:100%;max-height:155mm;width:auto;height:auto;object-fit:contain;margin:12px 0}.space{height:42px;border-bottom:1px dashed #ccc}.pending{font-size:11px;color:#555}.answers{break-before:page}.source{font-size:10px;overflow-wrap:anywhere;color:#555}.source-list{border-top:1px solid #ccc;margin-top:24px}.katex{font-size:1.05em}.katex-display{white-space:normal;max-width:100%;overflow:hidden}.print-tools{margin-bottom:20px}button{padding:10px 16px}@media print{body{margin:0;padding:0;max-width:none}.print-tools{display:none}}</style></head><body><div class="print-tools"><button onclick="window.print()">打印 / 存 PDF</button></div><h1>${esc(sheet.title)}${answersOnly ? " · 答案解析" : ""}</h1><div class="sheet-meta">共 ${sheet.items.length} 题　姓名：____________　日期：____________</div>${answersOnly ? "" : sheet.items.map((q,i)=>`<section class="q"><h2>${i+1}. ${q.printReviewed?'':'<span class="pending">资料待核对</span>'}</h2><div class="q-text">${renderStudyText(q.text)}</div>${/^data:image\/(jpeg|png|webp|gif);base64,[a-zA-Z0-9+/=]+$/.test(q.image||'')?`<img class="question-image" src="${esc(q.image)}" alt="原题图片">`:''}<div class="space"></div></section>`).join('')}${includeAnswers?`<section class="answers" ${answersOnly ? 'style="break-before:auto"' : ''}>${answersOnly ? "" : "<h1>参考答案与解析</h1>"}${sheet.items.map((q,i)=>`<section class="q answer"><h2>${i+1}. ${q.printReviewed?'':'资料待核对'}</h2>${renderStudyText(q.answer||'暂无参考答案')}<br>${renderStudyText(q.analysis||'暂无解析')}</section>`).join('')}</section>`:''}<section class="source-list"><h2>来源与许可</h2>${sheet.items.map((q,i)=>`<div class="source">${i+1}. ${esc(q.source||'来源待核对')} · ${esc(q.license||'许可待核对')}${q.originUrl?` · <a href="${esc(q.originUrl)}" rel="noopener">${esc(q.originUrl)}</a>`:''}</div>`).join('')}</section></body></html>`;
 }
-function launchLibraryPrint(html){
-  const frame=document.createElement('iframe');frame.title='题库打印';frame.style.cssText='position:fixed;width:1px;height:1px;left:-9999px;border:0';frame.onload=async()=>{await frame.contentDocument.fonts.ready;frame.contentWindow.onafterprint=()=>frame.remove();frame.contentWindow.focus();frame.contentWindow.print()};frame.srcdoc=html;document.body.append(frame);
+function launchLibraryPrint(html) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'print-preview';
+  dialog.innerHTML = `<div class="print-preview-toolbar">
+    <strong>打印预览</strong>
+    <button type="button" class="secondary" data-print-download>下载文档</button>
+    <button type="button" class="primary" data-print-now disabled>打印／存 PDF</button>
+    <button type="button" class="secondary" data-print-close aria-label="关闭预览">×</button>
+  </div>
+  <iframe title="打印文档"></iframe>
+  <p class="hint">如果微信没有打开打印窗口，可下载文档后在系统浏览器中打开打印。</p>`;
+  const frame = dialog.querySelector('iframe');
+  const print = dialog.querySelector('[data-print-now]');
+  const download = dialog.querySelector('[data-print-download]');
+  let documentUrl;
+  frame.onload = () => { print.disabled = false; };
+  print.onclick = () => {
+    try {
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+    } catch {
+      toast('当前浏览器无法启动打印，请下载文档后在系统浏览器打开');
+    }
+  };
+  download.onclick = () => {
+    documentUrl ||= URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = documentUrl;
+    link.download = '拾题打印文档.html';
+    link.click();
+  };
+  dialog.querySelector('[data-print-close]').onclick = () => dialog.close();
+  dialog.addEventListener('close', () => {
+    if (documentUrl) URL.revokeObjectURL(documentUrl);
+    dialog.remove();
+  }, { once: true });
+  frame.srcdoc = html.replace('</head>', '<style>.print-tools{display:none}</style></head>');
+  document.body.append(dialog);
+  dialog.showModal();
 }
+
 function bindLibraryPrint(){
   document.querySelectorAll('[data-library-select]').forEach(el=>el.onchange=()=>{el.checked?librarySelected.add(el.dataset.librarySelect):librarySelected.delete(el.dataset.librarySelect);const count=$('#library-selected-count');if(count)count.textContent=`已选 ${librarySelected.size} 题`});
   document.querySelectorAll('[data-library-print-one]').forEach(el=>el.onclick=e=>run(e.target,()=>openLibraryPrint(el.dataset.libraryPrintOne)));
   if($('#library-print'))$('#library-print').onclick=e=>run(e.target,()=>openLibraryPrint());
   if($('#library-print-close'))$('#library-print-close').onclick=()=>$('#library-print-dialog').close();
-  if($('#library-print-confirm'))$('#library-print-confirm').onclick=e=>run(e.target,()=>{const pool=libraryPrintPool($('#library-print-scope').value),from=Number($('#library-print-from').value),to=Number($('#library-print-to').value);if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<from||to>pool.length)throw Error('请填写有效打印题号范围');const sheet=prepareLibraryPrint(currentLibrary(),pool.slice(from-1,to));launchLibraryPrint(libraryPrintHtml(sheet,$('#library-print-answers').checked));$('#library-print-dialog').close()});
+  if($('#library-print-confirm'))$('#library-print-confirm').onclick=e=>run(e.target,()=>{const pool=libraryPrintPool($('#library-print-scope').value),from=Number($('#library-print-from').value),to=Number($('#library-print-to').value);if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<from||to>pool.length)throw Error('请填写有效打印题号范围');const sheet=prepareLibraryPrint(currentLibrary(),pool.slice(from-1,to));const html=libraryPrintHtml(sheet,$('#library-print-answers').checked);$('#library-print-dialog').close();launchLibraryPrint(html)});
 }
