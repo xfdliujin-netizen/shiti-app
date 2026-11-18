@@ -408,7 +408,7 @@ function bindPaper() {
     const item = paper.items[index];
     showSavedFigure(document.querySelector(`[data-paper-figure="${index}"]`), paper.image, item.figureRegion);
     button.onclick = event => run(event.target, async () => {
-      const region = await openFigurePicker(paper.image, item.figureRegion);
+      const region = await openFigurePicker(paper.image, item.figureRegion, paper.scope === 'crop' && paper.items.length === 1);
       if (region === undefined) return;
       item.figureRegion = region;
       render();

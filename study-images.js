@@ -63,12 +63,45 @@ function whitenStudyPaper({ width, height, data }, blackWhite) {
   }
 }
 
-async function openFigurePicker(src, previous) {
+function layoutFigureRegions(figures, width, height) {
+  const pad = Math.max(3, Math.round(Math.min(width, height) * .015));
+  return figures.flatMap(points => {
+    if (!Array.isArray(points) || points.length !== 4 ||
+        points.some(point => !point || !Number.isFinite(point.x) || !Number.isFinite(point.y))) return [];
+    const xs = points.map(point => point.x), ys = points.map(point => point.y);
+    if (Math.min(...xs) < 0 || Math.min(...ys) < 0 || Math.max(...xs) > width || Math.max(...ys) > height ||
+        Math.max(...xs) <= Math.min(...xs) || Math.max(...ys) <= Math.min(...ys)) return [];
+    const x = Math.max(0, Math.min(...xs) - pad) / width;
+    const y = Math.max(0, Math.min(...ys) - pad) / height;
+    const w = Math.min(width, Math.max(...xs) + pad) / width - x;
+    const h = Math.min(height, Math.max(...ys) + pad) / height - y;
+    return validFigureRegion({ x, y, w, h }) ? [{ x, y, w, h }] : [];
+  }).sort((a, b) => a.y - b.y || a.x - b.x);
+}
+
+async function detectStudyFigures(image) {
+  const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  if (Math.min(canvas.width, canvas.height) < 64) throw Error('图片太窄，请手动框选');
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const figures = await callBaiduOCR(canvas.toDataURL('image/jpeg', .9), 'figures');
+  return layoutFigureRegions(figures, canvas.width, canvas.height);
+}
+
+async function openFigurePicker(src, previous, allowDetection = true) {
   if (!isStudyImage(src)) throw Error('没有可框选的原题图片');
   const dialog = document.createElement('dialog');
   dialog.className = 'figure-picker';
   dialog.innerHTML = `<div class="card-head"><h2>框选题目配图</h2></div>
     <p class="hint">在图上拖出方框，保留标注、坐标轴和图例。重新拖动可调整范围。</p>
+    ${allowDetection ? `<div class="actions"><button type="button" class="secondary" data-detect>用百度自动找题图</button>
+      <label hidden data-candidates>候选位置 <select aria-label="候选题图"></select></label></div>
+      <p class="hint" data-detect-status role="status">每次点击调用一次百度「试卷分析与识别」。</p>` : ''}
     <div class="figure-stage"><img alt="待框选的原题图片" draggable="false"><span hidden></span></div>
     <div class="actions"><button type="button" class="secondary" data-cancel>取消</button>
     ${validFigureRegion(previous) ? '<button type="button" class="secondary" data-clear>移除题图</button>' : ''}
@@ -77,9 +110,13 @@ async function openFigurePicker(src, previous) {
   const image = stage.querySelector('img');
   const outline = stage.querySelector('span');
   const confirm = dialog.querySelector('[data-confirm]');
+  const detect = dialog.querySelector('[data-detect]');
+  const status = dialog.querySelector('[data-detect-status]');
+  const candidates = dialog.querySelector('[data-candidates]');
+  const choices = candidates?.querySelector('select');
   image.src = src;
   await image.decode();
-  let region = previous, start, pointer, result;
+  let region = previous, start, pointer, result, editCount = 0;
   function draw() {
     const valid = validFigureRegion(region);
     outline.hidden = !valid;
@@ -99,6 +136,8 @@ async function openFigurePicker(src, previous) {
     stage.setPointerCapture(event.pointerId);
     pointer = event.pointerId;
     start = point(event);
+    editCount++;
+    if (choices) choices.value = '';
     confirm.disabled = true;
   };
   function move(event) {
@@ -108,6 +147,36 @@ async function openFigurePicker(src, previous) {
   stage.onpointermove = event => { if (event.pointerId === pointer) { move(event); draw(); } };
   stage.onpointerup = event => { if (event.pointerId === pointer) { move(event); pointer = undefined; draw(); } };
   stage.onpointercancel = () => { pointer = undefined; region = previous; draw(); };
+  if (detect) detect.onclick = async () => {
+    const atStart = editCount;
+    detect.disabled = true;
+    status.textContent = '正在查找图和表格…';
+    try {
+      const figures = await detectStudyFigures(image);
+      if (!dialog.open) return;
+      candidates.hidden = !figures.length;
+      if (!figures.length) {
+        status.textContent = '没有找到题图，可以手动框选。';
+        return;
+      }
+      choices.replaceChildren(new Option('选择候选位置', ''));
+      figures.forEach((_, index) => choices.add(new Option('配图 ' + (index + 1), String(index))));
+      choices.onchange = () => {
+        if (choices.value === '' || pointer !== undefined) return;
+        region = figures[Number(choices.value)];
+        draw();
+      };
+      if (atStart === editCount && pointer === undefined) {
+        choices.value = '0';
+        choices.onchange();
+      }
+      status.textContent = `找到 ${figures.length} 处，请确认范围含完整标注，再保存题图。`;
+    } catch (error) {
+      if (dialog.open) status.textContent = `${error.message}。仍可手动框选。`;
+    } finally {
+      detect.disabled = false;
+    }
+  };
   dialog.querySelector('[data-cancel]').onclick = () => dialog.close();
   const clear = dialog.querySelector('[data-clear]');
   if (clear) clear.onclick = () => { result = null; dialog.close(); };

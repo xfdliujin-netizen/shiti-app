@@ -117,20 +117,25 @@ export function createOCRService(fetcher = globalThis.fetch) {
     if (!m || m[2].length % 4 !== 0) return reply(400, { error: '需要 PNG 或 JPEG 的 base64 图片' });
     if (m[2].length > MAX_IMAGE) return reply(413, { error: '图片编码超过 10 MB，请缩小选框' });
     const mode = body.mode || 'basic';
-    if (!['basic','accurate'].includes(mode)) return reply(400,{error:'不支持的 OCR 模式'});
+    if (!['basic','accurate','figures'].includes(mode)) return reply(400,{error:'不支持的 OCR 模式'});
+    const figureMode = mode === 'figures';
+    const form = new URLSearchParams(figureMode
+      ? { image: m[2], layout_analysis: 'true', detect_direction: 'false' }
+      : {
+        image: m[2], detect_direction: 'true', probability: 'true', paragraph: 'false',
+        ...(mode === 'accurate' ? {recognize_granularity:'small',char_probability:'true'} : {})
+      });
+    if (figureMode && (m[1] === 'webp' || form.toString().length > 4_000_000)) {
+      return reply(400,{error:'题图定位需要小于 4 MB 的 JPEG 或 PNG，请缩小范围或手动框选'});
+    }
 
     try {
       const token = await accessToken(env);
-      const r = await fetcher('https://aip.baidubce.com/rest/2.0/ocr/v1/' + (mode === 'accurate' ? 'accurate' : 'accurate_basic') + '?access_token=' + encodeURIComponent(token), {
+      const api = figureMode ? 'doc_analysis' : mode === 'accurate' ? 'accurate' : 'accurate_basic';
+      const r = await fetcher('https://aip.baidubce.com/rest/2.0/ocr/v1/' + api + '?access_token=' + encodeURIComponent(token), {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          image: m[2],
-          detect_direction: 'true', // 自动检测朝向，即使手机拍照稍微倒置也能准确识别
-          probability: 'true',
-          paragraph: 'false',
-          ...(mode === 'accurate' ? {recognize_granularity:'small',char_probability:'true'} : {})
-        }),
+        body: form,
         signal: AbortSignal.timeout(60000)
       });
       if (!r.ok) return reply(502, { error: '百度 OCR 服务暂不可用，请稍后重试' });
@@ -138,6 +143,14 @@ export function createOCRService(fetcher = globalThis.fetch) {
       if (j.error_code) {
         if ([110, 111].includes(Number(j.error_code))) cached = null;
         return reply(200, { error_code: j.error_code });
+      }
+      if (figureMode) {
+        if (!Array.isArray(j.layouts) && j.layouts_num !== 0) return reply(502,{error:'百度未返回版面布局，请手动框选'});
+        const figures = (j.layouts || []).filter(block => block && ['figure','table'].includes(block.layout))
+          .map(block => block.layout_location)
+          .filter(points => Array.isArray(points) && points.length === 4 && points.every(point => point && Number.isFinite(point.x) && Number.isFinite(point.y)))
+          .slice(0, 30);
+        return reply(200,{figures});
       }
       if (!Array.isArray(j.words_result) || j.words_result.some(p => typeof p.words !== 'string')) {
         return reply(502, { error: '百度 OCR 返回了异常格式' });
