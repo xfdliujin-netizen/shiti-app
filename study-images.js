@@ -81,76 +81,7 @@ function whitenStudyPaper({ width, height, data }, blackWhite) {
   }
 }
 
-function layoutFigureRegions(figures, width, height) {
-  const pad = Math.max(3, Math.round(Math.min(width, height) * .015));
-  return figures.flatMap(points => {
-    if (!Array.isArray(points) || points.length !== 4 ||
-        points.some(point => !point || !Number.isFinite(point.x) || !Number.isFinite(point.y))) return [];
-    const xs = points.map(point => point.x), ys = points.map(point => point.y);
-    if (Math.min(...xs) < 0 || Math.min(...ys) < 0 || Math.max(...xs) > width || Math.max(...ys) > height ||
-        Math.max(...xs) <= Math.min(...xs) || Math.max(...ys) <= Math.min(...ys)) return [];
-    const x = Math.max(0, Math.min(...xs) - pad) / width;
-    const y = Math.max(0, Math.min(...ys) - pad) / height;
-    const w = Math.min(width, Math.max(...xs) + pad) / width - x;
-    const h = Math.min(height, Math.max(...ys) + pad) / height - y;
-    return validFigureRegion({ x, y, w, h }) ? [{ x, y, w, h }] : [];
-  }).sort((a, b) => a.y - b.y || a.x - b.x);
-}
-
-function studyPhotoForBaidu(image, minimumSide) {
-  const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-  if (Math.min(canvas.width, canvas.height) < minimumSide) throw Error('照片尺寸太小，百度接口无法处理');
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-  return { src: canvas.toDataURL('image/jpeg', .9), width: canvas.width, height: canvas.height };
-}
-
-async function detectStudyFigures(image) {
-  const photo = studyPhotoForBaidu(image, 64);
-  const figures = await callBaiduOCR(photo.src, 'figures');
-  return layoutFigureRegions(figures, photo.width, photo.height);
-}
-
-async function removeStudyHandwriting(src) {
-  const image = new Image();
-  image.src = src;
-  await image.decode();
-  const photo = studyPhotoForBaidu(image, 15);
-  const inputInk = studyPhotoInk(image);
-  const cleaned = await callBaiduOCR(photo.src, 'remove-handwriting');
-  image.src = cleaned;
-  await image.decode();
-  const expectedRatio = photo.width / photo.height;
-  const actualRatio = image.naturalWidth / image.naturalHeight;
-  if (Math.abs(actualRatio / expectedRatio - 1) > .08) throw Error('返回图片的版面尺寸异常');
-  if (inputInk >= 40 && studyPhotoInk(image) < Math.max(6, inputInk * .04)) {
-    throw Error('返回图片几乎空白，可能误删了印刷内容');
-  }
-  return cleaned;
-}
-
-function studyPhotoInk(image) {
-  const scale = 360 / Math.max(image.naturalWidth, image.naturalHeight);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  whitenStudyPaper(pixels, true);
-  let ink = 0;
-  for (let i = 0; i < pixels.data.length; i += 4) if (pixels.data[i] === 0) ink++;
-  return ink;
-}
-
-async function openFigurePicker(src, previous, allowDetection = true) {
+async function openFigurePicker(src, previous) {
   if (!isStudyImage(src)) throw Error('没有可框选的原题图片');
   const dialog = document.createElement('dialog');
   dialog.className = 'figure-picker';
@@ -160,17 +91,13 @@ async function openFigurePicker(src, previous, allowDetection = true) {
       <button type="button" class="dialog-x" data-close aria-label="关闭题图窗口" autofocus>×</button>
     </header>
     <div class="figure-picker-body">
-      <p class="hint">在原图上拖动框选。记得保留字母、刻度和图例。</p>
-      ${allowDetection ? `<div class="figure-detection">
-        <button type="button" class="secondary" data-detect>用百度自动找题图</button>
-        <label hidden data-candidates>候选位置 <select aria-label="候选题图"></select></label>
-      </div>
-      <p class="hint" data-detect-status role="status">手动框选免费。自动查找每次使用 1 次百度试卷分析额度。</p>` : ''}
+      <p class="hint">在图上拖出选框，再从框内拖动可移动。需要换大小时点「重画」。</p>
       <div class="figure-image-pane">
         <div class="figure-stage"><img alt="待框选的原题图片" draggable="false"><span hidden></span></div>
       </div>
     </div>
     <footer class="figure-picker-footer">
+      <button type="button" class="text-button" data-redraw disabled>重画</button>
       ${validFigureRegion(previous) ? '<button type="button" class="text-button" data-clear>移除题图</button>' : ''}
       <button type="button" class="secondary" data-cancel>取消</button>
       <button type="button" class="primary" data-confirm disabled>保存题图</button>
@@ -179,18 +106,16 @@ async function openFigurePicker(src, previous, allowDetection = true) {
   const image = stage.querySelector('img');
   const outline = stage.querySelector('span');
   const confirm = dialog.querySelector('[data-confirm]');
-  const detect = dialog.querySelector('[data-detect]');
-  const status = dialog.querySelector('[data-detect-status]');
-  const candidates = dialog.querySelector('[data-candidates]');
-  const choices = candidates?.querySelector('select');
+  const redraw = dialog.querySelector('[data-redraw]');
   image.src = src;
   await image.decode();
   stage.style.setProperty('--figure-ratio', image.naturalWidth / image.naturalHeight);
-  let region = previous, start, regionBeforeDrag, pointer, result, editCount = 0;
+  let region = previous, start, regionBeforeDrag, moving, pointer, result;
   function draw() {
     const valid = validFigureRegion(region);
     outline.hidden = !valid;
     confirm.disabled = !valid || pointer !== undefined;
+    redraw.disabled = confirm.disabled;
     if (valid) Object.assign(outline.style, {
       left: region.x * 100 + '%', top: region.y * 100 + '%',
       width: region.w * 100 + '%', height: region.h * 100 + '%'
@@ -198,8 +123,7 @@ async function openFigurePicker(src, previous, allowDetection = true) {
   }
   function point(event) {
     const box = image.getBoundingClientRect();
-    const clamp = value => Math.min(1, Math.max(0, value));
-    return { x: clamp((event.clientX - box.left) / box.width), y: clamp((event.clientY - box.top) / box.height) };
+    return { x: clampFigureValue((event.clientX - box.left) / box.width), y: clampFigureValue((event.clientY - box.top) / box.height) };
   }
   stage.onpointerdown = event => {
     if (!event.isPrimary || event.button !== 0 || pointer !== undefined) return;
@@ -207,12 +131,20 @@ async function openFigurePicker(src, previous, allowDetection = true) {
     pointer = event.pointerId;
     start = point(event);
     regionBeforeDrag = region;
-    editCount++;
-    if (choices) choices.value = '';
+    moving = validFigureRegion(region) && start.x >= region.x && start.x <= region.x + region.w &&
+      start.y >= region.y && start.y <= region.y + region.h;
     confirm.disabled = true;
   };
   function move(event) {
     const end = point(event);
+    if (moving) {
+      region = {
+        ...regionBeforeDrag,
+        x: clampFigureValue(regionBeforeDrag.x + end.x - start.x, 1 - regionBeforeDrag.w),
+        y: clampFigureValue(regionBeforeDrag.y + end.y - start.y, 1 - regionBeforeDrag.h)
+      };
+      return;
+    }
     region = { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y), w: Math.abs(start.x - end.x), h: Math.abs(start.y - end.y) };
   }
   stage.onpointermove = event => { if (event.pointerId === pointer) { move(event); draw(); } };
@@ -224,36 +156,7 @@ async function openFigurePicker(src, previous, allowDetection = true) {
     draw();
   };
   stage.onpointercancel = () => { pointer = undefined; region = regionBeforeDrag; draw(); };
-  if (detect) detect.onclick = async () => {
-    const atStart = editCount;
-    detect.disabled = true;
-    status.textContent = '正在查找图和表格…';
-    try {
-      const figures = await detectStudyFigures(image);
-      if (!dialog.open) return;
-      candidates.hidden = !figures.length;
-      if (!figures.length) {
-        status.textContent = '没有找到题图，可以手动框选。';
-        return;
-      }
-      choices.replaceChildren(new Option('选择候选位置', ''));
-      figures.forEach((_, index) => choices.add(new Option('配图 ' + (index + 1), String(index))));
-      choices.onchange = () => {
-        if (choices.value === '' || pointer !== undefined) return;
-        region = figures[Number(choices.value)];
-        draw();
-      };
-      if (atStart === editCount && pointer === undefined) {
-        choices.value = '0';
-        choices.onchange();
-      }
-      status.textContent = `找到 ${figures.length} 处，请确认范围含完整标注，再保存题图。`;
-    } catch (error) {
-      if (dialog.open) status.textContent = `${error.message}。仍可手动框选。`;
-    } finally {
-      detect.disabled = false;
-    }
-  };
+  redraw.onclick = () => { region = null; draw(); };
   dialog.querySelectorAll('[data-cancel], [data-close]').forEach(button => {
     button.onclick = () => dialog.close();
   });
@@ -264,6 +167,10 @@ async function openFigurePicker(src, previous, allowDetection = true) {
   draw();
   dialog.showModal();
   return new Promise(resolve => dialog.addEventListener('close', () => { dialog.remove(); resolve(result); }, { once: true }));
+}
+
+function clampFigureValue(value, maximum = 1) {
+  return Math.min(maximum, Math.max(0, value));
 }
 
 function showSavedFigure(container, src, region) {

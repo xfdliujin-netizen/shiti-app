@@ -81,7 +81,7 @@ async function testOCRConnection() {
   }
 }
 
-async function callBaiduOCR(src, requestMode = cfg.ocrMode || 'accurate') {
+async function callBaiduOCR(src) {
   const localWarning = ocrLocalFileWarning();
   if (localWarning) throw Error(localWarning);
   const endpoint = (cfg.ocrProxy || defaultOCRProxy()).trim(),
@@ -93,7 +93,7 @@ async function callBaiduOCR(src, requestMode = cfg.ocrMode || 'accurate') {
     response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-OCR-Token': token },
-      body: JSON.stringify({ image: src, mode: requestMode }),
+      body: JSON.stringify({ image: src, mode: cfg.ocrMode || 'accurate' }),
       signal: AbortSignal.timeout(60000)
     });
   } catch (e) {
@@ -104,21 +104,7 @@ async function callBaiduOCR(src, requestMode = cfg.ocrMode || 'accurate') {
   let result;
   try { result = await response.json(); } catch { throw Error('OCR 代理未返回 JSON，请确认地址以 /api/ocr 结尾'); }
   if (!response.ok) throw Error(result.error || `OCR 代理错误（${response.status}）`);
-  if (result.error_code) {
-    if (requestMode === 'figures' && Number(result.error_code) === 6) throw Error('请给百度应用添加「试卷分析与识别」接口权限，或手动框选');
-    if (requestMode === 'remove-handwriting' && Number(result.error_code) === 6) throw Error('请给百度应用添加「文档去手写 V2」接口权限');
-    throw Error(baiduError(result.error_code));
-  }
-  if (requestMode === 'remove-handwriting') {
-    if (!isStudyImage(result.image)) throw Error('代理未返回去手写照片');
-    baiduUsage.calls++;
-    return result.image;
-  }
-  if (requestMode === 'figures') {
-    if (!Array.isArray(result.figures)) throw Error('代理未返回题图位置，请手动框选');
-    baiduUsage.calls++;
-    return result.figures;
-  }
+  if (result.error_code) throw Error(baiduError(result.error_code));
   if (!Array.isArray(result.words_result) || result.words_result.some(p => typeof p.words !== 'string')) {
     throw Error('百度返回的识别格式不完整，请重试');
   }

@@ -3,10 +3,29 @@ const isTestEnv = () => Boolean(globalThis.assert);
 
 const OCR_SCHEMA = '错字、错误拼音、错误标点和错误选项必须按原图照录，不能自动修正。返回 JSON {"items":[{"section":"大题标题，严格使用目录中的名称","number":"原卷小题号，无号用位置或拼音","text":"完整原题，包含材料、全部选项和空格，不含学生填入内容","studentAnswer":"仅转录实际可见的学生作答，不可推测","uncertainty":"模糊、缺失、跨区截断或无法区分的内容，清晰则空字符串"}],"warnings":["其他问题"]}';
 
-function deepSeekOCRSchema(subject) {
-  const allowed = questionTypesFor(subject).filter(kind => kind !== 'other')
+function ocrSubjectOptions() {
+  return subjects.filter(subject => subject !== '其他');
+}
+
+function ocrSubjectInstruction() {
+  return '请根据题目内容判断科目，填入 JSON 顶层 suggestedSubject。只能填：'
+    + ocrSubjectOptions().join('、') + '。混合科目、内容不足或无法确定时填空字符串。';
+}
+
+function recognizedSubject(result, fallback) {
+  const suggestion = typeof result.suggestedSubject === 'string' ? result.suggestedSubject.trim() : '';
+  return ocrSubjectOptions().includes(suggestion) ? suggestion : fallback;
+}
+
+function deepSeekOCRSchema(subject, detectSubject = false) {
+  const kinds = detectSubject
+    ? [...new Set([...ocrSubjectOptions(), subject].flatMap(questionTypesFor))]
+    : questionTypesFor(subject);
+  const allowed = kinds.filter(kind => kind !== 'other')
     .map(kind => kind + '（' + QUESTION_TYPE_NAMES[kind] + '）').join('、');
-  return OCR_SCHEMA.replace('"uncertainty":', '"suggestedQuestionType":"","uncertainty":')
+  const schema = detectSubject ? OCR_SCHEMA.replace('{"items":', '{"suggestedSubject":"","items":') : OCR_SCHEMA;
+  return schema.replace('"uncertainty":', '"suggestedQuestionType":"","uncertainty":')
+    + (detectSubject ? ' ' + ocrSubjectInstruction() : '')
     + ' 每题按纸面要求建议一个题型，仅填代码：' + allowed
     + '。混合题、看不清或无法确定时填空字符串。填空题另返回 blankAnswers 数组，按空位顺序逐字记录孩子写的内容，位置明确但空白或看不清用 null，无法匹配空位则省略数组。选择题的 studentAnswer 只写实际选项字母，判断题照录实际标记。不要解题或推测作答。';
 }
@@ -238,9 +257,12 @@ async function recognizePaper() {
   paper = { ...meta, image: sourceImage, inventory: [], items: [], warnings: [], complete: false };
   try {
     progress('1 / 3 · 扫描整卷大题与小题目录…');
-    const inv = await ai(`只做试卷目录扫描，不解题，不挑选错题。按先左栏后右栏、各栏从上到下列出全部大题以及每个独立小题号。无编号题用位置或拼音标识。填空小题不要拆成每个空；选项不要作为题目。包括书写、看拼音、选择、填空、实践等所有实际可见部分。不要凭常见试卷补齐不可见的题号。返回 JSON {"inventory":[{"section":"大题标题","number":"小题号或无号标识"}],"warnings":["遮挡、切边、不完整等"]}。${text ? JSON.stringify({ text }) : ''}`, sourceImage || null, { ocr: true });
+    const inv = await ai(`只做试卷目录扫描，不解题，不挑选错题。按先左栏后右栏、各栏从上到下列出全部大题以及每个独立小题号。无编号题用位置或拼音标识。填空小题不要拆成每个空；选项不要作为题目。包括书写、看拼音、选择、填空、实践等所有实际可见部分。不要凭常见试卷补齐不可见的题号。返回 JSON {"suggestedSubject":"","inventory":[{"section":"大题标题","number":"小题号或无号标识"}],"warnings":["遮挡、切边、不完整等"]}。${ocrSubjectInstruction()}${text ? JSON.stringify({ text }) : ''}`, sourceImage || null, { ocr: true });
     if (!Array.isArray(inv.inventory) || !inv.inventory.length || inv.inventory.some(p => typeof p.section !== 'string' || typeof p.number !== 'string')) throw Error('目录扫描未返回有效题号，请重试');
     paper.inventory = inv.inventory;
+    meta.subject = recognizedSubject(inv, meta.subject);
+    paper.subject = meta.subject;
+    paper.questionType = selectedCaptureQuestionType(meta.subject);
     paper.warnings = Array.isArray(inv.warnings) ? inv.warnings.map(String) : [];
     const groups = sourceImage ? Array.from({ length: columns }, () => []) : [[]];
     if (sourceImage) {
@@ -408,7 +430,7 @@ function bindPaper() {
     const item = paper.items[index];
     showSavedFigure(document.querySelector(`[data-paper-figure="${index}"]`), paper.image, item.figureRegion);
     button.onclick = event => run(event.target, async () => {
-      const region = await openFigurePicker(paper.image, item.figureRegion, paper.scope === 'crop' && paper.items.length === 1);
+      const region = await openFigurePicker(paper.image, item.figureRegion);
       if (region === undefined) return;
       item.figureRegion = region;
       render();

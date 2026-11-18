@@ -52,7 +52,7 @@ node -e "console.log(require('node:crypto').randomBytes(24).toString('hex'))"
 
 也可使用命令行部署：进入 `proxy` 目录，用 Wrangler 配置三个 Secret，`wrangler.toml` 已包含 `ALLOWED_ORIGIN` 示例。该项目未捆绑 Wrangler，命令行安装、登录及部署由你自己的 Cloudflare 账户完成。
 
-题图框选窗口中的「用百度自动找题图」需要部署包含 `figures` 模式的代理，并给同一百度应用授权「试卷分析与识别」。每次点击只提交当前原题图片一次，使用该接口的额度。返回的图和表格位置仅用于建议裁剪范围，确认后才保存。普通文字 OCR 不触发题图定位。
+题图在浏览器中手动框选和移动。打印预览的灰度和黑白效果也在本地生成。
 
 ## 四、本地运行（不用部署 Worker）
 

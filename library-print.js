@@ -32,7 +32,7 @@ function printsSourcePhoto(item, attachment) {
   return isStudyImage(item.image) && (attachment === 'all' || attachment === 'auto' && !validFigureRegion(item.figureRegion));
 }
 
-async function preparePrintImages(sheet, mode, attachment, isCurrent, cleanedCopies = new Map()) {
+async function preparePrintImages(sheet, mode, attachment, isCurrent) {
   const items = [];
   let failures = 0;
   for (const item of sheet.items) {
@@ -40,19 +40,17 @@ async function preparePrintImages(sheet, mode, attachment, isCurrent, cleanedCop
     const source = isStudyImage(item.image) ? item.image : '';
     const hasFigure = source && validFigureRegion(item.figureRegion);
     const includeSource = printsSourcePhoto(item, attachment);
-    const printSource = cleanedCopies.get(source) || source;
     let image = '', extraImage = '', isFigure = false;
     try {
       if (hasFigure) {
-        // Preserve color, dashed lines and pale labels in the selected diagram.
-        image = await studyImageCopy(source, 'original', item.figureRegion);
+        image = await studyImageCopy(source, mode, item.figureRegion);
         isFigure = true;
-        if (includeSource && printSource) extraImage = await studyImageCopy(printSource, mode);
-      } else if (includeSource && printSource) image = await studyImageCopy(printSource, mode);
+        if (includeSource) extraImage = await studyImageCopy(source, mode);
+      } else if (includeSource) image = await studyImageCopy(source, mode);
     } catch {
       failures++;
-      if (includeSource && !isFigure) image = printSource;
-      else if (includeSource) extraImage = printSource;
+      if (includeSource && !isFigure) image = source;
+      else if (includeSource) extraImage = source;
     }
     items.push({ ...item, image, extraImage, isFigure });
   }
@@ -68,62 +66,50 @@ function printQuestionImages(item) {
 function launchLibraryPrint(sheet, includeAnswers = false) {
   const dialog = document.createElement('dialog');
   dialog.className = 'print-preview';
+  dialog.setAttribute('aria-labelledby', 'print-preview-title');
   const offersPhotos = includeAnswers !== 'only' && sheet.items.some(item => isStudyImage(item.image));
-  dialog.innerHTML = `<div class="print-preview-toolbar">
-    <strong>打印预览</strong>
-    ${offersPhotos ? `
-      <label>整题照片 <select data-print-source>
-        <option value="auto">仅无独立题图时附上</option><option value="all">全部附上</option><option value="none">不附整题照片</option>
-      </select></label>
-      <label>照片效果 <select data-print-image-mode>
-        <option value="gray">增强灰度</option><option value="bw">黑白扫描</option><option value="original">原图</option>
-      </select></label>
-      <button type="button" class="secondary" data-clean-photos>去手写</button>
-      <button type="button" class="secondary" data-reset-photos hidden>恢复处理前照片</button>` : ''}
-    <button type="button" class="secondary" data-print-download disabled>下载文档</button>
-    <button type="button" class="primary" data-print-now disabled>打印／存 PDF</button>
-    <button type="button" class="secondary" data-print-close aria-label="关闭预览">×</button>
-  </div>
+  const hasFigure = offersPhotos && sheet.items.some(item => isStudyImage(item.image) && validFigureRegion(item.figureRegion));
+  dialog.innerHTML = `<header class="print-preview-header">
+    <h2 id="print-preview-title">打印预览</h2>
+    <button type="button" class="dialog-x" data-print-close aria-label="关闭预览">×</button>
+  </header>
+  ${offersPhotos ? `<div class="print-preview-options">
+    <label><span>整题照片</span><select data-print-source>
+      <option value="auto">按需附原照</option><option value="all">全部附上</option><option value="none">不附整题照片</option>
+    </select></label>
+    <label><span>照片效果</span><select data-print-image-mode>
+      <option value="original" ${hasFigure ? 'selected' : ''}>原图</option>
+      <option value="gray" ${hasFigure ? '' : 'selected'}>增强灰度</option><option value="bw">黑白扫描</option>
+    </select></label>
+  </div>` : ''}
   <p class="hint" data-print-status role="status" hidden></p>
   <iframe title="打印文档"></iframe>
-  <p class="hint">如果微信没有打开打印窗口，可下载文档后在系统浏览器中打开打印。</p>`;
+  <footer class="print-preview-footer">
+    <button type="button" class="secondary" data-print-download disabled>下载文档</button>
+    <button type="button" class="primary" data-print-now disabled>打印／存 PDF</button>
+  </footer>`;
   const frame = dialog.querySelector('iframe');
   const print = dialog.querySelector('[data-print-now]');
   const download = dialog.querySelector('[data-print-download]');
   const mode = dialog.querySelector('[data-print-image-mode]');
   const source = dialog.querySelector('[data-print-source]');
-  const clean = dialog.querySelector('[data-clean-photos]');
-  const resetPhotos = dialog.querySelector('[data-reset-photos]');
   const status = dialog.querySelector('[data-print-status]');
-  const cleanedCopies = new Map();
-  let cleaning = false;
-  let cleanNotice = '';
   let documentUrl, html, revision = 0;
-  const sourcePhotos = () => [...new Set(sheet.items.filter(item => printsSourcePhoto(item, source.value)).map(item => item.image))];
   async function update() {
     const request = ++revision;
     const current = () => request === revision && dialog.open;
     print.disabled = download.disabled = true;
     status.hidden = !mode;
     status.textContent = mode ? '正在生成预览…' : '';
-    const photos = mode ? sourcePhotos() : [];
-    const outstanding = photos.filter(photo => !cleanedCopies.has(photo)).length;
-    if (mode) {
-      mode.disabled = !photos.length;
-      clean.disabled = cleaning || !outstanding;
-      clean.textContent = outstanding ? `去手写（${outstanding} 张）` : photos.length ? '已去手写' : '去手写';
-      resetPhotos.hidden = !cleanedCopies.size;
-    }
-    const output = mode ? await preparePrintImages(sheet, mode.value, source.value, current, cleanedCopies) : { sheet, failures: 0 };
+    const hasPrintableImage = mode && (hasFigure || sheet.items.some(item => printsSourcePhoto(item, source.value)));
+    if (mode) mode.disabled = !hasPrintableImage;
+    const output = mode ? await preparePrintImages(sheet, mode.value, source.value, current) : { sheet, failures: 0 };
     if (!output || !current()) return;
     if (documentUrl) URL.revokeObjectURL(documentUrl);
     documentUrl = undefined;
     html = libraryPrintHtml(output.sheet, includeAnswers);
-    const notices = [];
-    if (cleanNotice) notices.push(cleanNotice);
-    if (output.failures) notices.push(`${output.failures} 道题的图片转换未完成，请核对预览。`);
-    status.hidden = !notices.length;
-    status.textContent = notices.join(' ');
+    status.hidden = !output.failures;
+    status.textContent = output.failures ? `${output.failures} 道题的图片转换未完成，请核对预览。` : '';
     frame.onload = () => {
       if (!current() || frame.contentDocument?.body?.dataset.previewVersion !== String(request)) return;
       print.disabled = download.disabled = false;
@@ -142,36 +128,6 @@ function launchLibraryPrint(sheet, includeAnswers = false) {
   }
   if (mode) mode.onchange = update;
   if (source) source.onchange = update;
-  if (resetPhotos) resetPhotos.onclick = () => {
-    cleanedCopies.clear();
-    cleanNotice = '';
-    update();
-  };
-  if (clean) clean.onclick = async () => {
-    const photos = sourcePhotos();
-    const pending = photos.filter(photo => !cleanedCopies.has(photo));
-    if (!pending.length) return;
-    if (!confirm(`将这 ${pending.length} 张照片提交百度「文档去手写 V2」，每张使用 1 次调用额度。继续吗？`)) return;
-    cleaning = true;
-    cleanNotice = '';
-    ++revision;
-    mode.disabled = source.disabled = clean.disabled = resetPhotos.disabled = print.disabled = download.disabled = true;
-    status.hidden = false;
-    try {
-      for (let index = 0; index < pending.length && dialog.open; index++) {
-        status.textContent = `正在去手写（${index + 1}/${pending.length}）…`;
-        try {
-          cleanedCopies.set(pending[index], await removeStudyHandwriting(pending[index]));
-        } catch (error) {
-          cleanNotice = `${pending.length - index} 张照片未处理，仍显示处理前的照片，可能含手写答案。${error.message || ''}`;
-          break;
-        }
-      }
-    } finally {
-      cleaning = false;
-      if (dialog.open) { source.disabled = resetPhotos.disabled = false; update(); }
-    }
-  };
   print.onclick = () => {
     try {
       frame.contentWindow.focus();
