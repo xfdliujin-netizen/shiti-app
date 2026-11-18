@@ -39,6 +39,7 @@ function bindCaptureOptions(){
     if (kind !== item.questionType) switchQuestionType(item, kind, paper.subject);
     else if (name !== item.questionTypeName) invalidatePaperEvidence(item);
     item.questionTypeName = name;
+    delete item.suggestedQuestionType;
     render();
   };
   document.querySelectorAll('[data-type-select]').forEach(select => {
@@ -65,7 +66,7 @@ function bindCaptureOptions(){
       selectType(index, name, kind);
     };
   });
-  document.querySelectorAll('[data-type-layout]').forEach(el=>el.onchange=()=>{const p=paper.items[Number(el.dataset.typeLayout)],name=p.questionTypeName||QUESTION_TYPE_NAMES[p.questionType],kind=el.value==='text'?'other':el.value;switchQuestionType(p,kind,paper.subject);p.questionTypeName=name;rememberType(name,kind);render()});
+  document.querySelectorAll('[data-type-layout]').forEach(el=>el.onchange=()=>{const p=paper.items[Number(el.dataset.typeLayout)],name=p.questionTypeName||QUESTION_TYPE_NAMES[p.questionType],kind=el.value==='text'?'other':el.value;switchQuestionType(p,kind,paper.subject);p.questionTypeName=name;delete p.suggestedQuestionType;rememberType(name,kind);render()});
   document.querySelectorAll('[data-edit-capture-options]').forEach(el=>el.onclick=()=>openCaptureOptions(el.dataset.editCaptureOptions));
 }
 function captureOptionRow(label,kind,types){return `<div class="capture-option-row" data-original-kind="${kind}"><input data-option-label maxlength="${types?30:40}" aria-label="选项名称" value="${esc(label)}">${types?`<select data-option-layout aria-label="作答方式">${layoutOptions(answerLayout(kind))}</select>`:''}<button type="button" class="text-button" data-option-remove aria-label="删除此选项">×</button></div>`}

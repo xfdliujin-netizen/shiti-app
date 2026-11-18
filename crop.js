@@ -103,8 +103,8 @@ async function recognizeSelection() {
   const meta = { notebookId:typeof captureNotebookId==='function'?captureNotebookId():'default', subject: $('#subject').value, source: '', mistake: '' };
   meta.questionType=selectedCaptureQuestionType(meta.subject);
   progress('正在识别框内原文…');
-  const result = await ai(`只转录此范围内实际存在的完整题目，若边缘缺失选项或材料应注明，不能补写框外内容。不需要寻找整卷题号，无大题标题用“框选题目”，无题号用“1”等位置号，不解题。${OCR_SCHEMA}${text ? JSON.stringify({ text }) : ''}`, src || null, { ocr: true, maxTokens: 4000 });
-  const items = normalizeOCR(result);
+  const result = await ai(`只转录此范围内实际存在的完整题目，若边缘缺失选项或材料应注明，不能补写框外内容。不需要寻找整卷题号，无大题标题用“框选题目”，无题号用“1”等位置号，不解题。${deepSeekOCRSchema(meta.subject)}${text ? JSON.stringify({ text }) : ''}`, src || null, { ocr: true, maxTokens: 4000 });
+  const items = normalizeOCR(result, meta.subject);
   if (!items.length) throw Error('框内未识别到题目，请调整选框');
   paper = { ...meta, image: src, scope: 'crop', inventory: items.map(p => ({ section: p.section, number: p.number })), items, warnings: Array.isArray(result.warnings) ? result.warnings.map(String) : [], complete: true };
   draft = null;

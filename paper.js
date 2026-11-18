@@ -3,6 +3,14 @@ const isTestEnv = () => Boolean(globalThis.assert);
 
 const OCR_SCHEMA = '错字、错误拼音、错误标点和错误选项必须按原图照录，不能自动修正。返回 JSON {"items":[{"section":"大题标题，严格使用目录中的名称","number":"原卷小题号，无号用位置或拼音","text":"完整原题，包含材料、全部选项和空格，不含学生填入内容","studentAnswer":"仅转录实际可见的学生作答，不可推测","uncertainty":"模糊、缺失、跨区截断或无法区分的内容，清晰则空字符串"}],"warnings":["其他问题"]}';
 
+function deepSeekOCRSchema(subject) {
+  const allowed = questionTypesFor(subject).filter(kind => kind !== 'other')
+    .map(kind => kind + '（' + QUESTION_TYPE_NAMES[kind] + '）').join('、');
+  return OCR_SCHEMA.replace('"uncertainty":', '"suggestedQuestionType":"","uncertainty":')
+    + ' 每题按纸面要求建议一个题型，仅填代码：' + allowed
+    + '。混合题、看不清或无法确定时填空字符串。题型仅用于校对表单，不要解题或推测作答。';
+}
+
 function getVerdictTagOptions(selected) {
   const list = typeof aiVerdictTags !== 'undefined' && Array.isArray(aiVerdictTags)
     ? aiVerdictTags
@@ -105,18 +113,25 @@ function paperKey(p) {
   return (p.section + '|' + p.number).replace(/[\s、.．：:（）()]/g, '');
 }
 
-function normalizeOCR(r) {
+function normalizeOCR(r, suggestionSubject) {
   if (!Array.isArray(r.items)) throw Error('模型没有返回逐题列表，未采用此结果，请重试');
   return r.items.map(p => {
     if (typeof p.text !== 'string' || !p.text.trim() || typeof p.section !== 'string' || typeof p.number !== 'string' || !p.section.trim() || !p.number.trim()) {
       throw Error('转录条目缺少题干、分组或题号，未采用此批结果');
     }
     const autoCheck = !isTestEnv() && r.items.length === 1;
+    const allowedTypes = suggestionSubject ? questionTypesFor(suggestionSubject) : [];
+    const suggestedType = allowedTypes.includes(p.suggestedQuestionType) && p.suggestedQuestionType !== 'other'
+      ? p.suggestedQuestionType : null;
+    const transcribedAnswer = typeof p.studentAnswer === 'string' ? p.studentAnswer : '';
+    const needsStructuredAnswer = suggestedType === 'choice' || suggestedType === 'fill';
     return {
       section: p.section.trim(),
       number: p.number.trim(),
       text: p.text,
-      studentAnswer: typeof p.studentAnswer === 'string' ? p.studentAnswer : '',
+      studentAnswer: needsStructuredAnswer ? '' : transcribedAnswer,
+      ...(suggestedType ? { questionType: suggestedType, suggestedQuestionType: suggestedType } : {}),
+      ...(needsStructuredAnswer && transcribedAnswer ? { ocrStudentAnswer: transcribedAnswer } : {}),
       uncertainty: typeof p.uncertainty === 'string' ? p.uncertainty : '',
       selected: autoCheck,
       verified: false,
@@ -190,8 +205,8 @@ async function recognizePaper() {
     }
     for (let col = 0; col < groups.length; col++) {
       progress(`2 / 3 · 转录第 ${col + 1} / ${groups.length} 栏…`);
-      const r = await ai(`你现在只做逐字转录，不解题、不筛错题、不改正印刷错字或学生答案。${sourceImage ? '接下来的三张图片是同一栏从上至下的重叠切片，按顺序合并跨片内容；重复题目只返回一次。' : '逐题处理下列文字。'}保留全部大题和小题，包括书写、拼音、选择、填空、阅读材料、实践。选择题必须包含全部选项，不能编造同类型题。手写答案与印刷题干分开，不能把教师勾叉直接当作正确性结论；无法识别写【无法辨认】，注明截断，不能猜测。不转录学生姓名等身份信息。目录供题号命名参考，不代表本栏一定出现全部题目：${JSON.stringify(paper.inventory)}。${text ? JSON.stringify({ text }) : ''}${OCR_SCHEMA}`, groups[col].length ? groups[col] : null, { ocr: true, maxTokens: 12000 });
-      const items = normalizeOCR(r);
+      const r = await ai(`你现在只做逐字转录，不解题、不筛错题、不改正印刷错字或学生答案。${sourceImage ? '接下来的三张图片是同一栏从上至下的重叠切片，按顺序合并跨片内容；重复题目只返回一次。' : '逐题处理下列文字。'}保留全部大题和小题，包括书写、拼音、选择、填空、阅读材料、实践。选择题必须包含全部选项，不能编造同类型题。手写答案与印刷题干分开，不能把教师勾叉直接当作正确性结论；无法识别写【无法辨认】，注明截断，不能猜测。不转录学生姓名等身份信息。目录供题号命名参考，不代表本栏一定出现全部题目：${JSON.stringify(paper.inventory)}。${text ? JSON.stringify({ text }) : ''}${deepSeekOCRSchema(meta.subject)}`, groups[col].length ? groups[col] : null, { ocr: true, maxTokens: 12000 });
+      const items = normalizeOCR(r, meta.subject);
       paper.items.push(...items);
       if (Array.isArray(r.warnings)) paper.warnings.push(...r.warnings.map(String));
     }

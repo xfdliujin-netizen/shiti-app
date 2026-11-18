@@ -76,6 +76,8 @@ function answerReviewFields(p,i) {
   if(!p.answerStatus)p.answerStatus='confirmed';
   const options=[['unknown','无法确认孩子作答（只解题，不判断错因）'],['confirmed','已确认孩子的作答'],['unanswered','已确认未作答']];
   return `<div class="answer-review">${typeof editableTypeFields==='function'?editableTypeFields(p,i,subject):`<label class="field"><span>题型</span><select data-paper="questionType" data-index="${i}">${questionTypeOptions(subject,p.questionType)}</select></label>`}
+    ${p.suggestedQuestionType === p.questionType && !p.questionTypeName ? '<p class="hint">题型由 DeepSeek 建议，可在上方修改。</p>' : ''}
+    ${p.ocrStudentAnswer ? '<p class="hint prose">作答转录供核对：' + esc(p.ocrStudentAnswer) + '</p>' : ''}
     ${structuredAnswerFields(p,i)}
     <label class="field"><span>作答证据状态</span><select data-paper="answerStatus" data-index="${i}">${options.map(([v,t])=>`<option value="${v}" ${(p.answerStatus||'unknown')===v?'selected':''}>${t}</option>`).join('')}</select></label>
     <details class="answer-extra" data-answer-extra="${i}" ${p.showAnswerExtra?'open':''}><summary>补充批注与原题视觉信息（选填）</summary>
