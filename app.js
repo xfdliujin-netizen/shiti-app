@@ -1021,7 +1021,9 @@ function bindOpen(withActions) {
     card.onpointermove = event => {
       if (press?.id === event.pointerId && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 10) cancelPress();
     };
-    card.onpointerup = card.onpointercancel = card.onpointerleave = cancelPress;
+    card.onpointerup = card.onpointercancel = card.onpointerleave = event => {
+      if (press?.id === event.pointerId) cancelPress();
+    };
     card.oncontextmenu = event => {
       event.preventDefault();
       if (!suppressClick && (event.pointerType !== 'touch' || press)) showActions();
