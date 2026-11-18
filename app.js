@@ -300,7 +300,7 @@ function cards(qs) {
     ? qs.map(q => {
         const verdict = inferAiVerdict(q);
         const vClass = verdict === '巩固良好' ? 'good' : (['概念混淆', '知识盲区', '审题偏差'].includes(verdict) ? 'bad' : '');
-        return `<button class="question" data-open="${esc(q.id)}">
+        return `<button type="button" class="question" data-open="${esc(q.id)}" aria-haspopup="dialog">
           <div class="q-meta">
             <span class="subject">${esc(q.subject)}</span>
             <span class="ai-verdict-chip ${vClass}">🤖 ${esc(verdict)}</span>
@@ -418,7 +418,8 @@ function notebook(){
   if(typeof activeNotebook!=='undefined')activeNotebook='all';
   const profile = getStudentProfile();
   const detail=filter!=='全部',scope=data.questions.filter(q=>(!detail||q.subject===filter)&&notebookPeriodMatches(q, profile)),shown=filteredQuestions(),total=scope.length,pending=scope.filter(q=>!q.mastered).length;
-  const toolbar=`<div class="notebook-toolbar"><input class="search" id="search" aria-label="搜索错题" placeholder="搜索题目、编号、知识点…" value="${esc(query)}"><div class="notebook-status" role="group" aria-label="掌握状态筛选">${[['all','累计错题',total],['unmastered','待巩固',pending],['mastered','已掌握',total-pending]].map(([value,label,count])=>`<button type="button" data-status="${value}" class="status-stat ${notebookStatus===value?'active':''}" aria-pressed="${notebookStatus===value}"><span>${label}</span><b>${count}</b></button>`).join('')}</div></div>`;
+  const search = `<input class="search" id="search" aria-label="搜索错题" placeholder="搜索题目、编号、知识点…" value="${esc(query)}">`;
+  const status = `<div class="notebook-status" role="group" aria-label="掌握状态筛选">${[['all','累计错题',total],['unmastered','待巩固',pending],['mastered','已掌握',total-pending]].map(([value,label,count])=>`<button type="button" data-status="${value}" class="status-stat ${notebookStatus===value?'active':''}" aria-pressed="${notebookStatus===value}"><span>${label}</span><b>${count}</b></button>`).join('')}</div>`;
   const periods=[...new Set(data.questions.filter(q=>!detail||q.subject===filter).map(q=>JSON.stringify([q.grade||'',q.term||''])))],types=[...new Set(scope.map(notebookTypeLabel))],tags=[...new Set(scope.flatMap(q=>q.tags||[]))].sort();
   if (notebookPeriod && notebookPeriod !== 'profile' && !periods.includes(notebookPeriod)) periods.push(notebookPeriod);
   const periodSelect = `<select id="notebook-period" aria-label="年级／学期">
@@ -431,11 +432,12 @@ function notebook(){
   </select>`;
   const tools = detail ? '' : `<div class="notebook-grade-bar"><label for="notebook-period">年级／学期</label>${periodSelect}</div>`;
   const count = notebookTypes.size + notebookTags.size + Number(aiFilter !== '全部') + Number(notebookPeriod !== 'profile');
-  const facets = `<div class="notebook-actions">
+  const toolbar = detail ? `<div class="notebook-toolbar notebook-detail-tools">
     <button type="button" class="secondary" id="notebook-toggle-filters" aria-expanded="${notebookFiltersOpen}" aria-controls="notebook-facet-panel">筛选${count ? ' · '+count : ''} <span class="filter-chevron" aria-hidden="true">▾</span></button>
-    <button type="button" class="secondary" id="notebook-print">导出打印</button>
-  </div>
-    <div class="notebook-facet-disclosure" id="notebook-facet-panel" ${notebookFiltersOpen?'data-expanded':'inert'}>
+    ${search}
+    <button type="button" class="notebook-print-button" id="notebook-print">导出打印</button>
+  </div>` : `<div class="notebook-toolbar">${search}${status}</div>`;
+  const facets = `<div class="notebook-facet-disclosure" id="notebook-facet-panel" ${notebookFiltersOpen?'data-expanded':'inert'}>
       <div class="notebook-facet-inner"><div class="notebook-facets"><div class="notebook-grade-bar"><label for="notebook-period">年级／学期</label>${periodSelect}</div>
         ${notebookFilterRow('题型','type',types,notebookTypes)}
         ${notebookFilterRow('知识点','tag',tags,notebookTags)}
@@ -444,7 +446,8 @@ function notebook(){
       </div></div>
     </div>`;
   const subjectList=[...new Set([...getQuickSubjects(),...data.questions.map(q=>q.subject)])];
-  return workspaceSwitch('notebook','notebook')+(detail?`<div class="subject-detail-head"><button type="button" class="text-button" id="notebook-back">← 科目列表</button><h2>${esc(filter)}错题本</h2><a href="#capture" class="primary subject-add">＋ 录题</a></div>`:'')+toolbar+tools+(detail?facets+notebookPrintOptions()+`<div class="section-title"><h2>题目</h2><span class="muted">${shown.length} 题</span></div>`+cards(shown):`<div class="subject-notebook-list">${subjectList.map((subject,i)=>{const n=shown.filter(q=>q.subject===subject).length;return `<button type="button" class="subject-notebook-card" data-notebook-subject="${subject}"><span class="subject-book-icon tone-${i%4}">▤</span><span class="subject-book-copy"><strong>${subject}错题本</strong><small>${n} 道错题</small></span><span class="subject-book-arrow">›</span></button>`}).join('')}</div>${query?'<div class="section-title"><h2>搜索结果</h2></div>'+cards(shown):''}`);
+  const head = detail ? `<div class="subject-detail-head"><button type="button" class="text-button" id="notebook-back">← 科目列表</button><h2>${esc(filter)}错题本</h2>${status}</div>` : '';
+  return workspaceSwitch('notebook','notebook')+head+toolbar+tools+notebookPrintOptions()+(detail?facets+`<div class="section-title"><h2>题目</h2><span class="muted">${shown.length} 题</span></div>`+cards(shown):`<div class="subject-notebook-list">${subjectList.map((subject,i)=>{const n=shown.filter(q=>q.subject===subject).length;return `<button type="button" class="subject-notebook-card" data-notebook-subject="${subject}"><span class="subject-book-icon tone-${i%4}">▤</span><span class="subject-book-copy"><strong>${subject}错题本</strong><small>${n} 道错题</small></span><span class="subject-book-arrow">›</span></button>`}).join('')}</div>${query?'<div class="section-title"><h2>搜索结果</h2></div>'+cards(shown):''}`);
 }
 function bindNotebookWorkspace(){
   document.querySelectorAll('[data-notebook-subject]').forEach(button => {
@@ -516,24 +519,31 @@ function notebookPrintOptions() {
   </dialog>`;
 }
 
+function notebookPrintSelection(id) {
+  const items = id ? data.questions.filter(q => q.id === id) : filteredQuestions();
+  if (!items.length || items.length > 100) throw Error(id ? '找不到这道错题' : '请筛选 1～100 道题后打印');
+  return items;
+}
+
+function openNotebookPrint(id = '') {
+  const items = notebookPrintSelection(id);
+  const dialog = $('#notebook-print-options');
+  dialog.dataset.questionId = id;
+  $('#notebook-print-count').textContent = id ? '仅打印此题' : '当前筛选 ' + items.length + ' 道题';
+  $('#notebook-print-mode').value = 'questions';
+  dialog.showModal();
+}
+
 function bindNotebookPrint() {
   const button = $('#notebook-print');
   const dialog = $('#notebook-print-options');
-  if (!button || !dialog) return;
+  if (!dialog) return;
   const mode = $('#notebook-print-mode');
-  const getItems = () => {
-    const items = filteredQuestions();
-    if (!items.length || items.length > 100) throw Error('请筛选 1～100 道题后打印');
-    return items;
-  };
-  button.onclick = event => run(event.currentTarget, () => {
-    $('#notebook-print-count').textContent = '当前筛选 ' + getItems().length + ' 道题';
-    mode.value = 'questions';
-    dialog.showModal();
-  });
+  if (button) button.onclick = event => run(event.currentTarget, () => openNotebookPrint());
   $('#notebook-print-close').onclick = () => dialog.close();
   $('#notebook-print-confirm').onclick = event => run(event.currentTarget, () => {
-    const items = getItems().map(q => ({
+    const id = dialog.dataset.questionId;
+    const items = notebookPrintSelection(id).map(q => ({
       ...q,
       recordId: q.id,
       printReviewed: Boolean(q.evidenceVerified),
@@ -543,7 +553,7 @@ function bindNotebookPrint() {
     }));
     const output = mode.value === 'answers' ? 'only' : mode.value === 'both';
     dialog.close();
-    launchLibraryPrint({ title: filter + '错题练习', items }, output);
+    launchLibraryPrint({ title: (id ? items[0].subject : filter) + '错题练习', items }, output);
   });
 }
 
