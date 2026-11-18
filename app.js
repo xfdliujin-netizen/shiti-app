@@ -640,7 +640,7 @@ ${filteredQuestions.map(q => `<option value="${esc(q.id)}" ${q.id === selectedPr
 <div id="exercise">${practice&&!['bank','bank-variant','library','library-variant'].includes(practice.sourceKind)?exercise():''}</div>
 
 <div class="section-title"><h2>练习记录</h2><span class="text-button">${data.practices.length} 次练习</span></div>
-${data.practices.slice().reverse().slice(0, 20).map(p => `<div class="card"><div class="q-meta"><span>${date(p.created)}</span><span>原题 #${esc(p.number)}</span>${p.aiStatus? `<span class="ai-verdict-chip ${p.aiStatus.includes('正确') &&!p.aiStatus.includes('部分')? 'good': 'bad'}">🤖 ${esc(p.aiStatus)}</span>`: ''}<span>${esc(p.rating)}</span></div><p class="prose">${esc(p.text)}</p><details><summary>查看作答与 AI 批改解析</summary><p class="prose">我的作答：${esc(p.response || '未填写')}${p.aiFeedback? `\n\n🤖 AI 点评：${esc(p.aiFeedback)}`: ''}\n\n答案：${esc(p.answer)}\n\n解析：${esc(p.analysis)}</p></details></div>`).join('') || '<div class="empty">练习后，你的作答、AI 判定和自评会保存在这里。</div>'}`;
+${data.practices.slice().reverse().slice(0, 20).map(p => `<div class="card"><div class="q-meta"><span>${date(p.created)}</span><span>原题 #${esc(shortQuestionNumber(p.number))}</span>${p.aiStatus? `<span class="ai-verdict-chip ${p.aiStatus.includes('正确') &&!p.aiStatus.includes('部分')? 'good': 'bad'}">🤖 ${esc(p.aiStatus)}</span>`: ''}<span>${esc(p.rating)}</span></div><p class="prose">${esc(p.text)}</p><details><summary>查看作答与 AI 批改解析</summary><p class="prose">我的作答：${esc(p.response || '未填写')}${p.aiFeedback? `\n\n🤖 AI 点评：${esc(p.aiFeedback)}`: ''}\n\n答案：${esc(p.answer)}\n\n解析：${esc(p.analysis)}</p></details></div>`).join('') || '<div class="empty">练习后，你的作答、AI 判定和自评会保存在这里。</div>'}`;
 }
 
 // practicePage 保留为别名（自检 check.cjs 会调用它）
@@ -1373,7 +1373,7 @@ function bindPractice() {
         items: chosen.map(q => ({
           recordId: q.id,
           subject: q.subject,
-          source: q.source || `#${q.number}`,
+          source: q.source || `#${shortQuestionNumber(q.number)}`,
           text: q.text,
           questionType: q.questionType,
           image: q.image || '',

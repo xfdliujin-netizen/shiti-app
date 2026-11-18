@@ -71,8 +71,9 @@ function questionNumberPrefix(subject, grade, term, day) {
 }
 
 function shortQuestionNumber(number) {
-  const legacy = /^([^-]+)-([^-]+)[（(]([上下])[）)]-(\d{8})-(\d+)$/.exec(number || '');
-  if (!legacy) return number || '';
+  const text = String(number ?? '');
+  const legacy = /^([^-]+)-([^-]+)[（(]([上下])[）)]-(\d{8})-(\d+)$/.exec(text);
+  if (!legacy) return text;
   const [, subject, grade, term, day, sequence] = legacy;
   return questionNumberPrefix(subject, grade, term, day) + sequence;
 }
