@@ -656,6 +656,14 @@ ${insufficient&&available?`<button type="button" class="secondary" id="exam-use-
 <div id="exam-area">${examSheet? renderExamSheet(): ''}</div>`;
 }
 
+function examQuestionImages(item, index) {
+  if (!isStudyImage(item.image)) return '';
+  const original = `<img src="${esc(item.image)}" alt="整题原图" class="saved-figure" loading="lazy">`;
+  if (!validFigureRegion(item.figureRegion)) return original;
+  return `<div data-exam-figure="${index}"></div>
+    <details class="exam-original-photo"><summary>查看整题原图</summary>${original}</details>`;
+}
+
 function renderExamSheet() {
   if (!examSheet) return '';
   const p = getStudentProfile();
@@ -676,7 +684,7 @@ function renderExamSheet() {
         <div style="padding-bottom:14px;border-bottom:1px dashed #e5e7eb">
           <div style="font-weight:700;font-size:14px;margin-bottom:6px;color:#111827">第 ${idx + 1} 题 <span style="font-weight:400;font-size:12px;color:#6b7280">[${esc(item.subject)}${item.source ? ' · ' + esc(item.source) : ''}]</span></div>
           <div class="prose" style="font-size:15px;line-height:1.7">${esc(item.text)}</div>
-          ${item.image ? validFigureRegion(item.figureRegion) ? `<div data-exam-figure="${idx}"></div>` : `<img src="${item.image}" alt="原题图片" style="max-width:100%;max-height:220px;object-fit:contain;margin-top:8px;border-radius:8px">` : ''}
+          ${examQuestionImages(item, idx)}
           <div style="height:56px;margin-top:8px;border:1px dashed #e5e7eb;border-radius:8px;padding:6px 10px;font-size:12px;color:#9ca3af">作答区：</div>
         </div>
       `).join('')}

@@ -97,15 +97,27 @@ async function openFigurePicker(src, previous, allowDetection = true) {
   if (!isStudyImage(src)) throw Error('没有可框选的原题图片');
   const dialog = document.createElement('dialog');
   dialog.className = 'figure-picker';
-  dialog.innerHTML = `<div class="card-head"><h2>框选题目配图</h2></div>
-    <p class="hint">在图上拖出方框，保留标注、坐标轴和图例。重新拖动可调整范围。</p>
-    ${allowDetection ? `<div class="actions"><button type="button" class="secondary" data-detect>用百度自动找题图</button>
-      <label hidden data-candidates>候选位置 <select aria-label="候选题图"></select></label></div>
-      <p class="hint" data-detect-status role="status">每次点击调用一次百度「试卷分析与识别」。</p>` : ''}
-    <div class="figure-stage"><img alt="待框选的原题图片" draggable="false"><span hidden></span></div>
-    <div class="actions"><button type="button" class="secondary" data-cancel>取消</button>
-    ${validFigureRegion(previous) ? '<button type="button" class="secondary" data-clear>移除题图</button>' : ''}
-    <button type="button" class="primary" data-confirm disabled>保存题图</button></div>`;
+  dialog.setAttribute('aria-labelledby', 'figure-picker-title');
+  dialog.innerHTML = `<header class="figure-picker-header">
+      <h2 id="figure-picker-title">保留题目配图</h2>
+      <button type="button" class="dialog-x" data-close aria-label="关闭题图窗口" autofocus>×</button>
+    </header>
+    <div class="figure-picker-body">
+      <p class="hint">在原图上拖动框选。记得保留字母、刻度和图例。</p>
+      ${allowDetection ? `<div class="figure-detection">
+        <button type="button" class="secondary" data-detect>用百度自动找题图</button>
+        <label hidden data-candidates>候选位置 <select aria-label="候选题图"></select></label>
+      </div>
+      <p class="hint" data-detect-status role="status">手动框选免费。自动查找每次使用 1 次百度试卷分析额度。</p>` : ''}
+      <div class="figure-image-pane">
+        <div class="figure-stage"><img alt="待框选的原题图片" draggable="false"><span hidden></span></div>
+      </div>
+    </div>
+    <footer class="figure-picker-footer">
+      ${validFigureRegion(previous) ? '<button type="button" class="text-button" data-clear>移除题图</button>' : ''}
+      <button type="button" class="secondary" data-cancel>取消</button>
+      <button type="button" class="primary" data-confirm disabled>保存题图</button>
+    </footer>`;
   const stage = dialog.querySelector('.figure-stage');
   const image = stage.querySelector('img');
   const outline = stage.querySelector('span');
@@ -116,7 +128,8 @@ async function openFigurePicker(src, previous, allowDetection = true) {
   const choices = candidates?.querySelector('select');
   image.src = src;
   await image.decode();
-  let region = previous, start, pointer, result, editCount = 0;
+  stage.style.setProperty('--figure-ratio', image.naturalWidth / image.naturalHeight);
+  let region = previous, start, regionBeforeDrag, pointer, result, editCount = 0;
   function draw() {
     const valid = validFigureRegion(region);
     outline.hidden = !valid;
@@ -136,6 +149,7 @@ async function openFigurePicker(src, previous, allowDetection = true) {
     stage.setPointerCapture(event.pointerId);
     pointer = event.pointerId;
     start = point(event);
+    regionBeforeDrag = region;
     editCount++;
     if (choices) choices.value = '';
     confirm.disabled = true;
@@ -145,8 +159,14 @@ async function openFigurePicker(src, previous, allowDetection = true) {
     region = { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y), w: Math.abs(start.x - end.x), h: Math.abs(start.y - end.y) };
   }
   stage.onpointermove = event => { if (event.pointerId === pointer) { move(event); draw(); } };
-  stage.onpointerup = event => { if (event.pointerId === pointer) { move(event); pointer = undefined; draw(); } };
-  stage.onpointercancel = () => { pointer = undefined; region = previous; draw(); };
+  stage.onpointerup = event => {
+    if (event.pointerId !== pointer) return;
+    move(event);
+    if (!validFigureRegion(region)) region = regionBeforeDrag;
+    pointer = undefined;
+    draw();
+  };
+  stage.onpointercancel = () => { pointer = undefined; region = regionBeforeDrag; draw(); };
   if (detect) detect.onclick = async () => {
     const atStart = editCount;
     detect.disabled = true;
@@ -177,7 +197,9 @@ async function openFigurePicker(src, previous, allowDetection = true) {
       detect.disabled = false;
     }
   };
-  dialog.querySelector('[data-cancel]').onclick = () => dialog.close();
+  dialog.querySelectorAll('[data-cancel], [data-close]').forEach(button => {
+    button.onclick = () => dialog.close();
+  });
   const clear = dialog.querySelector('[data-clear]');
   if (clear) clear.onclick = () => { result = null; dialog.close(); };
   confirm.onclick = () => { if (validFigureRegion(region)) { result = region; dialog.close(); } };

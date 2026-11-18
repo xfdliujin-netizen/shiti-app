@@ -59,7 +59,7 @@ function launchLibraryPrint(sheet, includeAnswers = false) {
         <option value="gray">增强灰度</option><option value="bw">黑白扫描</option><option value="original">原图</option>
       </select></label>` : ''}
     ${includeAnswers !== 'only' && sheet.items.some(item => isStudyImage(item.image) && validFigureRegion(item.figureRegion)) ? `
-      <label><input type="checkbox" data-print-source>配图题也附整题照片</label>` : ''}
+      <label><input type="checkbox" data-print-source>同时打印整题原图</label>` : ''}
     <button type="button" class="secondary" data-print-download disabled>下载文档</button>
     <button type="button" class="primary" data-print-now disabled>打印／存 PDF</button>
     <button type="button" class="secondary" data-print-close aria-label="关闭预览">×</button>
