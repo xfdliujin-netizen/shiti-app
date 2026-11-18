@@ -1027,14 +1027,14 @@ function bindOpen(withActions) {
       const pointerId = press?.id;
       cancelPress();
       if (!card.isConnected) return;
-      if (pointerId !== undefined) suppressHeldPointerClick(pointerId);
-      suppressClick = true;
+      suppressClick = pointerId !== undefined;
+      if (suppressClick) suppressHeldPointerClick(pointerId);
       openQuestionActions(id);
     }
     card.onpointerdown = event => {
+      suppressClick = false;
       if (!event.isPrimary || event.button !== 0) return;
       cancelPress();
-      suppressClick = false;
       press = { id: event.pointerId, x: event.clientX, y: event.clientY };
       timer = setTimeout(showActions, 520);
     };
