@@ -7,7 +7,9 @@ run("globalThis.p={questionType:'multiple',studentAnswer:'A、C'};ensureAnswerSt
 run("switchQuestionType(p,'fill','数学');assert.equal(p.blankCount,2);p.blankCount=3;p.blankAnswers=['原作答1','原作答2','原作答3'];updateStructuredAnswer(p)");assert.equal(c.p.studentAnswer,'第1空：原作答1\n第2空：原作答2\n第3空：原作答3');
 run("switchQuestionType(p,'choice','数学')");assert.equal(c.p.studentAnswer,'A、C');run("switchQuestionType(p,'fill','数学')");assert.equal(c.p.blankAnswers[1],'原作答2');
 run("globalThis.old={questionType:'single',studentAnswer:'B',optionCount:4};ensureAnswerStructure(old,'语文');updateStructuredAnswer(old)");assert.equal(c.old.questionType,'choice');assert.equal(c.old.studentAnswer,'B');assert.equal(c.old.optionCount,4);
-assert.equal(run("questionNumber('语文',new Date('2026-11-15T16:01:00Z'),[])"),'语文-四年级（上）-20261116-001');
-assert.equal(run("questionNumber('数学',new Date('2026-11-16T00:00:00Z'),[{number:'数学-四年级（上）-20261116-003'},{number:'语文-四年级（上）-20261116-099'}],1)"),'数学-四年级（上）-20261116-005');
-assert.equal(run("questionNumber('数学','20261117',[],0,{grade:'五年级',term:'下'})"),'数学-五年级（下）-20261117-001');
+assert.equal(run("questionNumber('语文',new Date('2026-11-15T16:01:00Z'),[])"),'语-小四上-261116-001');
+assert.equal(run("questionNumber('数学',new Date('2026-11-16T00:00:00Z'),[{number:'数学-四年级（上）-20261116-003'},{number:'数-小四上-261116-006'},{number:'语文-四年级（上）-20261116-099'}],1)"),'数-小四上-261116-008');
+assert.equal(run("questionNumber('数学','20261117',[],0,{grade:'五年级',term:'下'})"),'数-小五下-261117-001');
+assert.equal(run("shortQuestionNumber('物理-八年级（初二）（下）-20261117-005')"),'物-初二下-261117-005');
+assert.equal(run("shortQuestionNumber('M4')"),'M4');
 console.log('Passed: subject-specific types, choice serialization, separate type drafts, blank numbering, Shanghai date, per-subject daily sequence.');

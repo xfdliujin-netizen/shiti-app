@@ -304,7 +304,7 @@ function cards(qs) {
           <div class="q-meta">
             <span class="subject">${esc(q.subject)}</span>
             <span class="ai-verdict-chip ${vClass}">🤖 ${esc(verdict)}</span>
-            <span>#${esc(q.number)}</span>
+            <span title="${esc(q.number)}">#${esc(shortQuestionNumber(q.number))}</span>
             <span>${date(q.created)}</span>
             ${q.mastered ? '<span class="mastered">✓ 已掌握</span>' : ''}
           </div>
@@ -368,6 +368,7 @@ function draftForm() {
     </div>
     <div class="draft-meta-row">
       <label class="field"><span>所属学科</span><select id="draft-subject">${opts(draft.subject || currentSubject)}</select></label>
+      <label class="field"><span>题型</span><select id="draft-question-type">${draftQuestionTypeOptions(draft.subject || currentSubject, draft)}</select></label>
       ${field('题目来源', 'draft-source', draft.source || '')}
       <label class="field"><span>错因标签</span><select id="draft-verdict">${aiVerdictTags.map(v => `<option value="${v}" ${(draft.aiVerdict || inferAiVerdict(draft)) === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     </div>
@@ -378,6 +379,24 @@ function draftForm() {
       <button type="button" class="secondary" id="cancel-draft" style="flex:1">取消</button>
     </div>
   </dialog>`;
+}
+
+function draftQuestionTypes(subject, question) {
+  const choices = reviewTypeOptions(subject);
+  if (question && (question.subject || subject) === subject) {
+    const kind = normalizeQuestionType(question.questionType);
+    const label = question.questionTypeName || QUESTION_TYPE_NAMES[kind];
+    if (label && kind) choices.set(label, kind);
+  }
+  return choices;
+}
+
+function draftQuestionTypeOptions(subject, question, selected = '') {
+  const kind = normalizeQuestionType(question?.questionType);
+  const current = selected || question?.questionTypeName || QUESTION_TYPE_NAMES[kind] || '';
+  const choices = draftQuestionTypes(subject, question);
+  return '<option value="">未设置</option>' + [...choices].map(([name]) =>
+    `<option value="${esc(name)}" ${name === current ? 'selected' : ''}>${esc(name)}</option>`).join('');
 }
 
 let notebookFiltersOpen = false;
@@ -565,7 +584,7 @@ function filteredQuestions() {
         const matchSubj = (filter === '全部' || q.subject === filter) && (notebookStatus==='all' || (notebookStatus==='mastered'?q.mastered:!q.mastered));
         const verdict = inferAiVerdict(q);
         const matchAi = aiFilter === '全部' || verdict === aiFilter;
-        const matchQuery = [q.text, q.number, verdict, ...(q.tags || [])].join(' ').toLowerCase().includes(query.toLowerCase());
+        const matchQuery = [q.text, q.number, shortQuestionNumber(q.number), verdict, ...(q.tags || [])].join(' ').toLowerCase().includes(query.toLowerCase());
         const matchBook=typeof questionNotebook!=='function'||activeNotebook==='all'||questionNotebook(q)===activeNotebook;
         return matchBook && matchSubj && matchAi && matchQuery && notebookExtraMatch(q, profile);
       })
@@ -606,7 +625,7 @@ ${pracVerdictOptions.map(v => `<button type="button" class="chip ${practiceAiFil
 <span>选择一道错题（当前筛选下共 ${filteredQuestions.length} 题）</span>
 <select id="practice-source">
 <option value="">${filteredQuestions.length? '请选择错题…': '当前筛选下暂无错题'}</option>
-${filteredQuestions.map(q => `<option value="${esc(q.id)}" ${q.id === selectedPracticeId? 'selected': ''}>[${esc(inferAiVerdict(q))}] #${esc(q.number)} · ${esc(q.subject)} · ${esc(q.text.slice(0, 48))}</option>`).join('')}
+${filteredQuestions.map(q => `<option value="${esc(q.id)}" ${q.id === selectedPracticeId? 'selected': ''}>[${esc(inferAiVerdict(q))}] #${esc(shortQuestionNumber(q.number))} · ${esc(q.subject)} · ${esc(q.text.slice(0, 48))}</option>`).join('')}
 </select>
 </label>
 <div class="form-row variant-row">
@@ -1153,13 +1172,32 @@ function bindDraftEditor() {
   $('#cancel-draft').onclick = $('#cancel-draft-top').onclick = () => dialog.close();
   dialog.onclick = e => { if (e.target === dialog) dialog.close(); };
   dialog.onclose = () => { draft = null; editingId = null; dialog.remove(); };
+  const subjectField = $('#draft-subject');
+  const typeField = $('#draft-question-type');
+  subjectField.onchange = () => {
+    const subject = subjectField.value;
+    const current = typeField.value;
+    const options = draftQuestionTypes(subject, draft);
+    typeField.innerHTML = draftQuestionTypeOptions(subject, draft, current);
+    typeField.value = options.has(current) ? current : '';
+  };
   if ($('#save-draft')) $('#save-draft').onclick = e => run(e.target, async () => {
     const q = { ...draft };
-    q.subject = $('#draft-subject').value;
+    q.subject = subjectField.value;
+    const name = typeField.value;
+    const kind = draftQuestionTypes(q.subject, draft).get(name);
+    if (kind) {
+      q.questionType = kind;
+      q.questionTypeName = name;
+    } else {
+      delete q.questionType;
+      delete q.questionTypeName;
+    }
     q.aiVerdict = $('#draft-verdict') ? $('#draft-verdict').value : inferAiVerdict(q);
     q.source = $('#draft-source').value.trim();
     for (const k of ['text', 'mistake', 'answer', 'analysis', 'reminder']) q[k] = $('#draft-' + k).value.trim();
-    if(['text','mistake','answer'].some(k=>q[k]!==draft[k])){q.evidenceVerified=false;q.diagnosisStatus='pending';if(q.aiVerdict===(draft.aiVerdict||inferAiVerdict(draft)))q.aiVerdict='未判定'}
+    const changedType = normalizeQuestionType(q.questionType) !== normalizeQuestionType(draft.questionType);
+    if(changedType||['text','mistake','answer'].some(k=>q[k]!==draft[k])){q.evidenceVerified=false;q.diagnosisStatus='pending';if(q.aiVerdict===(draft.aiVerdict||inferAiVerdict(draft)))q.aiVerdict='未判定'}
     if (!q.text) throw Error('请补全题干');
     q.tags = $('#draft-tags').value.split(/[,，]/).map(t => t.trim()).filter(Boolean);
     q.id = uid();
@@ -1172,7 +1210,7 @@ function bindDraftEditor() {
       const original = data.questions.find(x => x.id === editingId);
       q.number = original.number;
       q.created = original.created; q.grade=original.grade; q.term=original.term;
-      await persist({ ...data, questions: data.questions.map(x => x.id === editingId ? { ...x, ...q } : x) });
+      await persist({ ...data, questions: data.questions.map(x => x.id === editingId ? q : x) });
       editingId = null;
       toast('✓ 错题修改已保存');
     } else {
@@ -1192,21 +1230,20 @@ function openQuestion(id) {
   $('#detail').innerHTML = `
     <div class="card-head detail-head">
       <select id="detail-subject" class="detail-subject-select" aria-label="更改科目">${opts(q.subject)}</select>
-      <span class="detail-number">#${esc(q.number)}</span>
-      ${q.source ? `<span class="detail-source">${esc(q.source)}</span>` : ''}
+      <span class="detail-number" title="${esc(q.number)}">${esc(shortQuestionNumber(q.number))}</span>
       <button type="button" class="detail-close" id="close-detail" aria-label="关闭">×</button>
     </div>
 
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;background:var(--surface-sub, #f8fafc);border-radius:10px">
-      <span style="font-size:12px;font-weight:700;color:var(--muted)">🤖 AI 判定标签：</span>
-      <select id="detail-verdict" style="width:auto;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600">
+    <div class="detail-verdict-row">
+      <label for="detail-verdict">AI 判定标签</label>
+      <select id="detail-verdict" title="${esc(curVerdict)}">
         ${aiVerdictTags.map(v => `<option value="${v}" ${curVerdict === v ? 'selected' : ''}>${v}</option>`).join('')}
       </select>
-      <button type="button" class="secondary" id="ai-diagnose-btn" style="padding:4px 10px;font-size:12px">✧ AI 重新诊断错因</button>
+      <button type="button" class="secondary" id="ai-diagnose-btn">AI 重新诊断错因</button>
     </div>
+    ${q.source ? `<p class="detail-question-source">来源 · ${esc(q.source)}</p>` : ''}
 
     <p class="prose">${esc(q.text)}</p>
-    ${q.questionType?`<p class="result-note">题型：${esc(q.questionTypeName||QUESTION_TYPE_NAMES[q.questionType]||'其他题型')}</p>`:''}
     <p class="result-note">作答证据：${q.evidenceVerified&&q.answerStatus==='confirmed'?'已人工核对孩子作答':q.answerStatus==='unanswered'?'已确认未作答':'未确认；不能据此诊断孩子错因'}</p>
     ${q.annotation?`<div class="analysis-block"><h3>批注／订正（非原始作答）</h3><p class="prose">${esc(q.annotation)}</p></div>`:''}
     ${q.visualFeatures?`<div class="analysis-block"><h3>加点／划线等视觉信息</h3><p class="prose">${esc(q.visualFeatures)}</p></div>`:''}

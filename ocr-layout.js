@@ -64,11 +64,29 @@ function structuredAnswerFields(p,i) {
   if(p.questionType==='fill')return `<div class="field"><div class="answer-tools"><span>孩子各空作答</span><label>空数 <input type="number" min="1" max="20" value="${p.blankCount}" data-answer-count="blanks" data-index="${i}"></label></div><div class="blank-answer-grid">${Array.from({length:p.blankCount},(_,j)=>`<label class="field"><span>第${j+1}空</span><input type="text" data-blank-answer="${j}" data-index="${i}" value="${esc(p.blankAnswers[j]||'')}" placeholder="填写孩子原始作答"></label>`).join('')}</div></div>`;
   return paperField(p.questionType==='calculation'?'孩子的计算结果与过程':'孩子实际作答','studentAnswer',p.studentAnswer,i,true);
 }
+function questionNumberPrefix(subject, grade, term, day) {
+  const middleGrade = /[（(](初[一二三])[）)]$/.exec(grade)?.[1];
+  const shortGrade = middleGrade || (grade.endsWith('年级') ? '小' + grade.slice(0, -2) : grade);
+  return `${subject.slice(0, 1)}-${shortGrade}${term}-${day.slice(-6)}-`;
+}
+
+function shortQuestionNumber(number) {
+  const legacy = /^([^-]+)-([^-]+)[（(]([上下])[）)]-(\d{8})-(\d+)$/.exec(number || '');
+  if (!legacy) return number || '';
+  const [, subject, grade, term, day, sequence] = legacy;
+  return questionNumberPrefix(subject, grade, term, day) + sequence;
+}
+
 function questionNumber(subject,date,existing,offset=0,profile=typeof getStudentProfile==='function'?getStudentProfile():{grade:'四年级',term:'上'}) {
-  const day=typeof date==='string'?date:new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(date).replace(/-/g,'');
-  const prefix=subject+'-'+profile.grade+'（'+profile.term+'）-'+day+'-';
-  const max=existing.reduce((n,q)=>q.number?.startsWith(prefix)?Math.max(n,Number(q.number.slice(prefix.length))||0):n,0);
-  return prefix+String(max+offset+1).padStart(3,'0');
+  const day = (typeof date === 'string' ? date : new Intl.DateTimeFormat('en-CA', {
+    timeZone:'Asia/Shanghai', year:'numeric', month:'2-digit', day:'2-digit'
+  }).format(date)).replace(/-/g, '');
+  const prefix = questionNumberPrefix(subject, profile.grade, profile.term, day);
+  const max = existing.reduce((latest, question) => {
+    const number = shortQuestionNumber(question.number);
+    return number.startsWith(prefix) ? Math.max(latest, Number(number.slice(prefix.length)) || 0) : latest;
+  }, 0);
+  return prefix + String(max + offset + 1).padStart(3, '0');
 }
 function answerReviewFields(p,i) {
   const subject=typeof paper!=='undefined'&&paper?paper.subject:currentSubject;
