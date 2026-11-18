@@ -25,7 +25,7 @@ const OCR_RULES = '你是忠实的图片转录员。只逐字照录，不解题�
 function cropView() {
  return `<section class="crop-editor inline-crop" id="crop-editor"><div class="crop-tools">
  <button type="button" class="crop-tool" id="rotate-left">↶ 左转</button><button type="button" class="crop-tool" id="rotate-right">↷ 右转</button><button type="button" class="crop-tool" id="crop-full">⛶ 全图</button><button type="button" class="crop-tool" id="crop-reset">✎ 重画</button><button type="button" class="crop-tool" id="crop-reselect">↻ 重新选图</button>
- </div><div class="crop-stage" id="crop-stage"><canvas id="crop-canvas" tabindex="0" aria-label="单指框选或移动选框；双指缩放、旋转和移动图片"></canvas></div><small class="crop-gesture-hint">单指框选／移动选框，双指缩放、旋转和移动图片</small></section>`;
+ </div><div class="crop-stage" id="crop-stage"><button type="button" id="clear-crop-image" aria-label="清除图片" title="清除图片">×</button><canvas id="crop-canvas" tabindex="0" aria-label="单指框选或移动选框；双指缩放、旋转和移动图片"></canvas></div><small class="crop-gesture-hint">单指框选／移动选框，双指缩放、旋转和移动图片</small></section>`;
 }
 
 function constrainRect(r) {
@@ -69,14 +69,13 @@ function cropPixels(r, w, h) {
 
 let cropCanvas = null, cropDraw = null, cropOriginal = null, cropCommit = null;
 
-function exportCrop() {
+function exportCrop(maxDim = 1800) {
   cropCommit?.();
   if (!cropCanvas || cropState.source !== image || !cropState.rect) throw Error('请先在图片上框选一道完整题目');
   const original=cropOriginal?.source===image?cropOriginal.img:null;
   const size=original?rotatedSize(original.naturalWidth,original.naturalHeight,cropState.rotation):cropCanvas;
   const p = cropPixels(cropState.rect, size.width, size.height);
   if (p.width < 24 || p.height < 24) throw Error('选框太小，请框入完整题目');
-  const maxDim = 1800;
   const scale = Math.min(1, maxDim / Math.max(p.width, p.height));
   const out = document.createElement('canvas');
   out.width = Math.max(1, Math.round(p.width * scale));
@@ -99,12 +98,12 @@ function exportCrop() {
 
 async function recognizeSelection() {
   if (!getStoredKey('shiti-key')) throw Error('请先在设置填写 DeepSeek API Key');
-  const src = mode === 'image' ? exportCrop() : '', text = $('#question-text')?.value || '';
+  const src = mode === 'image' ? exportCrop(1500) : '', text = $('#question-text')?.value || '';
   if (!src && !text.trim()) throw Error('请输入题目');
   const meta = { notebookId:typeof captureNotebookId==='function'?captureNotebookId():'default', subject: $('#subject').value, source: '', mistake: '' };
   meta.questionType=selectedCaptureQuestionType(meta.subject);
   progress('正在识别框内原文…');
-  const result = await ai(`${OCR_RULES}只转录此范围内实际存在的完整题目，若边缘缺失选项或材料应注明，不能补写框外内容。不需要寻找整卷题号，无大题标题用“框选题目”，无题号用“1”等位置号，不解题。${OCR_SCHEMA}${text ? JSON.stringify({ text }) : ''}`, src || null, { ocr: true, maxTokens: 6000 });
+  const result = await ai(`只转录此范围内实际存在的完整题目，若边缘缺失选项或材料应注明，不能补写框外内容。不需要寻找整卷题号，无大题标题用“框选题目”，无题号用“1”等位置号，不解题。${OCR_SCHEMA}${text ? JSON.stringify({ text }) : ''}`, src || null, { ocr: true, maxTokens: 4000 });
   const items = normalizeOCR(result);
   if (!items.length) throw Error('框内未识别到题目，请调整选框');
   paper = { ...meta, image: src, scope: 'crop', inventory: items.map(p => ({ section: p.section, number: p.number })), items, warnings: Array.isArray(result.warnings) ? result.warnings.map(String) : [], complete: true };

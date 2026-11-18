@@ -722,3 +722,23 @@ textarea { box-sizing:border-box; min-height:96px; }
 .answer-picker-pages button { min-height:40px; padding:6px 10px; font-size:12px; }
 .answer-picker-preview { border:1px solid var(--line); border-radius:8px; padding:10px; margin-bottom:10px; font-size:12px; color:var(--muted); }
 #answer-picker-preview { display:block; white-space:pre-wrap; max-height:72px; overflow:auto; margin-top:4px; color:var(--text); }
+/* v37: compact OCR review and controls shared by touch and desktop. */
+.ocr-notices { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; margin:6px 0 10px; font-size:11px; line-height:1.4; }
+.ocr-notices span { padding:3px 6px; border-radius:5px; }
+.ocr-info { color:#116c44; background:#1384521e; }
+.ocr-warning { color:#855100; background:#ca830022; }
+@media(prefers-color-scheme:dark) {
+  .ocr-info { color:#8bddb1; }
+  .ocr-warning { color:#ffd28e; }
+}
+.paper-answer-tools { display:grid; grid-template-columns:auto minmax(0,1fr); }
+#paper-selection-note { grid-column:2; grid-row:1; width:auto; }
+#paper-undo-answer { grid-column:1 / -1; justify-self:start; }
+.custom-type-field { grid-column:1 / -1; }
+.editable-type-grid > .custom-type-field[hidden] { display:none; }
+.draft-meta-row { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1fr) minmax(0,1fr); gap:8px; }
+.draft-meta-row .field { min-width:0; }
+.draft-meta-row input,.draft-meta-row select { width:100%; min-width:0; padding-inline:7px; }
+#clear-crop-image { position:absolute; top:8px; right:8px; z-index:2; width:44px; height:44px; padding:0; display:grid; place-items:center; background:#171b24dc; color:white; border:1px solid #fff7; border-radius:50%; font-size:24px; }
+.notebook-grade-bar { display:flex; align-items:center; gap:10px; margin:0 0 14px; color:var(--muted); font-size:13px; }
+.notebook-grade-bar select { width:min(230px,62%); }

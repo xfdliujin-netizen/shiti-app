@@ -14,7 +14,7 @@ vm.runInContext(`(async()=>{
   const cropped=exportCrop();assert.equal(cropped,'data:image/png;base64,Q1JPUA==');
   assert.match(OCR_RULES,/错字/);assert.match(OCR_RULES,/不能猜字补全/);assert.match(OCR_RULES,/禁止按语义/);
   const wrong='A. 程相并进，坚特，横七坚八';const normalized=normalizeOCR({items:[{section:'三',number:'2',text:wrong,studentAnswer:'错别自',uncertainty:''}]});assert.equal(normalized[0].text,wrong);assert.equal(normalized[0].studentAnswer,'错别自');
-  let count=0;ai=async(prompt,src,opts)=>{count++;assert.equal(src,cropped);assert.ok(!prompt.includes('ORIGINAL_FULL_IMAGE'));assert.equal(opts.ocr,true);assert.equal(opts.maxTokens,6000);return {items:[{section:'三',number:'2',text:wrong,studentAnswer:'错别自',uncertainty:''}]}};render=()=>{};
+  let count=0;ai=async(prompt,src,opts)=>{count++;assert.equal(src,cropped);assert.ok(!prompt.includes('ORIGINAL_FULL_IMAGE'));assert.equal(opts.ocr,true);assert.equal(opts.maxTokens,4000);return {items:[{section:'三',number:'2',text:wrong,studentAnswer:'错别自',uncertainty:''}]}};render=()=>{};
   await recognizeSelection();assert.equal(count,1);assert.equal(paper.image,cropped);assert.equal(paper.items[0].text,wrong);assert.equal(paper.scope,'crop');assert.equal(paper.items[0].analyzed,false);
   recordUsage({prompt_tokens:250,completion_tokens:80,total_tokens:330});recordUsage(null);assert.match(usageText(),/330/);assert.match(usageText(),/部分用量未知/);
   console.log('Passed: rotation bounds, crop constraints/pixels, missing-selection rejection, literal typo preservation, single-request cropped-only OCR, deferred analysis, usage aggregation.');

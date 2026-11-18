@@ -17,6 +17,6 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
  run('data=fixture');await run("ai('计算长方形周长',undefined,{learning:learningQuery})");assert.ok(c.calls[0].messages[1].content.includes('相关学习历史'));assert.equal(c.calls[0].model,'deepseek-chat');
  const before=c.calls.length;await assert.rejects(()=>run("ai('长'.repeat(10000),undefined,{learning:learningQuery})"),/输入预算/);assert.equal(c.calls.length,before,'oversized input rejected before network');
  await run("ai('逐字转录','data:image/png;base64,AA',{ocr:true,learning:learningQuery})");const imageCall=c.calls.at(-1);assert.equal(imageCall.model,'deepseek-flash');assert.ok(!JSON.stringify(imageCall.messages).includes('相关学习历史'));assert.equal(imageCall.messages[1].content[1].type,'image_url');
- run("cfg.ocrVisionModel='custom-vision'");await run("ai('逐字转录','data:image/png;base64,AA',{ocr:true})");assert.equal(c.calls.at(-1).model,'custom-vision');
+ run("cfg.ocrVisionModel='custom-vision'");await run("ai('逐字转录','data:image/png;base64,AA',{ocr:true})");assert.equal(c.calls.at(-1).model,'custom-vision');assert.equal(c.calls.at(-1).thinking?.type,'disabled');
  console.log('Passed: evidence-based summaries, self-rating separation, deleted/cross-subject/grade/term exclusions, 10K-record bounded history, cache invalidation, no-network budget rejection, OCR history isolation and vision-model routing.');
 })().catch(e=>{console.error(e);process.exitCode=1});

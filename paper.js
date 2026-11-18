@@ -25,7 +25,7 @@ function paperView() {
       </div>
       ${typeof paperMetadataFields==='function'?paperMetadataFields():''}
       ${paper.image ? `<div id="paper-crop-image-box" style="margin-bottom:10px;background:#f8fafc;padding:8px;border-radius:10px;text-align:center"><img id="paper-crop-img" class="paper-original" src="${paper.image}" alt="框选原图，点击全屏查看" title="点击全屏查看" style="max-height:180px;width:auto;margin:0 auto;display:block;cursor:zoom-in"></div><dialog id="paper-lightbox" class="image-lightbox"><button type="button" class="lightbox-close" id="paper-lightbox-close" aria-label="关闭">×</button><img id="paper-lightbox-img" alt="框选图全屏预览"></dialog>` : ''}
-      ${paper.warnings.map(w=>`<p class="result-note">${esc(w)}</p>`).join('')}
+      ${paper.ocrProvider === 'baidu' && paper.warnings.length ? `<div class="ocr-notices">${paper.warnings.map(w => `<span class="${w.startsWith('已保留') ? 'ocr-info' : 'ocr-warning'}">${esc(w)}</span>`).join('')}</div>` : paper.warnings.map(w => `<p class="result-note">${esc(w)}</p>`).join('')}
       <label class="field"><span>原题（仅题干、印刷选项和空位；请移出手写答案与订正，不修正原卷错字）</span><textarea class="paper-textarea" data-paper="text" data-index="0">${esc(p.text)}</textarea></label>
       ${typeof answerTransferTools==='function'?answerTransferTools():''}
       ${typeof rawOCRView === 'function' ? rawOCRView() : ''}

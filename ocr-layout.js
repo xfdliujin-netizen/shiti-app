@@ -40,7 +40,7 @@ function ensureAnswerStructure(p,subject) {
     const lines=String(p.studentAnswer||'').split('\n'),numbered=lines.length&&lines.every(x=>/^第\d+空[：:]/.test(x));
     p.blankAnswers=numbered?lines.map(x=>x.replace(/^第\d+空[：:]/,'')):p.studentAnswer?[p.studentAnswer]:[];
   }
-  p.blankCount=Math.min(20,Math.max(1,Number(p.blankCount)||Math.max(3,p.blankAnswers.length)));
+  p.blankCount=Math.min(20,Math.max(1,Number(p.blankCount)||Math.max(2,p.blankAnswers.length)));
   p.optionCount=Math.min(8,Math.max(2,Number(p.optionCount)||Math.max(5,...p.choices.map(x=>x.charCodeAt(0)-64))));
 }
 function updateStructuredAnswer(p) {
@@ -53,7 +53,7 @@ function switchQuestionType(p,type,subject) {
   p.answerDrafts[p.questionType]={studentAnswer:p.studentAnswer||'',choices:[...p.choices],blankAnswers:[...p.blankAnswers],blankCount:p.blankCount,optionCount:p.optionCount};
   p.questionType=questionTypesFor(subject).includes(type)?type:'other';
   const saved=p.answerDrafts[p.questionType];
-  p.studentAnswer=saved?.studentAnswer||'';p.choices=saved?.choices||[];p.blankAnswers=saved?.blankAnswers||[];p.blankCount=saved?.blankCount||3;p.optionCount=saved?.optionCount||5;
+  p.studentAnswer=saved?.studentAnswer||'';p.choices=saved?.choices||[];p.blankAnswers=saved?.blankAnswers||[];p.blankCount=saved?.blankCount||2;p.optionCount=saved?.optionCount||5;
   updateStructuredAnswer(p);
   p.answerStatus='unknown';invalidatePaperEvidence(p);
 }

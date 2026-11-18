@@ -129,11 +129,11 @@ async function recognizeWithBaidu() {
     const layout = arrangeOCRLines(raw.words_result);
     mergedTranscript = layout.text;
     mergedCount = Math.max(0, transcript.split('\n').length - mergedTranscript.split('\n').length);
-    if (!layout.located) warnings.push('代理没有返回完整行坐标，保留原始顺序；请更新代理或切换含位置版，不按语义猜测合并。');
+    if (!layout.located) warnings.push('缺少坐标，按原顺序显示');
     if (raw.words_result.some(p => p.probability && Number(p.probability.average) < 0.8)) {
-      warnings.push('部分行的识别置信度偏低，请重点核对。');
+      warnings.push('识别置信度偏低，请复核');
     }
-    warnings.push('已按原文保留百度识别结果（包含可能的手写或原卷错字），核对后即可分析或直接收录。');
+    warnings.push('已保留原文，请核对');
   }
   const items = normalizeOCR({ items: [{ section: src ? '框选题目' : '文字录入', number: '1', text: mergedTranscript, studentAnswer: '', uncertainty: '' }] });
   if (typeof window !== 'undefined' && window.document && items[0] && !globalThis.assert) {
@@ -153,7 +153,7 @@ async function recognizeWithBaidu() {
     complete: true
   };
   items.forEach(p=>{p.verified=false;p.answerStatus='confirmed';p.annotation='';p.visualFeatures=''});
-  if(/加点|划线|画线|下划线|图中/.test(transcript))paper.warnings.push('本题依赖加点、划线或图示，OCR 文字未保留这些视觉信息，请在视觉信息栏人工补充后再分析。');
+  if(/加点|划线|画线|下划线|图中/.test(transcript))paper.warnings.push('请补充加点、划线或图示');
   draft = null;
   editingId = null;
   progress(src ? '识别已返回，请核对原题，并单独确认孩子作答。坐标整理不代表内容已识别正确。' : '文字已录入，请核对题干与孩子作答。');
