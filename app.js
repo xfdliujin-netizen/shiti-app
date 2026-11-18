@@ -582,6 +582,8 @@ function subjectPicker(group, values, selected) {
 function variantsPage() {
 const p = getStudentProfile();
 const subjList = getQuickSubjects();
+const sourceQuestion = data.questions.find(q => q.id === selectedPracticeId);
+if (sourceQuestion?.subject === practiceSubject && !subjList.includes(practiceSubject)) subjList.push(practiceSubject);
 if (!subjList.includes(practiceSubject)) practiceSubject = subjList[0] || '语文';
 
 const usedVerdicts = [...new Set(data.questions.map(q => inferAiVerdict(q)))];
@@ -941,7 +943,96 @@ async function loadImage(f) {
   reader.readAsDataURL(f);
 }
 
-function bindOpen() { document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => openQuestion(b.dataset.open)); }
+function startQuestionPractice(question, dialog) {
+  selectedPracticeId = question.id;
+  practiceSubject = question.subject;
+  practiceAiFilter = '全部';
+  dialog.close();
+  location.hash = 'variants';
+  render();
+}
+
+function deleteNotebookQuestion(id, button, dialog) {
+  if (!confirm('删除这道错题？删除操作也会参与云端同步。')) return;
+  return run(button, async () => {
+    await persist({ ...data, questions: data.questions.filter(q => q.id !== id), deleted: { ...data.deleted, [id]: stamp() } });
+    dialog.close();
+    render();
+  });
+}
+
+function openQuestionActions(id) {
+  const question = data.questions.find(q => q.id === id);
+  if (!question || $('.question-actions-dialog[open]')) return;
+  const dialog = document.createElement('dialog');
+  dialog.className = 'compact-dialog question-actions-dialog';
+  dialog.setAttribute('aria-labelledby', 'question-actions-title');
+  dialog.innerHTML = `<div class="card-head"><h2 id="question-actions-title">错题操作</h2>
+    <button type="button" class="dialog-x" data-close aria-label="关闭" autofocus>×</button></div>
+    <div class="question-action-list">
+      <button type="button" class="secondary" data-practice>举一反三</button>
+      <button type="button" class="notebook-print-button" data-print>导出打印</button>
+      <button type="button" class="secondary danger" data-delete>删除</button>
+    </div>`;
+  const find = selector => dialog.querySelector(selector);
+  find('[data-close]').onclick = () => dialog.close();
+  find('[data-practice]').onclick = () => startQuestionPractice(question, dialog);
+  find('[data-delete]').onclick = event => deleteNotebookQuestion(id, event.currentTarget, dialog);
+  find('[data-print]').onclick = event => run(event.currentTarget, () => {
+    dialog.close();
+    openNotebookPrint(id);
+  });
+  dialog.onclick = event => { if (event.target === dialog) dialog.close(); };
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
+function bindOpen(withActions) {
+  document.querySelectorAll('[data-open]').forEach(card => {
+    const id = card.dataset.open;
+    let timer, press, suppressClick = false;
+    card.onclick = event => {
+      if (suppressClick && event.detail > 0) {
+        suppressClick = false;
+        return;
+      }
+      openQuestion(id);
+    };
+    if (!withActions) return;
+    card.classList.add('question-hold');
+    function cancelPress() {
+      clearTimeout(timer);
+      press = null;
+    }
+    function showActions() {
+      cancelPress();
+      if (!card.isConnected) return;
+      suppressClick = true;
+      openQuestionActions(id);
+    }
+    card.onpointerdown = event => {
+      if (!event.isPrimary || event.button !== 0) return;
+      cancelPress();
+      suppressClick = false;
+      press = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      timer = setTimeout(showActions, 520);
+    };
+    card.onpointermove = event => {
+      if (press?.id === event.pointerId && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 10) cancelPress();
+    };
+    card.onpointerup = card.onpointercancel = card.onpointerleave = cancelPress;
+    card.oncontextmenu = event => {
+      event.preventDefault();
+      if (!suppressClick && (event.pointerType !== 'touch' || press)) showActions();
+    };
+    card.onkeydown = event => {
+      if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+      event.preventDefault();
+      showActions();
+    };
+  });
+}
 
 function bindSubjectConfigEvents() {
   if ($('#toggle-subj-cfg')) $('#toggle-subj-cfg').onclick = () => { showSubjectConfig = !showSubjectConfig; render(); };
@@ -971,7 +1062,7 @@ function bindSubjectConfigEvents() {
 }
 
 function bind(tab) {
-  bindOpen();
+  bindOpen(tab === 'notebook');
   bindSubjectConfigEvents();
   if(tab==='notebook')bindNotebookWorkspace();
   if(tab==='libraries'){bindLibraries();bindPractice()}
@@ -1102,7 +1193,7 @@ function openQuestion(id) {
       <details ${validFigureRegion(q.figureRegion) ? '' : 'open'}><summary>原题图片</summary><img src="${esc(q.image)}" alt="原题图片" class="saved-figure"></details>` : ''}
     ${rawOcr ? `<details style="margin-top:10px;padding:8px 12px;background:var(--surface-sub, #f8fafc);border-radius:10px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--muted)">查看百度 OCR 原始转录（默认收起）</summary><div class="prose" style="margin-top:8px;font-size:13px;color:var(--muted)">${esc(rawOcr)}</div></details>` : ''}
     ${[['孩子的错误作答 / 困惑', q.mistake], ['正确答案', q.answer], ['解题步骤', q.analysis], ['易错提醒', q.reminder], ['知识点', (q.tags || []).join(' · ')]].filter(x => x[1]).map(x => `<div class="analysis-block"><h3>${x[0]}</h3><div class="prose">${esc(x[1])}</div></div>`).join('')}
-    <div class="actions">
+    <div class="actions detail-question-actions">
       <button class="primary" id="master">${q.mastered ? '重新巩固' : '标记已掌握'}</button>
       <button class="secondary" id="edit-q">编辑</button>
       <button class="secondary" id="practice-q">举一反三</button>
@@ -1163,16 +1254,8 @@ function openQuestion(id) {
     render();
   });
   $('#edit-q').onclick = () => { editingId = id; draft = { ...q }; openDraftOnRender = true; $('#detail').close(); render(); };
-  $('#practice-q').onclick = () => {
-    selectedPracticeId = id;
-    practiceSubject = q.subject;
-    practiceAiFilter = '全部';
-    $('#detail').close();
-    location.hash = 'variants';
-    render();
-    if ($('#practice-source')) $('#practice-source').value = id;
-  };
-  $('#delete-q').onclick = e => { if (!confirm('删除这道错题？删除操作也会参与云端同步。')) return; run(e.target, async () => { await persist({ ...data, questions: data.questions.filter(x => x.id !== id), deleted: { ...data.deleted, [id]: stamp() } }); $('#detail').close(); render(); }); };
+  $('#practice-q').onclick = () => startQuestionPractice(q, $('#detail'));
+  $('#delete-q').onclick = e => deleteNotebookQuestion(id, e.currentTarget, $('#detail'));
 }
 
 function bindPractice() {
