@@ -205,6 +205,7 @@ async function persist(next = data) {
 }
 
 function toast(s) {
+  if (typeof modalNotifications !== 'undefined') return modalNotifications.show(s);
   const el = $('#toast');
   if (!el) return;
   el.textContent = s;
@@ -349,8 +350,13 @@ function capture() {
 
     <div id="paper-area">${paper ? `<dialog id="paper-dialog" class="paper-dialog"><div class="paper-dialog-close-wrap"><button type="button" class="detail-close" id="paper-dialog-close" aria-label="关闭">×</button></div>${pView}</dialog><button type="button" class="secondary" id="open-paper">📄 查看识别结果 · ${paper.items.length} 题</button>` : ''}</div>
 
-    <div class="section-title"><h2>最近收录</h2><a class="text-button" href="#notebook">查看全部 (${data.questions.length}) →</a></div>
-    ${cards([...data.questions].sort((a, b) => b.created.localeCompare(a.created)).slice(0, 3))}`;
+    <details id="recent-entries" class="recent-entries" ${$('#recent-entries')?.open ? 'open' : ''}>
+      <summary><span>最近收录</span><span class="recent-entries-indicator" aria-hidden="true"></span></summary>
+      <div class="recent-entries-body">
+        ${cards([...data.questions].sort((a, b) => b.created.localeCompare(a.created)).slice(0, 3))}
+        <a class="text-button" href="#notebook">查看全部（${data.questions.length}）→</a>
+      </div>
+    </details>`;
 }
 
 function draftForm() {

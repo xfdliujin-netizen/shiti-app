@@ -742,3 +742,63 @@ textarea { box-sizing:border-box; min-height:96px; }
 #clear-crop-image { position:absolute; top:8px; right:8px; z-index:2; width:44px; height:44px; padding:0; display:grid; place-items:center; background:#171b24dc; color:white; border:1px solid #fff7; border-radius:50%; font-size:24px; }
 .notebook-grade-bar { display:flex; align-items:center; gap:10px; margin:0 0 14px; color:var(--muted); font-size:13px; }
 .notebook-grade-bar select { width:min(230px,62%); }
+
+/* Keep the sheet header visible and give the body a bounded scrolling area. */
+dialog.settings-sheet[open] {
+  display: flex;
+  flex-direction: column;
+  max-height: 88dvh;
+}
+.settings-sheet > .sheet-grabber,
+.settings-sheet > .sheet-head { flex-shrink: 0; }
+.settings-sheet > .sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y pinch-zoom;
+}
+@media (max-width: 767px) {
+  dialog.settings-sheet[open] { max-height: 92dvh; }
+}
+#toast[popover] {
+  inset: calc(16px + env(safe-area-inset-top)) auto auto 50%;
+  margin: 0;
+  border: 0;
+  width: max-content;
+  max-width: min(92vw, 520px);
+  background: #1c1c1e;
+  overflow-wrap: anywhere;
+}
+dialog > #toast:not([popover]) {
+  position: absolute;
+  max-width: 94%;
+  top: 8px;
+}
+.recent-entries { margin-top: 16px; }
+.recent-entries > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 650;
+  cursor: pointer;
+  list-style: none;
+}
+.recent-entries > summary::-webkit-details-marker { display: none; }
+.recent-entries-indicator {
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.recent-entries[open] .recent-entries-indicator { transform: rotate(225deg); }
+.recent-entries-body { display: grid; gap: 10px; margin-top: 10px; }
+.recent-entries-body > .text-button { justify-self: end; }
