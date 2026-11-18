@@ -146,7 +146,7 @@ export function createOCRService(fetcher = globalThis.fetch) {
       }
       if (figureMode) {
         if (!Array.isArray(j.layouts) && j.layouts_num !== 0) return reply(502,{error:'百度未返回版面布局，请手动框选'});
-        const figures = (j.layouts || []).filter(block => block && ['figure','table'].includes(block.layout))
+        const figures = (Array.isArray(j.layouts) ? j.layouts : []).filter(block => block && ['figure','table'].includes(block.layout))
           .map(block => block.layout_location)
           .filter(points => Array.isArray(points) && points.length === 4 && points.every(point => point && Number.isFinite(point.x) && Number.isFinite(point.y)))
           .slice(0, 30);
