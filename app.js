@@ -988,6 +988,24 @@ function openQuestionActions(id) {
   dialog.showModal();
 }
 
+function suppressHeldPointerClick(pointerId) {
+  const listeners = new AbortController();
+  const options = { capture: true, signal: listeners.signal };
+  // The browser can deliver the release click to the newly opened dialog.
+  document.addEventListener('pointerdown', () => listeners.abort(), options);
+  const finish = event => {
+    if (event.pointerId === pointerId) setTimeout(() => listeners.abort(), 500);
+  };
+  document.addEventListener('pointerup', finish, options);
+  document.addEventListener('pointercancel', finish, options);
+  document.addEventListener('click', event => {
+    if (event.pointerId !== pointerId && (event.pointerId !== undefined || !event.detail)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    listeners.abort();
+  }, options);
+}
+
 function bindOpen(withActions) {
   document.querySelectorAll('[data-open]').forEach(card => {
     const id = card.dataset.open;
@@ -1006,8 +1024,10 @@ function bindOpen(withActions) {
       press = null;
     }
     function showActions() {
+      const pointerId = press?.id;
       cancelPress();
       if (!card.isConnected) return;
+      if (pointerId !== undefined) suppressHeldPointerClick(pointerId);
       suppressClick = true;
       openQuestionActions(id);
     }
