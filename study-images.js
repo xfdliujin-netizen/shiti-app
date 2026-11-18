@@ -34,30 +34,48 @@ async function studyImageCopy(src, mode = 'original', region = null) {
 }
 
 function whitenStudyPaper({ width, height, data }, blackWhite) {
-  // Estimate local paper brightness from bright regions, then interpolate to avoid tile edges.
-  const step = Math.max(16, Math.round(Math.min(width, height) / 12));
+  // Estimate paper from the bright part of each neighborhood, excluding isolated glare.
+  const step = Math.max(12, Math.round(Math.min(width, height) / 20));
   const cols = Math.ceil(width / step), rows = Math.ceil(height / step);
-  const light = new Uint8Array(cols * rows);
+  const bins = 32;
+  const histogram = new Uint32Array(cols * rows * bins);
+  const background = new Uint8Array(cols * rows);
   for (let y = 0; y < height; y++) {
+    const row = Math.floor(y / step) * cols;
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
       const value = Math.round(.299 * data[i] + .587 * data[i + 1] + .114 * data[i + 2]);
       data[i] = value;
-      const cell = Math.floor(y / step) * cols + Math.floor(x / step);
-      light[cell] = Math.max(light[cell], value);
+      histogram[(row + Math.floor(x / step)) * bins + (value >> 3)]++;
     }
   }
-  const background = (x, y) => Math.max(70, light[y * cols + x]);
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const cell = row * cols + col;
+      const pixels = Math.min(step, width - col * step) * Math.min(step, height - row * step);
+      const brightCount = Math.ceil(pixels * .18);
+      let seen = 0;
+      for (let bin = bins - 1; bin >= 0; bin--) {
+        seen += histogram[cell * bins + bin];
+        if (seen < brightCount) continue;
+        background[cell] = Math.max(60, bin * 8 + 4);
+        break;
+      }
+    }
+  }
+  const paperAt = (x, y) => background[y * cols + x];
   for (let y = 0; y < height; y++) {
     const gy = Math.max(0, y / step - .5), top = Math.floor(gy), bottom = Math.min(rows - 1, top + 1);
     for (let x = 0; x < width; x++) {
       const gx = Math.max(0, x / step - .5), left = Math.floor(gx), right = Math.min(cols - 1, left + 1);
-      const upper = background(left, top) + (background(right, top) - background(left, top)) * (gx - left);
-      const lower = background(left, bottom) + (background(right, bottom) - background(left, bottom)) * (gx - left);
+      const upper = paperAt(left, top) + (paperAt(right, top) - paperAt(left, top)) * (gx - left);
+      const lower = paperAt(left, bottom) + (paperAt(right, bottom) - paperAt(left, bottom)) * (gx - left);
       const paper = upper + (lower - upper) * (gy - top);
       const i = (y * width + x) * 4;
-      const density = (paper - data[i]) / paper;
-      const value = blackWhite ? (density >= .20 ? 0 : 255) : 255 - Math.max(0, density - .035) * 435;
+      const gap = paper - data[i];
+      const value = blackWhite
+        ? (gap >= Math.max(12, paper * .15) ? 0 : 255)
+        : 255 - Math.max(0, gap - Math.max(8, paper * .055)) / paper * 580;
       data[i] = data[i + 1] = data[i + 2] = value;
     }
   }
@@ -103,10 +121,33 @@ async function removeStudyHandwriting(src) {
   image.src = src;
   await image.decode();
   const photo = studyPhotoForBaidu(image, 15);
+  const inputInk = studyPhotoInk(image);
   const cleaned = await callBaiduOCR(photo.src, 'remove-handwriting');
   image.src = cleaned;
   await image.decode();
+  const expectedRatio = photo.width / photo.height;
+  const actualRatio = image.naturalWidth / image.naturalHeight;
+  if (Math.abs(actualRatio / expectedRatio - 1) > .08) throw Error('返回图片的版面尺寸异常');
+  if (inputInk >= 40 && studyPhotoInk(image) < Math.max(6, inputInk * .04)) {
+    throw Error('返回图片几乎空白，可能误删了印刷内容');
+  }
   return cleaned;
+}
+
+function studyPhotoInk(image) {
+  const scale = 360 / Math.max(image.naturalWidth, image.naturalHeight);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  whitenStudyPaper(pixels, true);
+  let ink = 0;
+  for (let i = 0; i < pixels.data.length; i += 4) if (pixels.data[i] === 0) ink++;
+  return ink;
 }
 
 async function openFigurePicker(src, previous, allowDetection = true) {

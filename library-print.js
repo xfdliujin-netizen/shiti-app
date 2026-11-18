@@ -40,7 +40,7 @@ async function preparePrintImages(sheet, mode, attachment, isCurrent, cleanedCop
     const source = isStudyImage(item.image) ? item.image : '';
     const hasFigure = source && validFigureRegion(item.figureRegion);
     const includeSource = printsSourcePhoto(item, attachment);
-    const printSource = cleanedCopies.has(source) ? cleanedCopies.get(source) : source;
+    const printSource = cleanedCopies.get(source) || source;
     let image = '', extraImage = '', isFigure = false;
     try {
       if (hasFigure) {
@@ -78,7 +78,8 @@ function launchLibraryPrint(sheet, includeAnswers = false) {
       <label>照片效果 <select data-print-image-mode>
         <option value="gray">增强灰度</option><option value="bw">黑白扫描</option><option value="original">原图</option>
       </select></label>
-      <button type="button" class="secondary" data-clean-photos>去手写</button>` : ''}
+      <button type="button" class="secondary" data-clean-photos>去手写</button>
+      <button type="button" class="secondary" data-reset-photos hidden>恢复处理前照片</button>` : ''}
     <button type="button" class="secondary" data-print-download disabled>下载文档</button>
     <button type="button" class="primary" data-print-now disabled>打印／存 PDF</button>
     <button type="button" class="secondary" data-print-close aria-label="关闭预览">×</button>
@@ -92,9 +93,11 @@ function launchLibraryPrint(sheet, includeAnswers = false) {
   const mode = dialog.querySelector('[data-print-image-mode]');
   const source = dialog.querySelector('[data-print-source]');
   const clean = dialog.querySelector('[data-clean-photos]');
+  const resetPhotos = dialog.querySelector('[data-reset-photos]');
   const status = dialog.querySelector('[data-print-status]');
   const cleanedCopies = new Map();
   let cleaning = false;
+  let cleanNotice = '';
   let documentUrl, html, revision = 0;
   const sourcePhotos = () => [...new Set(sheet.items.filter(item => printsSourcePhoto(item, source.value)).map(item => item.image))];
   async function update() {
@@ -107,17 +110,17 @@ function launchLibraryPrint(sheet, includeAnswers = false) {
     const outstanding = photos.filter(photo => !cleanedCopies.has(photo)).length;
     if (mode) {
       mode.disabled = !photos.length;
-      clean.disabled = cleaning || !photos.length;
-      clean.textContent = outstanding ? `去手写（${outstanding} 张）` : photos.length ? '恢复手写原图' : '去手写';
+      clean.disabled = cleaning || !outstanding;
+      clean.textContent = outstanding ? `去手写（${outstanding} 张）` : photos.length ? '已去手写' : '去手写';
+      resetPhotos.hidden = !cleanedCopies.size;
     }
     const output = mode ? await preparePrintImages(sheet, mode.value, source.value, current, cleanedCopies) : { sheet, failures: 0 };
     if (!output || !current()) return;
     if (documentUrl) URL.revokeObjectURL(documentUrl);
     documentUrl = undefined;
     html = libraryPrintHtml(output.sheet, includeAnswers);
-    const failed = photos.filter(photo => cleanedCopies.has(photo) && !cleanedCopies.get(photo)).length;
     const notices = [];
-    if (failed) notices.push(`${failed} 张照片去手写失败，已从本次导出中省略。可恢复原图后重新尝试。`);
+    if (cleanNotice) notices.push(cleanNotice);
     if (output.failures) notices.push(`${output.failures} 道题的图片转换未完成，请核对预览。`);
     status.hidden = !notices.length;
     status.textContent = notices.join(' ');
@@ -139,18 +142,20 @@ function launchLibraryPrint(sheet, includeAnswers = false) {
   }
   if (mode) mode.onchange = update;
   if (source) source.onchange = update;
+  if (resetPhotos) resetPhotos.onclick = () => {
+    cleanedCopies.clear();
+    cleanNotice = '';
+    update();
+  };
   if (clean) clean.onclick = async () => {
     const photos = sourcePhotos();
     const pending = photos.filter(photo => !cleanedCopies.has(photo));
-    if (!pending.length) {
-      cleanedCopies.clear();
-      update();
-      return;
-    }
+    if (!pending.length) return;
     if (!confirm(`将这 ${pending.length} 张照片提交百度「文档去手写 V2」，每张使用 1 次调用额度。继续吗？`)) return;
     cleaning = true;
+    cleanNotice = '';
     ++revision;
-    mode.disabled = source.disabled = clean.disabled = print.disabled = download.disabled = true;
+    mode.disabled = source.disabled = clean.disabled = resetPhotos.disabled = print.disabled = download.disabled = true;
     status.hidden = false;
     try {
       for (let index = 0; index < pending.length && dialog.open; index++) {
@@ -158,14 +163,13 @@ function launchLibraryPrint(sheet, includeAnswers = false) {
         try {
           cleanedCopies.set(pending[index], await removeStudyHandwriting(pending[index]));
         } catch (error) {
-          pending.slice(index).forEach(photo => cleanedCopies.set(photo, null));
-          toast(error.message || '无法去手写');
+          cleanNotice = `${pending.length - index} 张照片未处理，仍显示处理前的照片，可能含手写答案。${error.message || ''}`;
           break;
         }
       }
     } finally {
       cleaning = false;
-      if (dialog.open) { source.disabled = false; update(); }
+      if (dialog.open) { source.disabled = resetPhotos.disabled = false; update(); }
     }
   };
   print.onclick = () => {
