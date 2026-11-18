@@ -117,21 +117,21 @@ export function createOCRService(fetcher = globalThis.fetch) {
     if (!m || m[2].length % 4 !== 0) return reply(400, { error: '需要 PNG 或 JPEG 的 base64 图片' });
     if (m[2].length > MAX_IMAGE) return reply(413, { error: '图片编码超过 10 MB，请缩小选框' });
     const mode = body.mode || 'basic';
-    if (!['basic','accurate','figures'].includes(mode)) return reply(400,{error:'不支持的 OCR 模式'});
+    if (!['basic','accurate','figures','remove-handwriting'].includes(mode)) return reply(400,{error:'不支持的 OCR 模式'});
     const figureMode = mode === 'figures';
-    const form = new URLSearchParams(figureMode
-      ? { image: m[2], layout_analysis: 'true', detect_direction: 'false' }
-      : {
-        image: m[2], detect_direction: 'true', probability: 'true', paragraph: 'false',
-        ...(mode === 'accurate' ? {recognize_granularity:'small',char_probability:'true'} : {})
-      });
-    if (figureMode && (m[1] === 'webp' || form.toString().length > 4_000_000)) {
-      return reply(400,{error:'题图定位需要小于 4 MB 的 JPEG 或 PNG，请缩小范围或手动框选'});
+    const cleanMode = mode === 'remove-handwriting';
+    const params = figureMode ? { layout_analysis: 'true', detect_direction: 'false' }
+      : cleanMode ? { enable_detect: 'false', enable_ori: '0' }
+      : { detect_direction: 'true', probability: 'true', paragraph: 'false',
+          ...(mode === 'accurate' ? {recognize_granularity:'small',char_probability:'true'} : {}) };
+    const form = new URLSearchParams({ image: m[2], ...params });
+    if ((figureMode || cleanMode) && (m[1] === 'webp' || form.toString().length > 4_000_000)) {
+      return reply(400,{error:'图片需为小于 4 MB 的 JPEG 或 PNG，请缩小范围'});
     }
 
     try {
       const token = await accessToken(env);
-      const api = figureMode ? 'doc_analysis' : mode === 'accurate' ? 'accurate' : 'accurate_basic';
+      const api = cleanMode ? 'remove_handwriting_v2' : figureMode ? 'doc_analysis' : mode === 'accurate' ? 'accurate' : 'accurate_basic';
       const r = await fetcher('https://aip.baidubce.com/rest/2.0/ocr/v1/' + api + '?access_token=' + encodeURIComponent(token), {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -143,6 +143,15 @@ export function createOCRService(fetcher = globalThis.fetch) {
       if (j.error_code) {
         if ([110, 111].includes(Number(j.error_code))) cached = null;
         return reply(200, { error_code: j.error_code });
+      }
+      if (cleanMode) {
+        const processed = j.image_processed;
+        if (typeof processed !== 'string' || processed.length > MAX_IMAGE || !/^[A-Za-z0-9+/]+={0,2}$/.test(processed)) {
+          return reply(502,{error:'百度未返回有效的去手写照片'});
+        }
+        const imageType = processed.startsWith('/9j/') ? 'jpeg' : processed.startsWith('iVBORw0KGgo') ? 'png' : '';
+        if (!imageType) return reply(502,{error:'百度返回的去手写图片格式不支持'});
+        return reply(200,{image: `data:image/${imageType};base64,${processed}`});
       }
       if (figureMode) {
         if (!Array.isArray(j.layouts) && j.layouts_num !== 0) return reply(502,{error:'百度未返回版面布局，请手动框选'});

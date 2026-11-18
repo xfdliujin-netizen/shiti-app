@@ -106,7 +106,13 @@ async function callBaiduOCR(src, requestMode = cfg.ocrMode || 'accurate') {
   if (!response.ok) throw Error(result.error || `OCR 代理错误（${response.status}）`);
   if (result.error_code) {
     if (requestMode === 'figures' && Number(result.error_code) === 6) throw Error('请给百度应用添加「试卷分析与识别」接口权限，或手动框选');
+    if (requestMode === 'remove-handwriting' && Number(result.error_code) === 6) throw Error('请给百度应用添加「文档去手写 V2」接口权限');
     throw Error(baiduError(result.error_code));
+  }
+  if (requestMode === 'remove-handwriting') {
+    if (!isStudyImage(result.image)) throw Error('代理未返回去手写照片');
+    baiduUsage.calls++;
+    return result.image;
   }
   if (requestMode === 'figures') {
     if (!Array.isArray(result.figures)) throw Error('代理未返回题图位置，请手动框选');

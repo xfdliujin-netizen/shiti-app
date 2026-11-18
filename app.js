@@ -535,6 +535,7 @@ function bindNotebookPrint() {
   $('#notebook-print-confirm').onclick = event => run(event.currentTarget, () => {
     const items = getItems().map(q => ({
       ...q,
+      recordId: q.id,
       printReviewed: Boolean(q.evidenceVerified),
       source: q.source || '个人错题记录',
       license: '来源许可待核对',
@@ -1218,9 +1219,11 @@ function bindPractice() {
         title: `拾题 · ${prof.grade}${subjLabel}错题重练卷`,
         created: new Date().toLocaleDateString('zh-CN'),
         items: chosen.map(q => ({
+          recordId: q.id,
           subject: q.subject,
           source: q.source || `#${q.number}`,
           text: q.text,
+          questionType: q.questionType,
           image: q.image || '',
           figureRegion: q.figureRegion,
           answer: q.answer,

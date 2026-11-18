@@ -79,18 +79,34 @@ function layoutFigureRegions(figures, width, height) {
   }).sort((a, b) => a.y - b.y || a.x - b.x);
 }
 
-async function detectStudyFigures(image) {
+function studyPhotoForBaidu(image, minimumSide) {
   const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
   canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-  if (Math.min(canvas.width, canvas.height) < 64) throw Error('图片太窄，请手动框选');
+  if (Math.min(canvas.width, canvas.height) < minimumSide) throw Error('照片尺寸太小，百度接口无法处理');
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-  const figures = await callBaiduOCR(canvas.toDataURL('image/jpeg', .9), 'figures');
-  return layoutFigureRegions(figures, canvas.width, canvas.height);
+  return { src: canvas.toDataURL('image/jpeg', .9), width: canvas.width, height: canvas.height };
+}
+
+async function detectStudyFigures(image) {
+  const photo = studyPhotoForBaidu(image, 64);
+  const figures = await callBaiduOCR(photo.src, 'figures');
+  return layoutFigureRegions(figures, photo.width, photo.height);
+}
+
+async function removeStudyHandwriting(src) {
+  const image = new Image();
+  image.src = src;
+  await image.decode();
+  const photo = studyPhotoForBaidu(image, 15);
+  const cleaned = await callBaiduOCR(photo.src, 'remove-handwriting');
+  image.src = cleaned;
+  await image.decode();
+  return cleaned;
 }
 
 async function openFigurePicker(src, previous, allowDetection = true) {
