@@ -41,17 +41,26 @@ async function preparePrintImages(sheet, mode, attachment, isCurrent) {
     const hasFigure = source && validFigureRegion(item.figureRegion);
     const includeSource = printsSourcePhoto(item, attachment);
     let image = '', extraImage = '', isFigure = false;
-    try {
-      if (hasFigure) {
+    let failed = false;
+    if (hasFigure) {
+      try {
         image = await studyImageCopy(source, mode, item.figureRegion);
-        isFigure = true;
-        if (includeSource) extraImage = await studyImageCopy(source, mode);
-      } else if (includeSource) image = await studyImageCopy(source, mode);
-    } catch {
-      failures++;
-      if (includeSource && !isFigure) image = source;
-      else if (includeSource) extraImage = source;
+      } catch {
+        failed = true;
+        if (mode !== 'original') {
+          try { image = await studyImageCopy(source, 'original', item.figureRegion); } catch { /* No decodable crop. */ }
+        }
+      }
+      isFigure = Boolean(image);
     }
+    if (includeSource) {
+      let photo;
+      try { photo = await studyImageCopy(source, mode); }
+      catch { failed = true; photo = source; }
+      if (isFigure) extraImage = photo;
+      else image = photo;
+    }
+    if (failed) failures++;
     items.push({ ...item, image, extraImage, isFigure });
   }
   return { sheet: { ...sheet, items }, failures };
