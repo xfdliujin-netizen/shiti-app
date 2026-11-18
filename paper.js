@@ -33,6 +33,7 @@ function paperView() {
       </div>
       ${typeof paperMetadataFields==='function'?paperMetadataFields():''}
       ${paper.image ? `<div id="paper-crop-image-box" style="margin-bottom:10px;background:#f8fafc;padding:8px;border-radius:10px;text-align:center"><img id="paper-crop-img" class="paper-original" src="${paper.image}" alt="框选原图，点击全屏查看" title="点击全屏查看" style="max-height:180px;width:auto;margin:0 auto;display:block;cursor:zoom-in"></div><dialog id="paper-lightbox" class="image-lightbox"><button type="button" class="lightbox-close" id="paper-lightbox-close" aria-label="关闭">×</button><img id="paper-lightbox-img" alt="框选图全屏预览"></dialog>` : ''}
+      ${paperFigureTools(p, 0)}
       ${paper.ocrProvider === 'baidu' && paper.warnings.length ? `<div class="ocr-notices">${paper.warnings.map(w => `<span class="${w.startsWith('已保留') ? 'ocr-info' : 'ocr-warning'}">${esc(w)}</span>`).join('')}</div>` : paper.warnings.map(w => `<p class="result-note">${esc(w)}</p>`).join('')}
       <label class="field"><span>原题（仅题干、印刷选项和空位；请移出手写答案与订正，不修正原卷错字）</span><textarea class="paper-textarea" data-paper="text" data-index="0">${esc(p.text)}</textarea></label>
       ${typeof answerTransferTools==='function'?answerTransferTools():''}
@@ -84,6 +85,7 @@ function paperView() {
         <span class="pill">${p.analyzed ? '已分析 · ' + esc(p.aiVerdict || '薄弱待练') : '待核对'}</span>
       </div>
       ${paperField('原题全文（保留材料、选项和空格）', 'text', p.text, i, true)}
+      ${paperFigureTools(p, i)}
       ${answerReviewFields(p,i)}
       ${p.uncertainty ? `<p class="result-note">需核对：${esc(p.uncertainty)}</p>` : ''}
       ${p.analyzed ? `
@@ -103,6 +105,12 @@ function paperView() {
       <button class="secondary" id="paper-save">收录已选题目</button>
     </div>
   </section>`;
+}
+
+function paperFigureTools(item, index) {
+  if (!paper.image || typeof isStudyImage !== 'function' || !isStudyImage(paper.image)) return '';
+  return `<div class="paper-figure-tools"><div data-paper-figure="${index}"></div>
+    <button type="button" class="secondary" data-pick-paper-figure="${index}">${validFigureRegion(item.figureRegion) ? '调整题图' : '从原图框选题图'}</button></div>`;
 }
 
 function paperField(label, key, value, i, area = false) {
@@ -337,6 +345,7 @@ async function saveSelectedItems() {
       reminder: p.reminder,
       tags: p.tags || [],
       image: paper.image,
+      figureRegion: p.figureRegion,
       mastered: false,
       originalSection: p.section,
       originalNumber: p.number,
@@ -394,6 +403,17 @@ function bindPaper() {
 
   document.querySelectorAll('[data-paper-delete]').forEach(b => b.onclick = () => { paper.items.splice(Number(b.dataset.paperDelete), 1); render(); });
   if (!paper) return;
+  document.querySelectorAll('[data-pick-paper-figure]').forEach(button => {
+    const index = Number(button.dataset.pickPaperFigure);
+    const item = paper.items[index];
+    showSavedFigure(document.querySelector(`[data-paper-figure="${index}"]`), paper.image, item.figureRegion);
+    button.onclick = event => run(event.target, async () => {
+      const region = await openFigurePicker(paper.image, item.figureRegion);
+      if (region === undefined) return;
+      item.figureRegion = region;
+      render();
+    });
+  });
   bindStructuredAnswerFields();
   if(typeof bindCaptureOptions==='function')bindCaptureOptions();
 

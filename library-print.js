@@ -16,24 +16,86 @@ function prepareLibraryPrint(bank,questions){
 function libraryPrintHtml(sheet,includeAnswers=false,baseUrl=location.href){
   const answersOnly = includeAnswers === "only";
   const mathCss=new URL('vendor/katex/katex.min.css',baseUrl).href;
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${esc(sheet.title)}${answersOnly ? " · 答案解析" : ""}</title><link rel="stylesheet" href="${esc(mathCss)}"><style>@page{size:A4;margin:15mm}body{font:15px/1.75 -apple-system,BlinkMacSystemFont,"Microsoft YaHei",sans-serif;color:#111;background:#fff;max-width:800px;margin:24px auto;padding:0 18px}h1{font-size:22px;margin:0 0 8px}h2{font-size:15px;margin:0}.sheet-meta{border-bottom:2px solid #111;padding-bottom:12px}.q{margin:24px 0;break-inside:avoid}.q-text,.answer{white-space:pre-wrap;overflow-wrap:anywhere}.question-image{display:block;max-width:100%;max-height:155mm;width:auto;height:auto;object-fit:contain;margin:12px 0}.space{height:42px;border-bottom:1px dashed #ccc}.pending{font-size:11px;color:#555}.answers{break-before:page}.source{font-size:10px;overflow-wrap:anywhere;color:#555}.source-list{border-top:1px solid #ccc;margin-top:24px}.katex{font-size:1.05em}.katex-display{white-space:normal;max-width:100%;overflow:hidden}.print-tools{margin-bottom:20px}button{padding:10px 16px}@media print{body{margin:0;padding:0;max-width:none}.print-tools{display:none}}</style></head><body><div class="print-tools"><button onclick="window.print()">打印 / 存 PDF</button></div><h1>${esc(sheet.title)}${answersOnly ? " · 答案解析" : ""}</h1><div class="sheet-meta">共 ${sheet.items.length} 题　姓名：____________　日期：____________</div>${answersOnly ? "" : sheet.items.map((q,i)=>`<section class="q"><h2>${i+1}. ${q.printReviewed?'':'<span class="pending">资料待核对</span>'}</h2><div class="q-text">${renderStudyText(q.text)}</div>${/^data:image\/(jpeg|png|webp|gif);base64,[a-zA-Z0-9+/=]+$/.test(q.image||'')?`<img class="question-image" src="${esc(q.image)}" alt="原题图片">`:''}<div class="space"></div></section>`).join('')}${includeAnswers?`<section class="answers" ${answersOnly ? 'style="break-before:auto"' : ''}>${answersOnly ? "" : "<h1>参考答案与解析</h1>"}${sheet.items.map((q,i)=>`<section class="q answer"><h2>${i+1}. ${q.printReviewed?'':'资料待核对'}</h2>${renderStudyText(q.answer||'暂无参考答案')}<br>${renderStudyText(q.analysis||'暂无解析')}</section>`).join('')}</section>`:''}<section class="source-list"><h2>来源与许可</h2>${sheet.items.map((q,i)=>`<div class="source">${i+1}. ${esc(q.source||'来源待核对')} · ${esc(q.license||'许可待核对')}${q.originUrl?` · <a href="${esc(q.originUrl)}" rel="noopener">${esc(q.originUrl)}</a>`:''}</div>`).join('')}</section></body></html>`;
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${esc(sheet.title)}${answersOnly ? " · 答案解析" : ""}</title><link rel="stylesheet" href="${esc(mathCss)}"><style>@page{size:A4;margin:15mm}body{font:15px/1.75 -apple-system,BlinkMacSystemFont,"Microsoft YaHei",sans-serif;color:#111;background:#fff;max-width:800px;margin:24px auto;padding:0 18px}h1{font-size:22px;margin:0 0 8px}h2{font-size:15px;margin:0}.sheet-meta{border-bottom:2px solid #111;padding-bottom:12px}.q{margin:24px 0;break-inside:avoid}.q-text,.answer{white-space:pre-wrap;overflow-wrap:anywhere}.question-image{display:block;max-width:100%;max-height:155mm;width:auto;height:auto;object-fit:contain;margin:12px 0}.space{height:42px;border-bottom:1px dashed #ccc}.pending{font-size:11px;color:#555}.answers{break-before:page}.source{font-size:10px;overflow-wrap:anywhere;color:#555}.source-list{border-top:1px solid #ccc;margin-top:24px}.katex{font-size:1.05em}.katex-display{white-space:normal;max-width:100%;overflow:hidden}.print-tools{margin-bottom:20px}button{padding:10px 16px}@media print{body{margin:0;padding:0;max-width:none}.print-tools{display:none}}</style></head><body><div class="print-tools"><button onclick="window.print()">打印 / 存 PDF</button></div><h1>${esc(sheet.title)}${answersOnly ? " · 答案解析" : ""}</h1><div class="sheet-meta">共 ${sheet.items.length} 题　姓名：____________　日期：____________</div>${answersOnly ? "" : sheet.items.map((q,i)=>`<section class="q"><h2>${i+1}. ${q.printReviewed?'':'<span class="pending">资料待核对</span>'}</h2><div class="q-text">${renderStudyText(q.text)}</div>${printQuestionImages(q)}<div class="space"></div></section>`).join('')}${includeAnswers?`<section class="answers" ${answersOnly ? 'style="break-before:auto"' : ''}>${answersOnly ? "" : "<h1>参考答案与解析</h1>"}${sheet.items.map((q,i)=>`<section class="q answer"><h2>${i+1}. ${q.printReviewed?'':'资料待核对'}</h2>${renderStudyText(q.answer||'暂无参考答案')}<br>${renderStudyText(q.analysis||'暂无解析')}</section>`).join('')}</section>`:''}<section class="source-list"><h2>来源与许可</h2>${sheet.items.map((q,i)=>`<div class="source">${i+1}. ${esc(q.source||'来源待核对')} · ${esc(q.license||'许可待核对')}${q.originUrl?` · <a href="${esc(q.originUrl)}" rel="noopener">${esc(q.originUrl)}</a>`:''}</div>`).join('')}</section></body></html>`;
 }
-function launchLibraryPrint(html) {
+async function preparePrintImages(sheet, mode, includeSource, isCurrent) {
+  const items = [];
+  let failures = 0;
+  for (const item of sheet.items) {
+    if (!isCurrent()) return null;
+    const source = isStudyImage(item.image) ? item.image : '';
+    const hasFigure = source && validFigureRegion(item.figureRegion);
+    let image = source, extraImage = '', isFigure = false;
+    try {
+      if (hasFigure) {
+        // Preserve color, dashed lines and pale labels in the selected diagram.
+        image = await studyImageCopy(source, 'original', item.figureRegion);
+        isFigure = true;
+        if (includeSource) extraImage = await studyImageCopy(source, mode);
+      } else if (source) image = await studyImageCopy(source, mode);
+    } catch {
+      failures++;
+      if (!isFigure) image = source;
+      else if (includeSource) extraImage = source;
+    }
+    items.push({ ...item, image, extraImage, isFigure });
+  }
+  return { sheet: { ...sheet, items }, failures };
+}
+
+function printQuestionImages(item) {
+  const image = (src, caption) => typeof src === 'string' && /^data:image\/(jpeg|png|webp|gif);base64,[a-zA-Z0-9+/=]+$/.test(src)
+    ? `<img class="question-image" src="${esc(src)}" alt="${caption}">` : '';
+  return image(item.image, item.isFigure ? '题目配图' : '原题图片') + image(item.extraImage, '整题原图');
+}
+
+function launchLibraryPrint(sheet, includeAnswers = false) {
   const dialog = document.createElement('dialog');
   dialog.className = 'print-preview';
   dialog.innerHTML = `<div class="print-preview-toolbar">
     <strong>打印预览</strong>
-    <button type="button" class="secondary" data-print-download>下载文档</button>
+    ${includeAnswers !== 'only' && sheet.items.some(item => isStudyImage(item.image)) ? `
+      <label>原题照片 <select data-print-image-mode>
+        <option value="gray">增强灰度</option><option value="bw">黑白扫描</option><option value="original">原图</option>
+      </select></label>` : ''}
+    ${includeAnswers !== 'only' && sheet.items.some(item => isStudyImage(item.image) && validFigureRegion(item.figureRegion)) ? `
+      <label><input type="checkbox" data-print-source>配图题也附整题照片</label>` : ''}
+    <button type="button" class="secondary" data-print-download disabled>下载文档</button>
     <button type="button" class="primary" data-print-now disabled>打印／存 PDF</button>
     <button type="button" class="secondary" data-print-close aria-label="关闭预览">×</button>
   </div>
+  <p class="hint" data-print-status role="status" hidden></p>
   <iframe title="打印文档"></iframe>
   <p class="hint">如果微信没有打开打印窗口，可下载文档后在系统浏览器中打开打印。</p>`;
   const frame = dialog.querySelector('iframe');
   const print = dialog.querySelector('[data-print-now]');
   const download = dialog.querySelector('[data-print-download]');
-  let documentUrl;
-  frame.onload = () => { print.disabled = false; };
+  const mode = dialog.querySelector('[data-print-image-mode]');
+  const source = dialog.querySelector('[data-print-source]');
+  const status = dialog.querySelector('[data-print-status]');
+  let documentUrl, html, revision = 0;
+  async function update() {
+    const request = ++revision;
+    const current = () => request === revision && dialog.open;
+    print.disabled = download.disabled = true;
+    status.hidden = !mode;
+    status.textContent = mode ? '正在生成预览…' : '';
+    const output = mode ? await preparePrintImages(sheet, mode.value, Boolean(source?.checked), current) : { sheet, failures: 0 };
+    if (!output || !current()) return;
+    if (documentUrl) URL.revokeObjectURL(documentUrl);
+    documentUrl = undefined;
+    html = libraryPrintHtml(output.sheet, includeAnswers);
+    status.hidden = !output.failures;
+    status.textContent = output.failures ? `${output.failures} 道题的图片处理未完成，已尽量保留原图，请核对预览。` : '';
+    frame.onload = () => {
+      if (!current() || frame.contentDocument?.body?.dataset.previewVersion !== String(request)) return;
+      print.disabled = download.disabled = false;
+    };
+    frame.srcdoc = html.replace('</head>', '<style>.print-tools{display:none}</style></head>')
+      .replace('<body>', `<body data-preview-version="${request}">`);
+  }
+  if (mode) mode.onchange = update;
+  if (source) source.onchange = update;
   print.onclick = () => {
     try {
       frame.contentWindow.focus();
@@ -51,12 +113,13 @@ function launchLibraryPrint(html) {
   };
   dialog.querySelector('[data-print-close]').onclick = () => dialog.close();
   dialog.addEventListener('close', () => {
+    revision++;
     if (documentUrl) URL.revokeObjectURL(documentUrl);
     dialog.remove();
   }, { once: true });
-  frame.srcdoc = html.replace('</head>', '<style>.print-tools{display:none}</style></head>');
   document.body.append(dialog);
   dialog.showModal();
+  update();
 }
 
 function bindLibraryPrint(){
@@ -64,5 +127,5 @@ function bindLibraryPrint(){
   document.querySelectorAll('[data-library-print-one]').forEach(el=>el.onclick=e=>run(e.target,()=>openLibraryPrint(el.dataset.libraryPrintOne)));
   if($('#library-print'))$('#library-print').onclick=e=>run(e.target,()=>openLibraryPrint());
   if($('#library-print-close'))$('#library-print-close').onclick=()=>$('#library-print-dialog').close();
-  if($('#library-print-confirm'))$('#library-print-confirm').onclick=e=>run(e.target,()=>{const pool=libraryPrintPool($('#library-print-scope').value),from=Number($('#library-print-from').value),to=Number($('#library-print-to').value);if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<from||to>pool.length)throw Error('请填写有效打印题号范围');const sheet=prepareLibraryPrint(currentLibrary(),pool.slice(from-1,to));const html=libraryPrintHtml(sheet,$('#library-print-answers').checked);$('#library-print-dialog').close();launchLibraryPrint(html)});
+  if($('#library-print-confirm'))$('#library-print-confirm').onclick=e=>run(e.target,()=>{const pool=libraryPrintPool($('#library-print-scope').value),from=Number($('#library-print-from').value),to=Number($('#library-print-to').value);if(!Number.isInteger(from)||!Number.isInteger(to)||from<1||to<from||to>pool.length)throw Error('请填写有效打印题号范围');const sheet=prepareLibraryPrint(currentLibrary(),pool.slice(from-1,to));const includeAnswers=$('#library-print-answers').checked;$('#library-print-dialog').close();launchLibraryPrint(sheet,includeAnswers)});
 }

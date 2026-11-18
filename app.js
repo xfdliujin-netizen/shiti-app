@@ -511,7 +511,7 @@ function notebookPrintOptions() {
       <option value="answers">仅答案解析</option>
     </select></label>
     <p class="hint" id="notebook-print-count"></p>
-    <p class="hint">题目下方附保存的原题图片，保留图上的手写痕迹。</p>
+    <p class="hint">预览可切换照片的扫描效果。已框选题图的题目默认只附配图。</p>
     <button type="button" class="primary" id="notebook-print-confirm">打印／存 PDF</button>
   </dialog>`;
 }
@@ -541,9 +541,8 @@ function bindNotebookPrint() {
       originUrl: ''
     }));
     const output = mode.value === 'answers' ? 'only' : mode.value === 'both';
-    const html = libraryPrintHtml({ title: filter + '错题练习', items }, output);
     dialog.close();
-    launchLibraryPrint(html);
+    launchLibraryPrint({ title: filter + '错题练习', items }, output);
   });
 }
 
@@ -677,7 +676,7 @@ function renderExamSheet() {
         <div style="padding-bottom:14px;border-bottom:1px dashed #e5e7eb">
           <div style="font-weight:700;font-size:14px;margin-bottom:6px;color:#111827">第 ${idx + 1} 题 <span style="font-weight:400;font-size:12px;color:#6b7280">[${esc(item.subject)}${item.source ? ' · ' + esc(item.source) : ''}]</span></div>
           <div class="prose" style="font-size:15px;line-height:1.7">${esc(item.text)}</div>
-          ${item.image ? `<img src="${item.image}" alt="配图" style="max-width:100%;max-height:220px;object-fit:contain;margin-top:8px;border-radius:8px">` : ''}
+          ${item.image ? validFigureRegion(item.figureRegion) ? `<div data-exam-figure="${idx}"></div>` : `<img src="${item.image}" alt="原题图片" style="max-width:100%;max-height:220px;object-fit:contain;margin-top:8px;border-radius:8px">` : ''}
           <div style="height:56px;margin-top:8px;border:1px dashed #e5e7eb;border-radius:8px;padding:6px 10px;font-size:12px;color:#9ca3af">作答区：</div>
         </div>
       `).join('')}
@@ -1079,7 +1078,9 @@ function openQuestion(id) {
     <p class="result-note">作答证据：${q.evidenceVerified&&q.answerStatus==='confirmed'?'已人工核对孩子作答':q.answerStatus==='unanswered'?'已确认未作答':'未确认；不能据此诊断孩子错因'}</p>
     ${q.annotation?`<div class="analysis-block"><h3>批注／订正（非原始作答）</h3><p class="prose">${esc(q.annotation)}</p></div>`:''}
     ${q.visualFeatures?`<div class="analysis-block"><h3>加点／划线等视觉信息</h3><p class="prose">${esc(q.visualFeatures)}</p></div>`:''}
-    ${q.image ? `<img src="${q.image}" alt="原题图片" style="max-width:100%;max-height:320px;object-fit:contain;margin-top:10px;border-radius:10px">` : ''}
+    ${isStudyImage(q.image) ? `<div id="detail-figure"></div>
+      <button type="button" id="detail-pick-figure" class="secondary">${validFigureRegion(q.figureRegion) ? '调整题图' : '从原图框选题图'}</button>
+      <details ${validFigureRegion(q.figureRegion) ? '' : 'open'}><summary>原题图片</summary><img src="${esc(q.image)}" alt="原题图片" class="saved-figure"></details>` : ''}
     ${rawOcr ? `<details style="margin-top:10px;padding:8px 12px;background:var(--surface-sub, #f8fafc);border-radius:10px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--muted)">查看百度 OCR 原始转录（默认收起）</summary><div class="prose" style="margin-top:8px;font-size:13px;color:var(--muted)">${esc(rawOcr)}</div></details>` : ''}
     ${[['孩子的错误作答 / 困惑', q.mistake], ['正确答案', q.answer], ['解题步骤', q.analysis], ['易错提醒', q.reminder], ['知识点', (q.tags || []).join(' · ')]].filter(x => x[1]).map(x => `<div class="analysis-block"><h3>${x[0]}</h3><div class="prose">${esc(x[1])}</div></div>`).join('')}
     <div class="actions">
@@ -1091,6 +1092,15 @@ function openQuestion(id) {
   $('#detail').showModal();
   $('#detail').onclick = e => { if (e.target === $('#detail')) $('#detail').close(); };
   $('#close-detail').onclick = () => $('#detail').close();
+  showSavedFigure($('#detail-figure'), q.image, q.figureRegion);
+  if ($('#detail-pick-figure')) $('#detail-pick-figure').onclick = e => run(e.target, async () => {
+    const figureRegion = await openFigurePicker(q.image, q.figureRegion);
+    if (figureRegion === undefined) return;
+    await persist({ ...data, questions: data.questions.map(item => item.id === id ? { ...item, figureRegion, updated: stamp() } : item) });
+    $('#detail').close();
+    render();
+    openQuestion(id);
+  });
 
   const changeDetailSubject = async (nextSubject) => {
     if (!nextSubject || nextSubject === q.subject || busy) return;
@@ -1148,6 +1158,10 @@ function openQuestion(id) {
 
 function bindPractice() {
   if(typeof bindBank==='function')bindBank();
+  document.querySelectorAll('[data-exam-figure]').forEach(el => {
+    const item = examSheet?.items[Number(el.dataset.examFigure)];
+    if (item) showSavedFigure(el, item.image, item.figureRegion);
+  });
   document.querySelectorAll('[data-prac-subj]').forEach(button => {
     button.onclick = () => { practiceSubject = button.dataset.pracSubj; selectedPracticeId = ''; render(); };
   });
@@ -1200,6 +1214,7 @@ function bindPractice() {
           source: q.source || `#${q.number}`,
           text: q.text,
           image: q.image || '',
+          figureRegion: q.figureRegion,
           answer: q.answer,
           analysis: q.analysis
         }))
@@ -1244,7 +1259,7 @@ function bindPractice() {
   if ($('#print-exam')) $('#print-exam').onclick = () => {
     if (!examSheet) return;
     const sheet = { ...examSheet, items: examSheet.items.map(item => ({ ...item, printReviewed: true })) };
-    launchLibraryPrint(libraryPrintHtml(sheet, examShowAnswers));
+    launchLibraryPrint(sheet, examShowAnswers);
   };
 
   document.querySelectorAll('[data-ai-judge]').forEach(b => b.onclick = () => run(b, async () => {

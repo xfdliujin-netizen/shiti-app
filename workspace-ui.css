@@ -852,6 +852,15 @@ dialog.print-preview[open] {
 .print-preview-toolbar button { min-height:38px; font-size:12px; padding:4px 8px; }
 .print-preview iframe { flex:1; min-height:0; width:100%; border:1px solid var(--line); border-radius:8px; background:white; }
 .print-preview > .hint { margin:6px 0 0; }
+.print-preview-toolbar label { display:flex; align-items:center; gap:5px; font-size:12px; }
+.print-preview-toolbar select { width:auto; padding:5px; }
+.print-preview-toolbar input { width:auto; }
+.figure-picker { width:min(94vw, 780px); max-height:90dvh; overflow:auto; }
+.figure-stage { position:relative; width:fit-content; max-width:100%; margin:auto; touch-action:none; cursor:crosshair; user-select:none; }
+.figure-stage img { display:block; width:auto; height:auto; max-width:100%; max-height:60dvh; pointer-events:none; }
+.figure-stage span { position:absolute; border:2px solid #2563eb; background:#2563eb25; pointer-events:none; box-sizing:border-box; }
+.saved-figure { display:block; max-width:100%; max-height:320px; object-fit:contain; margin:8px 0; }
+.paper-figure-tools { margin:8px 0; }
 .subject-picker { flex-wrap:wrap; max-width:100%; }
 .subject-picker .subject-config-trigger { font-weight:650; }
 .notebook-facets .notebook-grade-bar { margin:0; }
