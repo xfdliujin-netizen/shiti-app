@@ -663,9 +663,9 @@ dialog.question-actions-dialog[open] { position:fixed; inset:0; margin:auto; wid
 .library-toolbar .library-head-actions { flex-shrink: 0; }
 .library-grade-filter { width: 160px; margin: 12px 0; }
 
-.exam-mode-row { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
-.exam-mode-row .exam-source-tabs { flex: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: auto; margin: 0; }
-.exam-mode-row .exam-print-hint { position: static; margin: 0; flex-shrink: 0; }
+.exam-source-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; margin:0 0 18px; }
+.exam-model-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:12px 0; }
+.exam-model-controls .field { min-width:0; margin:0; }
 
 @media (max-width: 767px) {
   .workspace-tabs a { font-size: 16px; padding: 10px 8px; }
@@ -681,9 +681,8 @@ dialog.question-actions-dialog[open] { position:fixed; inset:0; margin:auto; wid
   .subject-detail-head .notebook-status { gap:2px; }
   .subject-detail-head .status-stat { min-width:46px; padding:5px 3px; font-size:10px; }
   .notebook-facets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .exam-mode-row { gap: 8px; }
-  .exam-mode-row .exam-print-hint { font-size: 10px; padding: 6px; }
-  .exam-mode-row .exam-source-tabs button { font-size: 12px; padding: 9px 6px; }
+  .exam-source-tabs button { font-size: 13px; padding: 10px 6px; }
+  .exam-model-controls { grid-template-columns:minmax(0,1fr); gap:8px; }
 }
 @media (max-width: 767px) {
   .notebook-toolbar .status-stat { min-width: 50px; font-size: 11px; }
