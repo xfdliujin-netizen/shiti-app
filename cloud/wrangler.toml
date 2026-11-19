@@ -16,6 +16,11 @@ binding = "DB"
 database_name = "shiti-notebook"
 database_id = "6001080c-5898-4ddc-a87c-302cd0434932"
 
+[[d1_databases]]
+binding = "IMAGES_DB"
+database_name = "shiti-images"
+database_id = "22c95d09-47e7-49f8-93ee-328233e13974"
+
 # This hostname is protected by a Cloudflare Access personal-email allowlist.
 [[routes]]
 pattern = "api.86518925.xyz"
