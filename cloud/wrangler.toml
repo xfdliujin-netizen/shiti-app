@@ -21,6 +21,14 @@ binding = "IMAGES_DB"
 database_name = "shiti-images"
 database_id = "22c95d09-47e7-49f8-93ee-328233e13974"
 
+[[durable_objects.bindings]]
+name = "SYNC_EVENTS"
+class_name = "SyncEvents"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SyncEvents"]
+
 # This hostname is protected by a Cloudflare Access personal-email allowlist.
 [[routes]]
 pattern = "api.86518925.xyz"

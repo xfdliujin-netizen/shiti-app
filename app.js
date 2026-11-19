@@ -159,8 +159,9 @@ function readConfig() {
   } catch { return {}; }
 }
 
-function saveLocalConfig() {
+function saveLocalConfig(sync = true) {
   try { localStorage.setItem('shiti-config', JSON.stringify(cfg)); } catch {}
+  if (sync && typeof queueCloudProfileSync === 'function') queueCloudProfileSync();
 }
 
 function getStoredKey(k) {
@@ -189,9 +190,12 @@ async function boot() {
     } catch {}
   }
   render();
+  if (typeof startCloudAutosync === 'function') startCloudAutosync();
 }
 
-async function persist(next = data) {
+async function persist(next = data, { sync = true } = {}) {
+  const syncable = next.questions !== data.questions || next.practices !== data.practices ||
+    next.notebooks !== data.notebooks || next.bankRecords !== data.bankRecords || next.deleted !== data.deleted;
   data = next;
   try { localStorage.setItem('shiti-notebook-fallback', JSON.stringify(next)); } catch {}
   if (db) {
@@ -201,6 +205,7 @@ async function persist(next = data) {
     await new Promise((ok, no) => { tx.oncomplete = ok; tx.onerror = () => no(tx.error); tx.onabort = () => no(tx.error); });
   }
   if ($('#save-status')) $('#save-status').textContent = '已保存到本机';
+  if (sync && syncable && typeof queueCloudSync === 'function') queueCloudSync();
 }
 
 function toast(s) {
@@ -894,10 +899,10 @@ function settings() {
     <div class="settings-group">
       <div class="settings-group-title">云端与同步</div>
       <div class="settings-list">
-        ${settingsRow('cloud', '☁', 'teal', '私人云端同步', '同步错题、练习与学情档案到自己的云端', '')}
+        ${settingsRow('cloud', '☁', 'teal', '私人云端同步', '登录后自动同步错题、作答记录与学情档案', '')}
         ${settingsRow('github', '▣', 'gray', 'GitHub 私有仓库同步', '手动合并同步到私有数据仓库', ghLabel)}
       </div>
-      <p class="settings-footnote">同步均为手动触发，不会自动上传。同一记录在两台设备同时修改时会停下并提示，不会覆盖。</p>
+      <p class="settings-footnote">私人云端可自动同步。GitHub 私有仓库在手动触发时同步。</p>
     </div>
 
     <div class="settings-group">
@@ -1056,7 +1061,7 @@ async function run(button, fn) {
   button.disabled = true;
   button.textContent = '处理中，请稍候…';
   try { await fn(); } catch (e) { toast(e.name === 'TimeoutError' ? '请求超时，请重试' : e.message || '操作失败，请重试'); }
-  finally { busy = false; if (button.isConnected) { button.disabled = false; button.textContent = old; } }
+  finally { busy = false; if (button.isConnected) { button.disabled = false; button.textContent = old; } if (typeof refreshCloudView === 'function') refreshCloudView(); }
 }
 
 async function loadImage(f) {

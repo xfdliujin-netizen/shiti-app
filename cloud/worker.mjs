@@ -22,7 +22,7 @@ export async function authenticate(request, env) {
     const jwk=keyCache.keys.find(k=>k.kid===header.kid); if(!jwk) throw Error();
     const key=await crypto.subtle.importKey('jwk',jwk,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['verify']);
     if(!await crypto.subtle.verify('RSASSA-PKCS1-v1_5',key,decode(parts[2]),new TextEncoder().encode(parts[0]+'.'+parts[1]))) throw Error();
-    return claims.email;
+    return claims.exp * 1000;
   } catch { fail(401,'登录已过期或无权访问，请重新登录'); }
 }
 async function bodyBytes(request, max) {
@@ -40,25 +40,61 @@ async function findImage(imageDb, legacyDb, id, includeBytes = false) {
   return image || await legacyDb.prepare(query).bind(id).first();
 }
 
-export async function handle(request, env) {
+export class SyncEvents {
+  constructor(state) { this.state = state; }
+
+  async fetch(request) {
+    const { pathname } = new URL(request.url);
+    if (pathname === '/subscribe') {
+      const expiresAt = Number(request.headers.get('X-Sync-Expiry'));
+      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return new Response(null, { status: 401 });
+      const [client, server] = Object.values(new WebSocketPair());
+      this.state.acceptWebSocket(server);
+      server.serializeAttachment(expiresAt);
+      return new Response(null, { status: 101, webSocket: client });
+    }
+    if (pathname === '/publish' && request.method === 'POST') {
+      for (const socket of this.state.getWebSockets()) {
+        try {
+          if (socket.deserializeAttachment() > Date.now()) socket.send('changed');
+          else socket.close(1008, 'Session expired');
+        } catch { /* A disconnected device will reconcile when it returns. */ }
+      }
+      return new Response(null, { status: 204 });
+    }
+    return new Response(null, { status: 404 });
+  }
+
+  webSocketMessage(socket) { socket.close(1008, 'Read-only subscription'); }
+  webSocketClose(socket) { socket.close(); }
+}
+
+export async function handle(request, env, context) {
   const origin=request.headers.get('Origin'), allowed=env.ALLOWED_ORIGIN;
   const cors={'Access-Control-Allow-Origin':allowed||'https://shiti.86518925.xyz','Access-Control-Allow-Credentials':'true','Vary':'Origin','X-Content-Type-Options':'nosniff'};
   try {
     if(origin && origin!==allowed) fail(403,'来源不允许');
     if(request.method==='OPTIONS') return new Response(null,{status:204,headers:{...cors,'Access-Control-Allow-Methods':'GET, PUT, OPTIONS','Access-Control-Allow-Headers':'Content-Type','Access-Control-Max-Age':'600'}});
     if(env.STORAGE_ENABLED!=='true') fail(503,'云端存储未启用或已暂停');
-    await authenticate(request,env); // No DB access before successful signature + allowlist checks.
+    const expiresAt = await authenticate(request,env); // No DB access before successful signature + allowlist checks.
     if(!env.DB) fail(503,'D1 尚未绑定');
     if(!['GET','PUT'].includes(request.method)) fail(405,'不支持此操作');
     if(request.method==='PUT' && origin!==allowed) fail(403,'写入需要可信网页来源');
     const url=new URL(request.url), path=url.pathname;
-    if(!['/api/session','/api/changes','/api/record','/api/image','/api/bank','/api/bank/item','/api/bank/items'].includes(path)) fail(404,'接口不存在');
+    if(!['/api/session','/api/changes','/api/record','/api/image','/api/bank','/api/bank/item','/api/bank/items','/api/live'].includes(path)) fail(404,'接口不存在');
+    if(path==='/api/live' && (request.method!=='GET' || origin!==allowed || request.headers.get('Upgrade')?.toLowerCase()!=='websocket')) fail(403,'实时连接需要可信网页来源');
     if(path.startsWith('/api/bank')&&request.method!=='GET')fail(405,'题库只读，不接受网页写入');
     const write=request.method==='PUT'?1:0, day=new Date().toISOString().slice(0,10);
     const quota=await env.DB.prepare(`INSERT INTO quotas(day,requests,writes) VALUES(?,1,?) ON CONFLICT(day) DO UPDATE SET requests=requests+1,writes=writes+excluded.writes WHERE requests<10000 AND writes+excluded.writes<=2000 RETURNING requests`).bind(day,write).first();
     if(!quota) fail(429,'今日云端请求达到安全上限，本地仍可使用');
     const db=env.DB.withSession?env.DB.withSession('first-primary'):env.DB;
     const imageDb=env.IMAGES_DB?.withSession ? env.IMAGES_DB.withSession('first-primary') : env.IMAGES_DB;
+    if(path==='/api/live') {
+      if(!env.SYNC_EVENTS) fail(503,'实时通知未配置');
+      return env.SYNC_EVENTS.getByName('notebook').fetch('https://sync.internal/subscribe',{
+        headers:{Upgrade:'websocket','X-Sync-Expiry':String(expiresAt)}
+      });
+    }
     if(path.startsWith('/api/bank')){const result=await bankRead(url,db);return json(result.body,result.status,cors)}
     if(path==='/api/session'&&request.method==='GET') return json({ok:true},200,cors);
     if(path==='/api/changes'&&request.method==='GET') {
@@ -81,6 +117,10 @@ export async function handle(request, env) {
         ? await db.prepare('INSERT INTO records(kind,id,payload,deleted,revision) VALUES(?,?,?,?,1) ON CONFLICT(kind,id) DO NOTHING RETURNING revision').bind(b.kind,b.id,payload,b.deleted?1:0).first()
         : await db.prepare('UPDATE records SET payload=?,deleted=?,revision=revision+1 WHERE kind=? AND id=? AND revision=? RETURNING revision').bind(payload,b.deleted?1:0,b.kind,b.id,b.revision).first();
       if(!updated)fail(409,'另一设备修改了同一记录；已保留本地数据，请先备份并处理冲突');
+      if (env.SYNC_EVENTS && context) {
+        context.waitUntil(Promise.resolve().then(() => env.SYNC_EVENTS.getByName('notebook')
+          .fetch('https://sync.internal/publish', { method:'POST' })).catch(() => {}));
+      }
       return json(updated,200,cors);
     }
     if(path==='/api/image') {
