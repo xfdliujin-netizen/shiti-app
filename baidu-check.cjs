@@ -9,6 +9,48 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
   assert.equal((await handler(request({origin:'https://other.example'}),env)).status,403);assert.equal((await handler(request({token:'wrong'}),env)).status,401);assert.equal(auth,0);assert.equal((await handler(request({body:'{'}),env)).status,400);assert.equal((await handler(request({image:'https://other.example/image'}),env)).status,400);
   r=await handler(request(),env);const j=await r.json();assert.equal(j.words_result[0].words,words[0].words);assert.equal(r.headers.get('Cache-Control'),'no-store');assert.ok(!JSON.stringify(j).includes('server-secret'));await handler(request(),env);assert.equal(auth,1);assert.equal(ocr,2);
   let errors=0;const quotaHandler=createOCRService(async url=>url.endsWith('/token')?Response.json({access_token:'x',expires_in:3600}):(errors++,Response.json({error_code:17,error_msg:'not exposed'})));assert.equal((await(await quotaHandler(request(),env)).json()).error_code,17);assert.equal(errors,1);
+  const image = 'data:image/jpeg;base64,Q1JPUA==';
+  const taskId = '1996199501805445169';
+  let polls = 0, submissions = 0, completions = 0;
+  const integrationHandler = createOCRService(async (url, options) => {
+    if (url.endsWith('/token')) return Response.json({ access_token: 'vendor-token', expires_in: 3600 });
+    const payload = JSON.parse(options.body);
+    if (url.includes('/create_task?')) {
+      submissions++;
+      assert.deepEqual(payload, { image: 'Q1JPUA==' });
+      return Response.json({ error_code: '0', result: { task_id: taskId } });
+    }
+    if (url.includes('/get_result?')) {
+      assert.deepEqual(payload, { task_id: taskId });
+      if (++polls === 1) return Response.json({ error_code: 60, result: { status: 'Running' } });
+      return Response.json({ error_code: 0, result: { status: 'Success', imageResults: [
+        { result: [{ seqence: 0, correctResult: 2, cropUrl: 'https://private.example/image', slot: [{ reason: '核对进位' }] }] }
+      ] } });
+    }
+    assert.equal(url, 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions');
+    assert.equal(options.headers.Authorization, 'Bearer server-qwen-credential');
+    assert.equal(payload.model, 'qwen-plus');
+    assert.equal(payload.enable_thinking, false);
+    completions++;
+    return Response.json({ choices: [{ message: { content: '{"ok":true}' } }], usage: { total_tokens: 25 } });
+  });
+  const invoke = async (payload, overrides = {}) => integrationHandler(request({ body: JSON.stringify(payload), ...overrides }), {
+    ...env, QWEN_API_KEY: 'server-qwen-credential'
+  });
+  assert.equal((await invoke({ action: 'homework-create', image }, { token: 'wrong' })).status, 401);
+  assert.equal((await invoke({ action: 'homework-result', task_id: '../invalid' })).status, 400);
+  assert.deepEqual(await (await invoke({ action: 'homework-create', image })).json(), { task_id: taskId });
+  assert.deepEqual(await (await invoke({ action: 'homework-result', task_id: taskId })).json(), { status: 'pending' });
+  assert.deepEqual(await (await invoke({ action: 'homework-result', task_id: taskId })).json(), {
+    status: 'complete', questions: [{ number: 1, verdict: 2, reasons: ['核对进位'] }]
+  });
+  const payload = { model: 'qwen-plus', max_tokens: 8000, messages: [
+    { role: 'system', content: 'JSON' }, { role: 'user', content: '题目' }
+  ] };
+  assert.equal((await invoke({ action: 'qwen-completion', payload }, { token: 'wrong' })).status, 401);
+  assert.equal((await invoke({ action: 'qwen-completion', payload: {...payload, max_tokens: 9000} })).status, 400);
+  assert.equal((await (await invoke({ action: 'qwen-completion', payload })).json()).usage.total_tokens, 25);
+  assert.deepEqual([submissions, polls, completions], [1, 2, 1]);
   const controls={'#subject':{value:'语文'},'#source':{value:'课堂练习'},'#mistake':{value:''},'#paper-progress':{},'#paper-area':{scrollIntoView(){}}};let fetches=0;
   const c={assert,console,AbortSignal,TextEncoder,TextDecoder,crypto:globalThis.crypto,setTimeout,clearTimeout,confirm:()=>true,location:{hash:'#capture'},localStorage:{getItem:()=>null},sessionStorage:{getItem:k=>k==='shiti-ocr-token'?env.OCR_PROXY_TOKEN:null},window:{addEventListener(){}},document:{querySelector:s=>controls[s]||null,querySelectorAll:()=>[]},fetch:async(url,options)=>{fetches++;assert.equal(url,'https://proxy.example/api/ocr');assert.deepEqual(JSON.parse(options.body),{image:'data:image/png;base64,Q1JPUA==',mode:'accurate'});assert.equal(options.headers['X-OCR-Token'],env.OCR_PROXY_TOKEN);return Response.json({words_result:words,log_id:123})}};
   vm.createContext(c);vm.runInContext(fs.readFileSync(__dirname+'/ocr-layout.js','utf8'),c);for(const p of ['crop.js','paper.js','baidu.js','app.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+p,'utf8').replace(/window\.addEventListener\('hashchange',\s*render\);\s*boot\(\);\s*$/,''),c);

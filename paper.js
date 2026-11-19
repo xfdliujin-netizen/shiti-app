@@ -445,7 +445,7 @@ function bindPaper() {
   if ($('#paper-analyze')) $('#paper-analyze').onclick = e => runPaperAction(e, async () => {
     const failures = await analyzeSelectedItems();
     render();
-    toast(failures ? `${failures} 题分析失败，请检查 DeepSeek 设置后重试` : '✓ AI 分析与错因判定完成，核对无误后点击收录');
+    toast(failures ? `${failures} 题分析失败，请检查文字模型设置后重试` : '✓ AI 分析与错因判定完成，核对无误后点击收录');
   });
 
   if ($('#paper-save')) $('#paper-save').onclick = e => runPaperAction(e, async () => {

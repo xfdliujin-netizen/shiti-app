@@ -1,4 +1,99 @@
 const baiduUsage = { calls: 0 };
+let homeworkTask = null, homeworkResult = null;
+
+function baiduGradingSettings() {
+  return `<p class="notice">作业批改使用「图片文字识别」中配置的百度代理和访问口令。百度应用需开通智能作业批改权限。</p>
+    <p class="result-note">本机已提交 ${Number(cfg.baiduHomeworkCalls) || 0} 次批改。账户免费余量请在百度控制台查看。</p>
+    <a href="https://console.bce.baidu.com/ai/#/ai/ocr/overview/index" target="_blank" rel="noopener">打开百度文字识别控制台</a>`;
+}
+
+function homeworkGradingView() {
+  if (!image && !homeworkTask && !homeworkResult) return '';
+  const verdicts = { 0: '未批改', 1: '正确', 2: '错误', 3: '未作答', 5: '批改失败' };
+  return `<div class="homework-grading">
+    ${image || homeworkTask ? `<button type="button" class="secondary" id="grade-homework">${homeworkTask ? '继续查询百度批改' : '百度批改整张作业图'}</button>` : ''}
+    <p class="hint" id="homework-status" role="status">${homeworkTask ? '已提交，等待百度返回结果。' : '提交后由百度返回逐题批改，结果请人工核对。'}</p>
+    ${homeworkResult ? `<section aria-label="百度作业批改结果">
+      <h3>上次百度批改结果 · ${homeworkResult.length} 题</h3>
+      ${homeworkResult.length ? homeworkResult.map(question => `<details><summary>第 ${esc(question.number)} 题 · ${verdicts[question.verdict] || '待核对'}</summary>
+        ${question.reasons.length ? question.reasons.map(reason => `<p class="prose">${esc(reason)}</p>`).join('') : '<p class="muted">百度未提供批改说明。</p>'}</details>`).join('') : '<p class="muted">百度未返回可批改的题目。</p>'}
+    </section>` : ''}
+  </div>`;
+}
+
+async function prepareHomeworkImage(source) {
+  const photo = new Image();
+  photo.src = source;
+  await photo.decode();
+  const shortest = Math.min(photo.naturalWidth, photo.naturalHeight);
+  const longest = Math.max(photo.naturalWidth, photo.naturalHeight);
+  if (shortest < 512 || Math.round(8192 * shortest / longest) < 512) {
+    throw Error('百度作业批改要求处理后的图片短边至少 512 像素，请换一张清晰的作业图');
+  }
+  const scale = Math.min(1, 8192 / longest, Math.max(4096 / longest, 512 / shortest));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(photo.naturalWidth * scale);
+  canvas.height = Math.round(photo.naturalHeight * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(photo, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.84);
+}
+
+async function requestHomeworkGrading(connection, body) {
+  const response = await fetch(connection.endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-OCR-Token': connection.token },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(45000)
+  });
+  const result = await response.json();
+  if (!response.ok) throw Error(result.error || `百度批改代理请求失败（${response.status}）`);
+  if (result.error_code) {
+    if (result.failed) homeworkTask = null;
+    if (Number(result.error_code) === 6) throw Error('百度应用未开通智能作业批改权限');
+    throw Error([17, 18, 19, 110, 111].includes(Number(result.error_code)) ? baiduError(result.error_code) : `百度作业批改失败（${result.error_code}）`);
+  }
+  return result;
+}
+
+function bindHomeworkGrading() {
+  const button = $('#grade-homework');
+  if (!button) return;
+  button.onclick = () => run(button, async () => {
+    try {
+      if (!homeworkTask) {
+        const warning = ocrLocalFileWarning();
+        if (warning) throw Error(warning);
+        const connection = { endpoint: (cfg.ocrProxy || defaultOCRProxy()).trim(), token: getOcrToken() };
+        if (connection.token.length < 24) throw Error('请先在设置的「图片文字识别」中填写代理访问口令');
+        if (!image) throw Error('请先上传作业图片');
+        const encoded = await prepareHomeworkImage(image);
+        $('#homework-status')?.replaceChildren('正在向百度提交整张作业图…');
+        const result = await requestHomeworkGrading(connection, { action: 'homework-create', image: encoded });
+        if (typeof result.task_id !== 'string' || !result.task_id) throw Error('代理未返回批改任务编号，请确认代理已更新');
+        homeworkTask = { ...connection, id: result.task_id };
+        homeworkResult = null;
+        cfg.baiduHomeworkCalls = (Number(cfg.baiduHomeworkCalls) || 0) + 1;
+        saveLocalConfig();
+      }
+      $('#homework-status')?.replaceChildren('已提交，等待百度返回批改结果…');
+      for (let attempt = 0; attempt < 8; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const result = await requestHomeworkGrading(homeworkTask, { action: 'homework-result', task_id: homeworkTask.id });
+        if (result.status === 'pending') continue;
+        if (result.status !== 'complete' || !Array.isArray(result.questions)) throw Error('批改结果格式不正确，请继续查询');
+        homeworkResult = result.questions;
+        homeworkTask = null;
+        return;
+      }
+      toast('百度仍在批改，可以稍后继续查询');
+    } finally {
+      if (current() === 'capture') render();
+    }
+  });
+}
 
 function ocrLocalFileWarning() {
   return typeof location !== 'undefined' && (location.protocol === 'file:' || location.origin === 'null')
@@ -22,7 +117,7 @@ function baiduSettings() {
     ${ocrLocalFileWarning()?`<p class="notice">${esc(ocrLocalFileWarning())} <a href="https://shiti.86518925.xyz" target="_blank" rel="noopener">打开线上拾题</a></p>`:''}
     <label class="field"><span>识别服务</span>
       <select id="ocr-provider">
-        <option value="baidu" ${(cfg.ocrProvider || 'baidu') === 'baidu' ? 'selected' : ''}>百度高精度 OCR → 校对 → DeepSeek 分析</option>
+        <option value="baidu" ${(cfg.ocrProvider || 'baidu') === 'baidu' ? 'selected' : ''}>百度高精度 OCR → 校对 → 文字模型分析</option>
         <option value="deepseek" ${cfg.ocrProvider === 'deepseek' ? 'selected' : ''}>DeepSeek 视觉转录</option>
       </select>
     </label>

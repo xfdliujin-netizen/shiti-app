@@ -35,6 +35,81 @@ export function createOCRService(fetcher = globalThis.fetch) {
     try { return await promise; } finally { if (pending?.promise === promise) pending = null; }
   }
 
+  async function gradeHomework(action, payload, env, reply) {
+    try {
+      const token = await accessToken(env);
+      const response = await fetcher('https://aip.baidubce.com/rest/2.0/ocr/v1/correct_edu/' + action + '?access_token=' + encodeURIComponent(token), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(30000)
+      });
+      if (!response.ok) return reply(502, { error: '百度作业批改服务暂不可用' });
+      const json = await response.json();
+      const result = json.result;
+      const code = Number(json.error_code ?? 0);
+      if (action === 'get_result' && (['Pending', 'Running'].includes(result?.status) || [50, 60].includes(code))) {
+        return reply(200, { status: 'pending' });
+      }
+      if (code || result?.status === 'Failed') {
+        if ([110, 111].includes(code)) cached = null;
+        return reply(200, { error_code: Number.isSafeInteger(code) ? code || -1 : -1, failed: result?.status === 'Failed' });
+      }
+      if (action === 'create_task' && typeof result?.task_id === 'string' && /^\d{1,40}$/.test(result.task_id)) {
+        return reply(200, { task_id: result.task_id });
+      }
+      if (action === 'get_result' && result?.status === 'Success' && Array.isArray(result.imageResults)) {
+        const questions = result.imageResults.flatMap(page => Array.isArray(page?.result) ? page.result : [])
+          .filter(question => question && typeof question === 'object')
+          .map((question, index) => ({
+            number: Number.isSafeInteger(question.seqence) && question.seqence >= 0 ? question.seqence + 1 : index + 1,
+            verdict: Number(question.correctResult),
+            reasons: Array.isArray(question.slot) ? question.slot.map(slot => slot?.reason).filter(reason => typeof reason === 'string' && reason.trim()) : []
+          }));
+        return reply(200, { status: 'complete', questions });
+      }
+      return reply(502, { error: '百度作业批改返回了无法识别的结果' });
+    } catch (error) {
+      return reply(502, { error: error.message === 'BAIDU_AUTH' ? '百度鉴权失败，请检查代理端凭据和作业批改权限' : '百度作业批改请求失败或超时' });
+    }
+  }
+
+  async function completeWithQwen(payload, env, reply) {
+    if (!env.QWEN_API_KEY) return reply(503, { error: '代理尚未配置 QWEN_API_KEY' });
+    const { model, messages, max_tokens } = payload || {};
+    if (typeof model !== 'string' || !/^[A-Za-z0-9_.:-]{1,100}$/.test(model) ||
+        !Array.isArray(messages) || messages.length !== 2 ||
+        messages[0]?.role !== 'system' || messages[1]?.role !== 'user' ||
+        messages.some(message => typeof message.content !== 'string') ||
+        new TextEncoder().encode(messages.map(message => message.content).join('')).length > 24000 ||
+        !Number.isInteger(max_tokens) || max_tokens < 1 || max_tokens > 8000) {
+      return reply(400, { error: '千问请求的模型、文字内容或输出预算无效' });
+    }
+    try {
+      const base = new URL(env.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1');
+      if (base.protocol !== 'https:' || base.username || base.password || base.port || base.search || base.hash ||
+          !['/compatible-mode/v1', '/compatible-mode/v1/'].includes(base.pathname) ||
+          !/^(?:[a-z0-9.-]+\.maas\.aliyuncs\.com|(?:cn-hongkong\.)?dashscope(?:-intl|-us)?\.aliyuncs\.com)$/.test(base.hostname)) {
+        return reply(503, { error: '代理端 QWEN_BASE_URL 需使用百炼 OpenAI 兼容地址' });
+      }
+      const response = await fetcher(base.href.replace(/\/$/, '') + '/chat/completions', {
+        method: 'POST',
+        redirect: 'error',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.QWEN_API_KEY },
+        body: JSON.stringify({
+          model, messages: messages.map(({ role, content }) => ({ role, content })), max_tokens,
+          enable_thinking: false, response_format: { type: 'json_object' }, temperature: 0, stream: false
+        }),
+        signal: AbortSignal.timeout(150000)
+      });
+      const json = await response.json();
+      return response.ok ? reply(200, { choices: json.choices, usage: json.usage })
+        : reply(response.status, { code: json.code || json.error?.code });
+    } catch {
+      return reply(502, { error: '代理请求百炼失败或超时' });
+    }
+  }
+
   return async function handle(request, env) {
     const origin = request.headers.get('Origin');
     const rawAllowed = String(env.ALLOWED_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -79,8 +154,8 @@ export function createOCRService(fetcher = globalThis.fetch) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (request.method !== 'POST') return reply(405, { error: '仅支持 POST' });
 
-    if (!env.OCR_PROXY_TOKEN || env.OCR_PROXY_TOKEN.length < 24 || !env.BAIDU_API_KEY || !env.BAIDU_SECRET_KEY) {
-      return reply(503, { error: '代理尚未配置完整：请检查 Worker 的 BAIDU_API_KEY、BAIDU_SECRET_KEY、OCR_PROXY_TOKEN（至少24位）' });
+    if (!env.OCR_PROXY_TOKEN || env.OCR_PROXY_TOKEN.length < 24) {
+      return reply(503, { error: '代理尚未配置 OCR_PROXY_TOKEN（至少24位）' });
     }
     if (request.headers.get('X-OCR-Token') !== env.OCR_PROXY_TOKEN) {
       return reply(401, { error: 'OCR 代理访问口令不正确，请核对设置中的口令' });
@@ -112,10 +187,25 @@ export function createOCRService(fetcher = globalThis.fetch) {
       return reply(400, { error: 'JSON 格式错误' });
     }
 
-    if (typeof body.image !== 'string' || !body.image) return reply(400, { error: '缺少选框图片' });
+    if (!body || typeof body !== 'object') return reply(400, { error: 'JSON 格式错误' });
+    if (body.action === 'qwen-completion') return completeWithQwen(body.payload, env, reply);
+    if (!env.BAIDU_API_KEY || !env.BAIDU_SECRET_KEY) {
+      return reply(503, { error: '代理尚未配置 BAIDU_API_KEY 或 BAIDU_SECRET_KEY' });
+    }
+    if (body.action === 'homework-result') {
+      if (typeof body.task_id !== 'string' || !/^\d{1,40}$/.test(body.task_id)) return reply(400, { error: '批改任务编号无效' });
+      return gradeHomework('get_result', { task_id: body.task_id }, env, reply);
+    }
+    if (body.action !== undefined && body.action !== 'homework-create') return reply(400, { error: '不支持的操作' });
+    if (typeof body.image !== 'string' || !body.image) return reply(400, { error: '缺少图片' });
     const m = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(body.image);
     if (!m || m[2].length % 4 !== 0) return reply(400, { error: '需要 PNG 或 JPEG 的 base64 图片' });
     if (m[2].length > MAX_IMAGE) return reply(413, { error: '图片编码超过 10 MB，请缩小选框' });
+    if (body.action === 'homework-create') {
+      if (m[1] === 'webp') return reply(400, { error: '作业批改需要 JPG 或 PNG 图片' });
+      if (encodeURIComponent(m[2]).length > MAX_IMAGE) return reply(413, { error: '作业图片编码超过 10 MB' });
+      return gradeHomework('create_task', { image: m[2] }, env, reply);
+    }
     const mode = body.mode || 'basic';
     if (!['basic','accurate'].includes(mode)) return reply(400,{error:'不支持的 OCR 模式'});
 

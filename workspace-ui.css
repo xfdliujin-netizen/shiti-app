@@ -941,6 +941,10 @@ dialog#detail .detail-head {
 .exam-history-entry { display:grid; gap:4px; width:100%; text-align:start; white-space:normal; }
 .exam-history-entry span { font-size:12px; }
 .exam-history p { margin:12px 0 0; }
+.homework-grading { border-top:1px solid var(--line); margin-top:12px; padding-top:12px; }
+.homework-grading h3 { margin:12px 0 6px; }
+.homework-grading details { border-bottom:1px solid var(--line); padding:8px 0; }
+.homework-grading summary { cursor:pointer; }
 .detail-head .detail-number { min-width:0; font-variant-numeric:tabular-nums; }
 .detail-verdict-row {
   display:grid;

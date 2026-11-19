@@ -13,6 +13,7 @@ enabled = true
 [vars]
 ALLOWED_ORIGIN = "https://shiti.86518925.xyz,https://xfdliujin-netizen.github.io"
 # BAIDU_API_KEY / BAIDU_SECRET_KEY / OCR_PROXY_TOKEN 请通过 Secrets 配置。
+# 千问代理可选：QWEN_API_KEY 使用 Secret；QWEN_BASE_URL 可在变量中设置。
 
 [[routes]]
 pattern = "ocr.86518925.xyz"

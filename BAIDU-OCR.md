@@ -1,5 +1,16 @@
 # 百度 OCR 接入与部署
 
+## 千问文字模型与百度智能作业批改
+
+- 千问在「设置 → 文字分析与练习」配置。选择「千问」，填百炼 API Key 和对应地域的 OpenAI 兼容 Base URL。默认模型为 `qwen-plus`，自定义模型需支持非思考模式下的 JSON 输出。所选模型用于文字分析、AI 判题和出题。
+- 若浏览器直连受跨域或网络限制，可使用同一个代理。将 `QWEN_API_KEY` 作为 Worker Secret 配置，可选设置 `QWEN_BASE_URL`，然后在设置中勾选「通过已配置的代理调用千问」。本地运行时可在 `.env` 设置同名变量。
+- 百度作业批改复用现有 `/api/ocr` 代理和口令。线上使用前需将更新后的 `proxy/worker.mjs` 部署到现有 Worker，并确认百度应用已获「智能作业批改」权限。录题页上传整张作业图片后，点击「百度批改整张作业图」。应用展示逐题判断和返回的说明，供人工核对。
+- 设置显示本设备记录的千问 Token 和百度已提交批改次数。平台账户余量请通过两个设置入口打开官方控制台。百炼的控制台数据为分钟级更新，官方 CLI 的 `bl usage free` 需要单独的控制台登录。
+
+官方文档：[百炼兼容接口](https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope) · [百炼免费额度](https://help.aliyun.com/zh/model-studio/new-free-quota/) · [百度智能作业批改 API](https://ai.baidu.com/ai-doc/OCR/omimjkvlz)
+
+## 原有 OCR 功能
+
 当前默认流程：**本地旋转与框选 → 百度高精度 OCR → 人工校对 → DeepSeek 文字分析 / 举一反三**。
 
 百度负责识字，网页将 `words_result` 中每行的 `words` 原样拼接，不自动纠错、不调用 DeepSeek 重写转录。每个框作为一道题，选择题请框全题干和所有选项。印刷文字与手写答案可能混合，请自行区分。OCR 本身仍可能错认字，必须对照裁剪图校对。保存时会一并保留裁剪图、OCR 原始文本和返回的行记录。
