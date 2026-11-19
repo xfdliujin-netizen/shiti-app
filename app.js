@@ -52,13 +52,11 @@ const regionList = [
 const paths = [
   '<path d="M12 5v14M5 12h14"/>',
   '<path d="M4 4h6a3 3 0 0 1 2 2 3 3 0 0 1 2-2h6v15h-6a3 3 0 0 0-2 2 3 3 0 0 0-2-2H4z"/>',
-  '<path d="m13 2-9 12h7l-1 8 10-12h-7z"/>',
   '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h4"/><path d="M10 12h5M10 16h5"/>',
+  '<path d="M4 4h16v16H4z"/><path d="M8 4v16M4 9h16M12 13h4M12 16h4"/>',
   '<circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/>'
 ];
-paths.splice(2,0,'<path d="M4 4h16v16H4z"/><path d="M8 4v16M4 9h16M12 13h4M12 16h4"/>');
-paths.splice(3,2);
-const tabs = [['capture', '录题'], ['notebook', '错题本'], ['libraries','题库'], ['settings', '设置']];
+const tabs = [['capture', '录题'], ['notebook', '错题本'], ['exam', '练习'], ['libraries', '题库'], ['settings', '设置']];
 
 let data = { version: 1, questions: [], practices: [], deleted: {} },
     cfg = readConfig(),
@@ -218,7 +216,7 @@ function toast(s) {
 function uid() { return generateId(); }
 function stamp() { return new Date().toISOString(); }
 function date(s) { return new Date(s).toLocaleDateString('zh-CN'); }
-function current() { const h = location.hash.slice(1); if (h === 'practice') return 'variants'; return [...tabs.map(t=>t[0]),'variants','exam'].includes(h) ? h : 'capture'; }
+function current() { const h = location.hash.slice(1); if (h === 'practice') return 'variants'; return [...tabs.map(t=>t[0]),'variants'].includes(h) ? h : 'capture'; }
 function opts(selected) { return subjects.map(s => `<option ${s === selected ? 'selected' : ''}>${s}</option>`).join(''); }
 function field(label, id, value = '', type = 'text', placeholder = '') {
   return `<label class="field"><span>${label}</span><input id="${id}" type="${type}" value="${esc(value)}" placeholder="${placeholder}"></label>`;
@@ -260,12 +258,21 @@ function renderSubjectConfigModal() {
 
 function render() {
   injectCustomStyles();
-  const tab = current(),parentTab=tab==='variants'?'notebook':tab==='exam'?'libraries':tab;
+  const tab = current(), parentTab = tab === 'variants' ? 'notebook' : tab;
   const draftWasOpen = Boolean($('#draft-dialog')?.open);
   const paperWasOpen = !!document.getElementById('paper-dialog')?.open;
   const p = getStudentProfile();
   if ($('#nav')) {
     $('#nav').innerHTML = tabs.map((t, i) => `<a href="#${t[0]}" class="${parentTab === t[0] ? 'active' : ''}" ${parentTab === t[0] ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${paths[i]}</svg><span>${t[1]}</span></a>`).join('');
+    $('#nav a[href="#notebook"]').addEventListener('click', event => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      resetNotebookSubject();
+      if (tab === 'notebook') {
+        event.preventDefault();
+        render();
+        $('#nav a[href="#notebook"]').focus();
+      }
+    });
   }
   if ($('#breadcrumb')) $('#breadcrumb').textContent = `${p.stageName}（${p.grade}） / ` + tabs.find(t => t[0] === parentTab)[1];
   const mobileBar = '';
@@ -315,9 +322,9 @@ function cards(qs) {
     : '<div class="card empty"><b>还没有符合条件的错题记录</b>拍一张照片，或切换筛选条件查看其他题目。</div>';
 }
 
-function workspaceSwitch(group,active){
-  const entries=group==='notebook'?[['notebook','错题本'],['variants','举一反三']]:[['libraries','题库'],['exam','试卷']];
-  return `<div class="workspace-header"><h1 class="visually-hidden">${entries.find(([id])=>id===active)[1]}</h1><nav class="workspace-tabs" aria-label="${group==='notebook'?'错题与练习':'题库与试卷'}">${entries.map(([id,label])=>`<a href="#${id}" class="${id===active?'active':''}" ${id===active?'aria-current="page"':''}>${label}</a>`).join('')}</nav></div>`;
+function notebookWorkspaceSwitch(active) {
+  const entries = [['notebook', '错题本'], ['variants', '举一反三']];
+  return `<div class="workspace-header"><h1 class="visually-hidden">${entries.find(([id])=>id===active)[1]}</h1><nav class="workspace-tabs" aria-label="错题与变式">${entries.map(([id,label])=>`<a href="#${id}" class="${id===active?'active':''}" ${id===active?'aria-current="page"':''}>${label}</a>`).join('')}</nav></div>`;
 }
 
 function capture() {
@@ -433,6 +440,11 @@ function clearNotebookFacets() {
   notebookTags.clear();
   aiFilter = '全部';
 }
+function resetNotebookSubject() {
+  filter = '全部';
+  clearNotebookFacets();
+  notebookFiltersOpen = false;
+}
 function notebook(){
   if(typeof activeNotebook!=='undefined')activeNotebook='all';
   const profile = getStudentProfile();
@@ -465,8 +477,8 @@ function notebook(){
       </div></div>
     </div>`;
   const subjectList=[...new Set([...getQuickSubjects(),...data.questions.map(q=>q.subject)])];
-  const head = detail ? `<div class="subject-detail-head"><button type="button" class="text-button" id="notebook-back">← 科目列表</button><h2>${esc(filter)}错题本</h2>${status}</div>` : '';
-  return workspaceSwitch('notebook','notebook')+head+toolbar+tools+notebookPrintOptions()+(detail?facets+`<div class="section-title"><h2>题目</h2><span class="muted">${shown.length} 题</span></div>`+cards(shown):`<div class="subject-notebook-list">${subjectList.map((subject,i)=>{const n=shown.filter(q=>q.subject===subject).length;return `<button type="button" class="subject-notebook-card" data-notebook-subject="${subject}"><span class="subject-book-icon tone-${i%4}">▤</span><span class="subject-book-copy"><strong>${subject}错题本</strong><small>${n} 道错题</small></span><span class="subject-book-arrow">›</span></button>`}).join('')}</div>${query?'<div class="section-title"><h2>搜索结果</h2></div>'+cards(shown):''}`);
+  const head = detail ? `<div class="subject-detail-head"><div class="subject-detail-title"><button type="button" class="text-button" id="notebook-back" aria-label="返回科目列表"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m7-7-7 7 7 7"/></svg></button><h1>${esc(filter)}错题本</h1></div>${status}</div>` : notebookWorkspaceSwitch('notebook');
+  return head+toolbar+tools+notebookPrintOptions()+(detail?facets+`<div class="section-title"><h2>题目</h2><span class="muted">${shown.length} 题</span></div>`+cards(shown):`<div class="subject-notebook-list">${subjectList.map((subject,i)=>{const n=shown.filter(q=>q.subject===subject).length;return `<button type="button" class="subject-notebook-card" data-notebook-subject="${subject}"><span class="subject-book-icon tone-${i%4}">▤</span><span class="subject-book-copy"><strong>${subject}错题本</strong><small>${n} 道错题</small></span><span class="subject-book-arrow">›</span></button>`}).join('')}</div>${query?'<div class="section-title"><h2>搜索结果</h2></div>'+cards(shown):''}`);
 }
 function bindNotebookWorkspace(){
   document.querySelectorAll('[data-notebook-subject]').forEach(button => {
@@ -481,10 +493,10 @@ function bindNotebookWorkspace(){
     };
   });
   if ($('#notebook-back')) $('#notebook-back').onclick = () => {
-    filter = '全部';
-    clearNotebookFacets();
-    notebookFiltersOpen = false;
+    const subject = filter;
+    resetNotebookSubject();
     render();
+    [...document.querySelectorAll('[data-notebook-subject]')].find(button => button.dataset.notebookSubject === subject)?.focus();
   };
   const toggle = $('#notebook-toggle-filters');
   const panel = $('#notebook-facet-panel');
@@ -613,7 +625,7 @@ const filteredQuestions = data.questions
 .sort((a, b) => b.created.localeCompare(a.created));
 
 return renderStageBanner() +
-workspaceSwitch('notebook','variants') + '<div class="workspace-caption">AI 变式 + 智能批改</div>' + `
+notebookWorkspaceSwitch('variants') + '<div class="workspace-caption">AI 变式 + 智能批改</div>' + `
 <section class="card">
 ${subjectPicker('prac', subjList, practiceSubject)}
 ${renderSubjectConfigModal()}
@@ -648,7 +660,6 @@ function practicePage() { return variantsPage();}
 
 function examPage() {
 if(!['original','ai'].includes(examMode))examMode='original';
-const p = getStudentProfile();
 const examSubjList = getQuickSubjects();
 if (!examSubjList.includes(examSubject)) examSubject = examSubjList[0] || '语文';
 const available=data.questions.filter(q=>q.subject===examSubject&&(examScope!=='unmastered'||!q.mastered)).length;
@@ -657,7 +668,7 @@ if (!countOptions.includes(examCount)) examCount = 5;
 const insufficient=examMode==='original'&&available<examCount;
 
 return renderStageBanner() +
-workspaceSwitch('libraries','exam') + `
+`<h1 class="visually-hidden">练习</h1>
 <section class="card" id="exam-builder">
 <div class="exam-mode-row"><div class="segmented exam-source-tabs">
 <button type="button" data-exam-mode="original" class="${examMode === 'original'? 'active': ''}">错题重练</button>
@@ -685,7 +696,19 @@ ${insufficient&&available?`<button type="button" class="secondary" id="exam-use-
 <button class="primary" id="build-exam" ${insufficient?'disabled':''}>${insufficient?'原题不足（'+available+'/'+examCount+'）':'生成 '+examCount+' 道题'}</button>
 </section>
 
-<div id="exam-area">${examSheet? renderExamSheet(): ''}</div>`;
+<div id="exam-area">${examSheet ? renderExamSheet() : ''}</div>
+${renderExamHistory()}`;
+}
+
+function renderExamHistory() {
+  const records = [...(data.examHistory || [])].sort((a, b) => b.created.localeCompare(a.created));
+  return `<details class="card exam-history">
+    <summary>练习记录 <span class="muted">${records.length} 次</span></summary>
+    ${records.length ? `<ul>${records.map(record => `<li><button type="button" class="secondary exam-history-entry" data-exam-record="${esc(record.id)}">
+      <strong>${esc(record.title)}</strong>
+      <span class="muted">${esc(new Date(record.created).toLocaleString('zh-CN'))} · ${record.items.length} 题</span>
+    </button></li>`).join('')}</ul>` : '<p class="muted">暂无练习记录</p>'}
+  </details>`;
 }
 
 function examQuestionImages(item, index) {
@@ -698,12 +721,11 @@ function examQuestionImages(item, index) {
 
 function renderExamSheet() {
   if (!examSheet) return '';
-  const p = getStudentProfile();
   return `<section class="card" id="printable-exam" style="background:#fff;border:1.5px solid #d1d5db">
     <div class="card-head" style="border-bottom:2px solid #111827;padding-bottom:12px;margin-bottom:16px">
       <div>
         <h2 style="font-size:18px;margin-bottom:4px">${esc(examSheet.title)}</h2>
-        <p class="subtitle">${esc(p.stageName)} · ${esc(p.grade)} · 生成时间：${esc(examSheet.created)} · 共 ${examSheet.items.length} 题 · 姓名：__________  得分：______</p>
+        <p class="subtitle">${esc(examSheet.stageName)} · ${esc(examSheet.grade)} · 生成时间：${esc(date(examSheet.created))} · 共 ${examSheet.items.length} 题 · 姓名：__________  得分：______</p>
       </div>
       <div class="actions" style="margin:0">
         <button type="button" class="secondary" id="toggle-exam-ans" style="padding:6px 12px;font-size:13px">${examShowAnswers ? '隐藏答案解析' : '显示参考答案'}</button>
@@ -1356,21 +1378,25 @@ function bindPractice() {
   if ($('#exam-count')) $('#exam-count').onchange = e => { examCount = Number(e.target.value);examSheet=null;render(); };
   if ($('#exam-use-ai')) $('#exam-use-ai').onclick=()=>{examMode='ai';if(![3,5,8,10].includes(examCount))examCount=5;examSheet=null;render()};
 
+  document.querySelectorAll('[data-exam-record]').forEach(button => {
+    button.onclick = () => {
+      const record = data.examHistory.find(record => record.id === button.dataset.examRecord);
+      if (record) openExamSheet(record);
+    };
+  });
+
   if ($('#build-exam')) $('#build-exam').onclick = e => run(e.target, async () => {
-    let pool = data.questions.filter(q => q.subject === examSubject && (examScope !== 'unmastered' || !q.mastered));
+    const mode = examMode, count = examCount, subjLabel = examSubject;
+    const pool = data.questions.filter(q => q.subject === subjLabel && (examScope !== 'unmastered' || !q.mastered));
     if (!pool.length) throw Error(examScope === 'unmastered' ? '本科目暂无待巩固错题，请切换科目或选择全部错题' : '本科目暂无可用错题，请先录题或切换科目');
-    if(examMode==='original'&&pool.length<examCount)throw Error(`当前只有 ${pool.length} 道原题，无法整理为 ${examCount} 道；请减少题量或切换 AI 扩展`);
+    if(mode==='original'&&pool.length<count)throw Error(`当前只有 ${pool.length} 道原题，无法整理为 ${count} 道；请减少题量或切换 AI 扩展`);
 
-    const sortedPool = [...pool].sort((a, b) => Number(a.mastered) - Number(b.mastered) || b.created.localeCompare(a.created));
-    const chosen = sortedPool.slice(0, examCount);
-    const subjLabel = examSubject;
+    const chosen = pool.sort((a, b) => Number(a.mastered) - Number(b.mastered) || b.created.localeCompare(a.created)).slice(0, count);
     const prof = getStudentProfile();
+    let items;
 
-    if (examMode === 'original') {
-      examSheet = {
-        title: `拾题 · ${prof.grade}${subjLabel}错题重练卷`,
-        created: new Date().toLocaleDateString('zh-CN'),
-        items: chosen.map(q => ({
+    if (mode === 'original') {
+      items = chosen.map(q => ({
           recordId: q.id,
           subject: q.subject,
           source: q.source || `#${shortQuestionNumber(q.number)}`,
@@ -1380,35 +1406,35 @@ function bindPractice() {
           figureRegion: q.figureRegion,
           answer: q.answer,
           analysis: q.analysis
-        }))
-      };
-      examShowAnswers = false;
-      render();
-      setTimeout(() => $('#exam-area')?.scrollIntoView({ behavior: 'smooth' }), 50);
-      toast(`✓ 已整理 ${chosen.length} 道错题生成试卷`);
+      }));
     } else {
       const seedCount = Math.min(chosen.length, 3);
       const seeds = chosen.slice(0, seedCount);
       const promptSeeds = seeds.map((q, i) => `【母题${i + 1}（${q.subject} · 历史标签:${inferAiVerdict(q)}）】${q.text}（知识点：${(q.tags || []).join('，') || '课内巩固'}）`).join('\n');
-      const r = await ai(`请为【${prof.stageName}${prof.grade} · 地区教材背景：${prof.region}】学生命制【${subjLabel}】单科试卷，所有题目 subject 必须为“${subjLabel}”，不能混入其他科目。基于以下 ${seedCount} 道学生错题命制共 ${examCount} 道扩展训练题（若母题不足，请围绕本科目薄弱知识点补充同类新题）。要求：题干完整清晰、不要照抄原题数字或选项、难度贴合${prof.grade}、条件充分、答案准确。返回严格 JSON：{"items":[{"subject":"${subjLabel}","text":"完整题干（含选项）","answer":"标准答案","analysis":"分步解析"}]}。\n\n错题母题：\n${promptSeeds}`, undefined, {learning:{subject:subjLabel,text:seeds.map(q=>q.text).join(' '),tags:seeds.flatMap(q=>q.tags||[]),excludeIds:seeds.map(q=>q.id)}});
-      if (!Array.isArray(r.items) || r.items.length!==examCount || r.items.some(x=>!x.text||!x.answer||!x.analysis||(x.subject&&x.subject!==subjLabel))) throw Error('AI 返回的题量、科目或题目内容不符合要求，未采用此结果');
-      examSheet = {
-        title: `拾题 · ${prof.grade}${subjLabel} AI 变式扩展训练卷`,
-        created: new Date().toLocaleDateString('zh-CN'),
-        items: r.items.map(x => ({
+      const r = await ai(`请为【${prof.stageName}${prof.grade} · 地区教材背景：${prof.region}】学生命制【${subjLabel}】单科试卷，所有题目 subject 必须为“${subjLabel}”，不能混入其他科目。基于以下 ${seedCount} 道学生错题命制共 ${count} 道扩展训练题（若母题不足，请围绕本科目薄弱知识点补充同类新题）。要求：题干完整清晰、不要照抄原题数字或选项、难度贴合${prof.grade}、条件充分、答案准确。返回严格 JSON：{"items":[{"subject":"${subjLabel}","text":"完整题干（含选项）","answer":"标准答案","analysis":"分步解析"}]}。\n\n错题母题：\n${promptSeeds}`, undefined, {learning:{subject:subjLabel,text:seeds.map(q=>q.text).join(' '),tags:seeds.flatMap(q=>q.tags||[]),excludeIds:seeds.map(q=>q.id)}});
+      if (!Array.isArray(r.items) || r.items.length!==count || r.items.some(x=>!x?.text||!x.answer||!x.analysis||(x.subject&&x.subject!==subjLabel))) throw Error('AI 返回的题量、科目或题目内容不符合要求，未采用此结果');
+      items = r.items.map(x => ({
           subject: subjLabel,
           source: 'AI 扩展变式',
           text: String(x.text || ''),
           image: '',
           answer: String(x.answer || ''),
           analysis: String(x.analysis || '')
-        }))
-      };
-      examShowAnswers = false;
-      render();
-      setTimeout(() => $('#exam-area')?.scrollIntoView({ behavior: 'smooth' }), 50);
-      toast(`✓ 已生成 ${examSheet.items.length} 道 AI 扩展训练卷`);
+      }));
     }
+    const created = stamp();
+    const record = {
+      id: uid(),
+      title: `拾题 · ${prof.grade}${subjLabel}${mode === 'original' ? '错题重练卷' : ' AI 变式扩展训练卷'}`,
+      stageName: prof.stageName,
+      grade: prof.grade,
+      created,
+      updated: created,
+      items
+    };
+    await persist({ ...data, examHistory: [...(data.examHistory || []), record] });
+    if (current() === 'exam') openExamSheet(record);
+    toast(`✓ 已生成并保存 ${items.length} 道练习题`);
   });
 
   if ($('#toggle-exam-ans')) $('#toggle-exam-ans').onclick = () => {
@@ -1489,6 +1515,13 @@ function bindPractice() {
   }));
 }
 
+function openExamSheet(record) {
+  examSheet = record;
+  examShowAnswers = false;
+  render();
+  $('#exam-area')?.scrollIntoView({ behavior: 'smooth' });
+}
+
 function saveConfig() {
   cfg = {
     ...cfg,
@@ -1521,6 +1554,18 @@ function validate(d) {
     if (!q.id || !q.number || !subjects.includes(q.subject) || typeof q.text !== 'string' || !Array.isArray(q.tags) || q.tags.some(t => typeof t !== 'string') || !Number.isFinite(Date.parse(q.updated)) || !Number.isFinite(Date.parse(q.created)) || q.image && !/^data:image\/(jpeg|png|webp|gif);base64,[a-zA-Z0-9+/=]+$/.test(q.image)) throw Error('备份中存在无效题目');
   }
   for (const p of d.practices) if (!p.id || typeof p.text !== 'string' || !Number.isFinite(Date.parse(p.created)) || !Number.isFinite(Date.parse(p.updated))) throw Error('备份中存在无效练习');
+  if (d.examHistory !== undefined) {
+    if (!Array.isArray(d.examHistory)) throw Error('练习记录格式无效');
+    for (const record of d.examHistory) {
+      if (typeof record?.id !== 'string' || !record.id || typeof record.title !== 'string' ||
+          typeof record.stageName !== 'string' || typeof record.grade !== 'string' ||
+          !Number.isFinite(Date.parse(record.created)) || !Number.isFinite(Date.parse(record.updated)) ||
+          !Array.isArray(record.items) || !record.items.length ||
+          record.items.some(item => typeof item?.text !== 'string' || !subjects.includes(item.subject) || (item.image && !isStudyImage(item.image)))) {
+        throw Error('备份中存在无效练习记录');
+      }
+    }
+  }
   for (const [k, v] of Object.entries(d.deleted)) if (!k || !Number.isFinite(Date.parse(v))) throw Error('删除记录无效');
   if(typeof validateExtraData==='function')validateExtraData(d);
   return d;
@@ -1534,7 +1579,7 @@ function merge(a, b) {
     for (const i of y) if (!m.has(i.id) || i.updated > m.get(i.id).updated) m.set(i.id, i);
     return [...m.values()].filter(i => !deleted[prefix+i.id] || i.updated > deleted[prefix+i.id]);
   };
-  return { version: 1, questions: combine(a.questions, b.questions), practices: combine(a.practices, b.practices), notebooks:combine(a.notebooks||[],b.notebooks||[],'profile:notebook:'), bankRecords:combine(a.bankRecords||[],b.bankRecords||[],'profile:library:'), deleted };
+  return { version: 1, questions: combine(a.questions, b.questions), practices: combine(a.practices, b.practices), examHistory: combine(a.examHistory || [], b.examHistory || [], 'exam:'), notebooks:combine(a.notebooks||[],b.notebooks||[],'profile:notebook:'), bankRecords:combine(a.bankRecords||[],b.bankRecords||[],'profile:library:'), deleted };
 }
 
 function bindSettings() {
