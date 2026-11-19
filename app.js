@@ -671,6 +671,29 @@ function examQuestionPool() {
   return data.questions.filter(q => q.subject === examSubject && (examScope !== 'unmastered' || !q.mastered));
 }
 
+function sampleExamQuestions(pool, count, subject) {
+  const shuffled = [...pool];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const selected = shuffled.slice(0, count);
+  if (pool.length <= count) return selected;
+
+  let previous;
+  for (const record of data.examHistory || []) {
+    if (record.items.length !== count || !record.items.every(item => item.subject === subject && item.recordId)) continue;
+    if (!previous || record.created >= previous.created) previous = record;
+  }
+  if (previous) {
+    const selectedIds = new Set(selected.map(question => question.id));
+    if (previous.items.every(item => selectedIds.has(item.recordId))) {
+      selected[count - 1] = shuffled[count];
+    }
+  }
+  return selected;
+}
+
 function examPage() {
 const examSubjList = getQuickSubjects();
 if (!examSubjList.includes(examSubject)) examSubject = examSubjList[0] || '语文';
@@ -1446,12 +1469,11 @@ function bindPractice() {
     if (!pool.length) throw Error(examScope === 'unmastered' ? '本科目暂无待巩固错题，请切换科目或选择全部错题' : '本科目暂无可用错题，请先录题或切换科目');
     if (mode === 'original' && pool.length < count) throw Error(`当前只有 ${pool.length} 道原题，请减少题量或使用 AI 扩展`);
 
-    const chosen = pool.sort((a, b) => Number(a.mastered) - Number(b.mastered) || b.created.localeCompare(a.created)).slice(0, count);
     const prof = getStudentProfile();
     let items;
 
     if (mode === 'original') {
-      items = chosen.map(q => ({
+      items = sampleExamQuestions(pool, count, subjLabel).map(q => ({
         recordId: q.id,
         subject: q.subject,
         source: q.source || `#${shortQuestionNumber(q.number)}`,
@@ -1464,8 +1486,8 @@ function bindPractice() {
       }));
     } else {
       const provider = examModelProvider || defaultTextProvider();
-      const seedCount = Math.min(chosen.length, 3);
-      const seeds = chosen.slice(0, seedCount);
+      const seeds = pool.sort((a, b) => Number(a.mastered) - Number(b.mastered) || b.created.localeCompare(a.created)).slice(0, Math.min(count, 3));
+      const seedCount = seeds.length;
       const promptSeeds = seeds.map((q, i) => `【母题${i + 1}（${q.subject} · 历史标签:${inferAiVerdict(q)}）】${q.text}（知识点：${(q.tags || []).join('，') || '课内巩固'}）`).join('\n');
       const r = await ai(`请为【${prof.stageName}${prof.grade} · 地区教材背景：${prof.region}】学生命制【${subjLabel}】单科试卷，所有题目 subject 必须为“${subjLabel}”，不能混入其他科目。基于以下 ${seedCount} 道学生错题命制共 ${count} 道扩展训练题（若母题不足，请围绕本科目薄弱知识点补充同类新题）。要求：题干完整清晰、不要照抄原题数字或选项、难度贴合${prof.grade}、条件充分、答案准确。返回严格 JSON：{"items":[{"subject":"${subjLabel}","text":"完整题干（含选项）","answer":"标准答案","analysis":"分步解析"}]}。\n\n错题母题：\n${promptSeeds}`, undefined, {provider,learning:{subject:subjLabel,text:seeds.map(q=>q.text).join(' '),tags:seeds.flatMap(q=>q.tags||[]),excludeIds:seeds.map(q=>q.id)}});
       if (!Array.isArray(r.items) || r.items.length!==count || r.items.some(x=>!x?.text||!x.answer||!x.analysis||(x.subject&&x.subject!==subjLabel))) throw Error('AI 返回的题量、科目或题目内容不符合要求，未采用此结果');
