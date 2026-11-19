@@ -188,7 +188,6 @@ async function boot() {
       if (fallback && Array.isArray(fallback.questions)) data = fallback;
     } catch {}
   }
-  if(typeof restoreBankCache==='function')await restoreBankCache();
   render();
 }
 
