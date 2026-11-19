@@ -208,17 +208,17 @@ async function syncCloud() {
     if(!r.payload.cloudImage&&await cloudHash(JSON.stringify(normalized))===pending.get(key).hash){pending.delete(key);continue}
     throw Error('同步冲突：'+r.id+' 已在另一设备修改。本地内容已保留，请导出备份后核对；没有覆盖云端');
   }}
-  const next=structuredClone(initial);let profile,changed=false;
+  let next,profile;
   for(const r of received) {
     const key=r.kind+':'+r.id;if(pending.has(key))continue;
     if(r.revision===state.base[key]?.revision)continue;
     if(r.kind==='profile'){
       const target=typeof extraCloudTarget==='function'?extraCloudTarget(r.id):null;
-      if(target){changed=true;const list=next[target.list]||=[];const index=list.findIndex(p=>p.id===target.id);if(r.deleted){if(index>=0)list.splice(index,1);next.deleted['profile:'+r.id]=r.payload.updated}else{if(r.payload.id!==target.id)throw Error('云端错题本或题库编号不一致');if(index>=0)list[index]=r.payload;else list.push(r.payload);delete next.deleted['profile:'+r.id]}}
+      if(target){next||=structuredClone(initial);const list=next[target.list]||=[];const index=list.findIndex(p=>p.id===target.id);if(r.deleted){if(index>=0)list.splice(index,1);next.deleted['profile:'+r.id]=r.payload.updated}else{if(r.payload.id!==target.id)throw Error('云端错题本或题库编号不一致');if(index>=0)list[index]=r.payload;else list.push(r.payload);delete next.deleted['profile:'+r.id]}}
       else if(r.id==='student')profile=r.payload;
       state.base[key]={revision:r.revision,hash:await cloudHash(JSON.stringify({kind:r.kind,id:r.id,payload:r.payload,deleted:Boolean(r.deleted)}))};continue;
     }
-    changed=true;
+    next||=structuredClone(initial);
     const list=r.kind==='question'?next.questions:next.practices;
     const index=list.findIndex(q=>q.id===r.id);
     if(r.deleted){if(index>=0)list.splice(index,1);next.deleted[r.id]=r.payload.updated}
@@ -232,9 +232,9 @@ async function syncCloud() {
   if(data!==initial||JSON.stringify(cloudProfilePayload())!==profileInitial||cloudRoot()!==root) {
     throw Object.assign(Error('同步期间本地内容发生变化，正在等待重试'),{code:'local-change'});
   }
-  if(changed){validate(next);await persist(next,{sync:false})}
+  if(next){validate(next);await persist(next,{sync:false})}
   if(profile){cfg.stage=profile.stage;cfg.grade=profile.grade;cfg.term=['上','下'].includes(profile.term)?profile.term:getStudentProfile().term;cfg.region=profile.region;cfg.teachingStyle=profile.teachingStyle||'step';cfg.teachingFocus=profile.teachingFocus||'understanding';cfg.knowledgeProgress=profile.knowledgeProgress||{};cfg.methodProgress=profile.methodProgress||{};cfg.bankReviewed=profile.bankReviewed||[];if(Array.isArray(profile.sourceChoices))cfg.sourceChoices=profile.sourceChoices;if(profile.typeChoices&&typeof profile.typeChoices==='object')cfg.typeChoices=profile.typeChoices;cloudRuntime.profile=JSON.stringify(cloudProfilePayload());saveLocalConfig(false)}
-  if(changed||profile)await cloudSaveState(stateKey,state);
+  if(next||profile)await cloudSaveState(stateKey,state);
   // Persist progress per accepted record. Conflicts and interruptions never overwrite remote edits.
   for(const [key,entry] of pending) {
     const payload={...entry.payload};
@@ -246,7 +246,7 @@ async function syncCloud() {
   }
   state.cursor=cursor;await cloudSaveState(stateKey,state);
   if($('#save-status'))$('#save-status').textContent='已完成云端同步';
-  return {root,changed:changed||Boolean(profile)};
+  return {root,changed:Boolean(next||profile)};
 }
 async function cloudSaveState(key,state) {
   const tx=db.transaction('data','readwrite');tx.objectStore('data').put(state,key);

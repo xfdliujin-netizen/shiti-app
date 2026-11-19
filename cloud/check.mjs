@@ -18,8 +18,8 @@ const realFetch=globalThis.fetch;globalThis.fetch=async()=>new Response(JSON.str
 const b64=v=>Buffer.from(typeof v==='string'?v:JSON.stringify(v)).toString('base64url');
 async function jwt(overrides={}){const input=b64({alg:'RS256',kid:jwk.kid})+'.'+b64({iss:env.ACCESS_ISSUER,aud:[env.ACCESS_AUD],exp:Date.now()/1000+300,email:env.ALLOWED_EMAIL,...overrides});return input+'.'+Buffer.from(await crypto.subtle.sign('RSASSA-PKCS1-v1_5',pair.privateKey,new TextEncoder().encode(input))).toString('base64url')}
 const token=await jwt();
-async function call(path,method='GET',body,auth=token,origin=env.ALLOWED_ORIGIN,contentType='application/json'){
- return handle(new Request('https://api.86518925.xyz'+path,{method,headers:{Origin:origin,...(auth?{'Cf-Access-Jwt-Assertion':auth}:{}),'Content-Type':contentType},...(body!==undefined?{body:body instanceof Uint8Array?body:JSON.stringify(body)}:{})}),env);
+async function call(path,method='GET',body,auth=token,origin=env.ALLOWED_ORIGIN,contentType='application/json',extraHeaders={},context){
+ return handle(new Request('https://api.86518925.xyz'+path,{method,headers:{Origin:origin,...(auth?{'Cf-Access-Jwt-Assertion':auth}:{}),'Content-Type':contentType,...extraHeaders},...(body!==undefined?{body:body instanceof Uint8Array?body:JSON.stringify(body)}:{})}),env,context);
 }
 assert.equal((await call('/api/session','GET',undefined,null)).status,401);assert.equal(calls,0);
 assert.equal((await call('/api/session','GET',undefined,await jwt({email:'attacker@example.com'}))).status,401);assert.equal(calls,0);
@@ -27,6 +27,7 @@ assert.equal((await call('/api/session','GET',undefined,await jwt({exp:1}))).sta
 assert.equal((await call('/api/session','GET',undefined,token,'https://evil.example')).status,403);assert.equal(calls,0);
 assert.equal((await call('/api/session','GET',undefined,token+'x')).status,401);assert.equal(calls,0);
 assert.equal((await call('/api/bank','GET',undefined,null)).status,401);assert.equal(calls,0);
+assert.equal((await call('/api/live','GET',undefined,null,env.ALLOWED_ORIGIN,'application/json',{Upgrade:'websocket'})).status,401);assert.equal(calls,0);
 assert.equal((await call('/api/bank','PUT',{})).status,405);assert.equal(calls,0);
 const page=await(await call('/api/bank?grade=4&limit=20')).json();assert.equal(page.items.length,20);assert.equal(page.more,true);assert.ok(page.items.every(q=>!q.answer&&!q.analysis&&!q.numericAnswer&&!q.proof));
 const nextPage=await(await call('/api/bank?grade=4&limit=20&after='+page.cursor)).json();assert.ok(nextPage.items.every(q=>!page.items.some(p=>p.id===q.id)));
@@ -39,8 +40,22 @@ sql.prepare("UPDATE bank_questions SET review_status='pending' WHERE id=?").run(
 sql.prepare("UPDATE bank_questions SET review_status='checked' WHERE id=?").run(page.items[0].id);
 const payload={id:'q1',number:'001',subject:'语文',text:'测试题',tags:[],created:new Date().toISOString(),updated:new Date().toISOString()};
 const record={kind:'question',id:'q1',payload,revision:0,deleted:false};
-assert.equal((await call('/api/record','PUT',record)).status,200);
-assert.equal((await call('/api/record','PUT',record)).status,409);
+const events=[], deferred=[];
+env.SYNC_EVENTS={getByName(name){
+  assert.equal(name,'notebook');
+  return {fetch:async(url,options)=>{
+    events.push({path:new URL(url).pathname,options});
+    return new Response(null,{status:204});
+  }};
+}};
+assert.equal((await call('/api/live','GET',undefined,token,env.ALLOWED_ORIGIN,'application/json',{Upgrade:'websocket'})).status,204);
+assert.equal(events[0].path,'/subscribe');
+assert.ok(Number(events[0].options.headers['X-Sync-Expiry'])>Date.now());
+const ctx={waitUntil:promise=>deferred.push(promise)};
+assert.equal((await call('/api/record','PUT',record,token,env.ALLOWED_ORIGIN,'application/json',{},ctx)).status,200);
+assert.equal((await call('/api/record','PUT',record,token,env.ALLOWED_ORIGIN,'application/json',{},ctx)).status,409);
+await Promise.all(deferred);
+assert.deepEqual(events.map(event=>event.path),['/subscribe','/publish']);
 const first=await(await call('/api/changes')).json();assert.equal(first.items.length,1);assert.equal(first.items[0].revision,1);
 const race=await Promise.all([call('/api/record','PUT',{...record,revision:1}),call('/api/record','PUT',{...record,revision:1})]);
 assert.deepEqual(race.map(r=>r.status).sort(),[200,409]);

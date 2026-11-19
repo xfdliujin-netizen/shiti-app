@@ -51,3 +51,53 @@ const n4=client(true);await n4.syncCloud();n4.data.bankRecords=[part,meta];for(c
 const transport=n4.fetch;let interrupted=false;n4.fetch=async(url,opts)=>{if(opts?.method==='PUT'&&JSON.parse(opts.body).id==='library:'+meta.id&&!interrupted){interrupted=true;throw Error('offline')}return transport(url,opts)};
 await assert.rejects(()=>n4.syncCloud(),/连接失败/);const partRevision=records.get('profile:library:'+part.id).revision;n4.fetch=transport;await n4.syncCloud();assert.equal(records.get('profile:library:'+part.id).revision,partRevision);const n5=client(true);await n5.syncCloud();assert.equal(n5.data.bankRecords.length,2);
 console.log('Collection sync passed: new/legacy clients, private chunks, no-op, rename conflicts, isolated deletion and interrupted upload resume.');
+
+function realtimeClient() {
+  const instance=client(true), timers=new Map(), sockets=[], events=new Map();
+  let timerId=0;
+  Object.assign(instance,{
+    navigator:{onLine:true},window:{addEventListener:(type,listener)=>events.set(type,listener)},
+    document:{hidden:false,addEventListener(){},querySelector:()=>null},
+    setTimeout:callback=>{timers.set(++timerId,callback);return timerId},
+    clearTimeout:id=>timers.delete(id),setInterval:()=>0,current:()=> 'capture',busy:false,
+    WebSocket:class {
+      constructor(url){this.url=url;sockets.push(this)}
+      close(){}
+    }
+  });
+  instance.startCloudAutosync();
+  return {
+    instance,sockets,events,timers,
+    async tick(){
+      const [id,task]=timers.entries().next().value;
+      timers.delete(id);task();
+      await vm.runInContext('cloudRuntime.syncing',instance);
+    }
+  };
+}
+records.clear();
+const live1=realtimeClient(), live2=realtimeClient();
+await live1.tick();await live2.tick();
+for(const live of [live1,live2]) {
+  assert.equal(live.sockets[0].url,'wss://api.86518925.xyz/api/live');
+  live.sockets[0].onopen();
+  await live.tick();
+}
+const liveQuestion={id:'live1',number:'LIVE1',subject:'语文',tags:[],text:'实时新增',created:now,updated:now};
+live1.instance.navigator.onLine=false;
+live1.instance.data={...live1.instance.data,questions:[liveQuestion]};
+live1.instance.queueCloudSync();
+assert.equal(live1.timers.size,0);
+live1.instance.navigator.onLine=true;
+live1.events.get('online')();
+await live1.tick();
+assert.equal(records.get('question:live1').payload.text,'实时新增');
+live2.sockets[0].onmessage({data:'ignored'});
+assert.equal(live2.timers.size,0);
+live2.sockets[0].onmessage({data:'changed'});
+await live2.tick();
+assert.equal(live2.instance.data.questions[0].text,'实时新增');
+live2.instance.cfg.cloudAutoSync=false;
+live2.sockets[0].onmessage({data:'changed'});
+assert.equal(live2.timers.size,0);
+console.log('Realtime client checks passed: subscription, offline retention, reconnect upload, incremental pull on notification and opt-out.');

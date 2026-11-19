@@ -1684,7 +1684,7 @@ function saveConfig() {
     ocrProxy: $('#ocr-proxy') ? $('#ocr-proxy').value.trim() : cfg.ocrProxy
   };
   if ($('#ocr-token')) setStoredKey('shiti-ocr-token', $('#ocr-token').value.trim());
-  localStorage.setItem('shiti-config', JSON.stringify(cfg));
+  saveLocalConfig();
   if ($('#api-key')) setStoredKey('shiti-key', $('#api-key').value.trim());
   if ($('#qwen-key')) setStoredKey('shiti-qwen-key', $('#qwen-key').value.trim());
   if ($('#github-token')) setStoredKey('shiti-gh', $('#github-token').value.trim());
