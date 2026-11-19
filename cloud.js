@@ -42,6 +42,7 @@ function cloudEntries(notebook) {
   const result=new Map();
   for(const [kind,list] of [['question',notebook.questions],['practice',notebook.practices]])for(const p of list)result.set(kind+':'+p.id,{kind,id:p.id,payload:p,deleted:false});
   for(const [id,updated] of Object.entries(notebook.deleted)) {
+    if(id.startsWith('exam:'))continue;
     if(id.startsWith('profile:')){const recordId=id.slice(8);result.set('profile:'+recordId,{kind:'profile',id:recordId,payload:{updated},deleted:true});continue}
     // Existing application uses a shared tombstone namespace; preserve its semantics.
     for(const kind of ['question','practice'])result.set(kind+':'+id,{kind,id,payload:{updated},deleted:true});

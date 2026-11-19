@@ -73,6 +73,7 @@ let data = { version: 1, questions: [], practices: [], deleted: {} },
     practiceSubject = '全部',
     practiceAiFilter = '全部',
     examSheet = null,
+    examFolded = false,
     examSubject = '语文',
     examScope = 'unmastered',
     examCount = 5,
@@ -744,7 +745,7 @@ ${renderExamHistory()}`;
 
 function renderExamHistory() {
   const records = [...(data.examHistory || [])].sort((a, b) => b.created.localeCompare(a.created));
-  return `<details class="card exam-history">
+  return `<details class="card exam-history" id="exam-history" ${$('#exam-history')?.open ? 'open' : ''}>
     <summary>练习记录 <span class="muted">${records.length} 次</span></summary>
     ${records.length ? `<ul>${records.map(record => `<li><button type="button" class="secondary exam-history-entry" data-exam-record="${esc(record.id)}">
       <strong>${esc(record.title)}</strong>
@@ -766,15 +767,17 @@ function renderExamSheet() {
   return `<section class="card" id="printable-exam" style="background:#fff;border:1.5px solid #d1d5db">
     <div class="card-head" style="border-bottom:2px solid #111827;padding-bottom:12px;margin-bottom:16px">
       <div>
-        <h2 style="font-size:18px;margin-bottom:4px">${esc(examSheet.title)}</h2>
+        <h2 id="exam-sheet-title" tabindex="0" style="font-size:18px;margin-bottom:4px">${esc(examSheet.title)}</h2>
         <p class="subtitle">${esc(examSheet.stageName)} · ${esc(examSheet.grade)} · 生成时间：${esc(date(examSheet.created))} · 共 ${examSheet.items.length} 题 · 姓名：__________  得分：______</p>
       </div>
       <div class="actions" style="margin:0">
+        <button type="button" class="secondary" id="fold-exam" aria-controls="exam-sheet-body" aria-expanded="${!examFolded}" style="padding:6px 10px;font-size:13px">${examFolded ? '展开试卷' : '折叠试卷'}</button>
         <button type="button" class="secondary" id="toggle-exam-ans" style="padding:6px 12px;font-size:13px">${examShowAnswers ? '隐藏答案解析' : '显示参考答案'}</button>
         <button type="button" class="primary" id="print-exam" style="padding:6px 12px;font-size:13px">🖨️ 打印 / 导出 PDF</button>
         <button type="button" class="secondary" id="close-exam" style="padding:6px 10px;font-size:13px">关闭</button>
       </div>
     </div>
+    <div id="exam-sheet-body" ${examFolded ? 'hidden' : ''}>
     <div style="display:flex;flex-direction:column;gap:18px">
       ${examSheet.items.map((item, idx) => `
         <div style="padding-bottom:14px;border-bottom:1px dashed #e5e7eb">
@@ -797,6 +800,7 @@ function renderExamSheet() {
       </div>
     ` : ''}
     ${typeof bankAttribution==='function'?bankAttribution(examSheet.items):''}
+    </div>
   </section>`;
 }
 
@@ -1133,51 +1137,56 @@ function suppressHeldPointerClick(pointerId) {
 function bindOpen(withActions) {
   document.querySelectorAll('[data-open]').forEach(card => {
     const id = card.dataset.open;
-    let timer, press, suppressClick = false;
-    card.onclick = event => {
-      if (suppressClick && event.detail > 0) {
-        suppressClick = false;
-        return;
-      }
-      openQuestion(id);
-    };
-    if (!withActions) return;
-    card.classList.add('question-hold');
-    function cancelPress() {
-      clearTimeout(timer);
-      press = null;
-    }
-    function showActions() {
-      const pointerId = press?.id;
-      cancelPress();
-      if (!card.isConnected) return;
-      suppressClick = pointerId !== undefined;
-      if (suppressClick) suppressHeldPointerClick(pointerId);
-      openQuestionActions(id);
-    }
-    card.onpointerdown = event => {
-      suppressClick = false;
-      if (!event.isPrimary || event.button !== 0) return;
-      cancelPress();
-      press = { id: event.pointerId, x: event.clientX, y: event.clientY };
-      timer = setTimeout(showActions, 520);
-    };
-    card.onpointermove = event => {
-      if (press?.id === event.pointerId && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 10) cancelPress();
-    };
-    card.onpointerup = card.onpointercancel = card.onpointerleave = event => {
-      if (press?.id === event.pointerId) cancelPress();
-    };
-    card.oncontextmenu = event => {
-      event.preventDefault();
-      if (!suppressClick && (event.pointerType !== 'touch' || press)) showActions();
-    };
-    card.onkeydown = event => {
-      if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
-      event.preventDefault();
-      showActions();
-    };
+    const open = () => openQuestion(id);
+    if (withActions) bindHoldActions(card, () => openQuestionActions(id), open);
+    else card.onclick = open;
   });
+}
+
+function bindHoldActions(card, openActions, activate) {
+  let timer, press, suppressClick = false;
+  if (activate) card.onclick = event => {
+    if (suppressClick && event.detail > 0) {
+      suppressClick = false;
+      return;
+    }
+    activate();
+  };
+  card.classList.add('hold-actions');
+  function cancelPress() {
+    clearTimeout(timer);
+    press = null;
+  }
+  function showActions() {
+    const pointerId = press?.id;
+    cancelPress();
+    if (!card.isConnected) return;
+    suppressClick = pointerId !== undefined;
+    if (suppressClick) suppressHeldPointerClick(pointerId);
+    openActions();
+  }
+  card.onpointerdown = event => {
+    suppressClick = false;
+    if (!event.isPrimary || event.button !== 0) return;
+    cancelPress();
+    press = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    timer = setTimeout(showActions, 520);
+  };
+  card.onpointermove = event => {
+    if (press?.id === event.pointerId && Math.hypot(event.clientX - press.x, event.clientY - press.y) > 10) cancelPress();
+  };
+  card.onpointerup = card.onpointercancel = card.onpointerleave = event => {
+    if (press?.id === event.pointerId) cancelPress();
+  };
+  card.oncontextmenu = event => {
+    event.preventDefault();
+    if (!suppressClick && (event.pointerType !== 'touch' || press)) showActions();
+  };
+  card.onkeydown = event => {
+    if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+    event.preventDefault();
+    showActions();
+  };
 }
 
 function bindSubjectConfigEvents() {
@@ -1457,10 +1466,11 @@ function bindPractice() {
   if (modelProvider) modelProvider.onchange = () => { examModelProvider = modelProvider.value; };
 
   document.querySelectorAll('[data-exam-record]').forEach(button => {
-    button.onclick = () => {
-      const record = data.examHistory.find(record => record.id === button.dataset.examRecord);
+    const id = button.dataset.examRecord;
+    bindHoldActions(button, () => openExamActions(id), () => {
+      const record = data.examHistory.find(record => record.id === id);
       if (record) openExamSheet(record);
-    };
+    });
   });
 
   const buildExam = async mode => {
@@ -1518,6 +1528,15 @@ function bindPractice() {
     button.onclick = () => run(button, () => buildExam(button.dataset.buildExam));
   });
 
+  const examTitle = $('#exam-sheet-title');
+  if (examTitle) bindHoldActions(examTitle, () => openExamActions(examSheet.id));
+  const fold = $('#fold-exam');
+  if (fold) fold.onclick = () => {
+    examFolded = !examFolded;
+    $('#exam-sheet-body').hidden = examFolded;
+    fold.setAttribute('aria-expanded', String(!examFolded));
+    fold.textContent = examFolded ? '展开试卷' : '折叠试卷';
+  };
   if ($('#toggle-exam-ans')) $('#toggle-exam-ans').onclick = () => {
     examShowAnswers = !examShowAnswers;
     render();
@@ -1596,8 +1615,41 @@ function bindPractice() {
   }));
 }
 
+function openExamActions(id) {
+  const record = data.examHistory?.find(item => item.id === id);
+  if (!record || $('#exam-actions[open]')) return;
+  const dialog = document.createElement('dialog');
+  dialog.id = 'exam-actions';
+  dialog.className = 'compact-dialog question-actions-dialog';
+  dialog.setAttribute('aria-labelledby', 'exam-actions-title');
+  dialog.innerHTML = `<div class="card-head"><h2 id="exam-actions-title">试卷操作</h2>
+    <button type="button" class="dialog-x" data-close aria-label="关闭" autofocus>×</button></div>
+    <p>${esc(record.title)}</p>
+    <div class="question-action-list"><button type="button" class="secondary danger" data-delete>删除试卷</button></div>`;
+  dialog.querySelector('[data-close]').onclick = () => dialog.close();
+  dialog.querySelector('[data-delete]').onclick = event => {
+    if (!confirm('删除这份试卷和它的练习记录？')) return;
+    return run(event.currentTarget, async () => {
+      await persist({
+        ...data,
+        examHistory: data.examHistory.filter(item => item.id !== id),
+        deleted: { ...data.deleted, ['exam:' + id]: stamp() }
+      });
+      if (examSheet?.id === id) examSheet = null;
+      dialog.close();
+      render();
+      toast('试卷已删除');
+    });
+  };
+  dialog.onclick = event => { if (event.target === dialog) dialog.close(); };
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
 function openExamSheet(record) {
   examSheet = record;
+  examFolded = false;
   examShowAnswers = false;
   render();
   $('#exam-area')?.scrollIntoView({ behavior: 'smooth' });

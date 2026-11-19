@@ -642,7 +642,7 @@ button.secondary:active:not(:disabled),
 .notebook-detail-tools button { padding:6px 10px; white-space:nowrap; }
 .notebook-print-button { color:#fff; background:#5b3aae; border:1px solid transparent; font-weight:700; box-shadow:0 3px 10px #5b3aae26; }
 .notebook-print-button:hover { background:#4a2e96; }
-.question-hold { touch-action:pan-y pinch-zoom; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.hold-actions { touch-action:pan-y pinch-zoom; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
 dialog.question-actions-dialog[open] { position:fixed; inset:0; margin:auto; width:min(340px,calc(100vw - 32px)); background:var(--surface-solid); }
 .question-action-list { display:grid; gap:8px; }
 .question-action-list button { min-height:44px; }
