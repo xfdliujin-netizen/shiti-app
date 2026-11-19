@@ -444,6 +444,7 @@ function clearNotebookFacets() {
 }
 function resetNotebookSubject() {
   filter = '全部';
+  notebookPeriod = 'profile';
   clearNotebookFacets();
   notebookFiltersOpen = false;
 }
@@ -463,7 +464,6 @@ function notebook(){
       return `<option value="${esc(value)}" ${value===notebookPeriod?'selected':''}>${esc(compactNotebookPeriod(grade, term))}</option>`;
     }).join('')}
   </select>`;
-  const tools = detail ? '' : `<div class="notebook-grade-bar"><label for="notebook-period">年级／学期</label>${periodSelect}</div>`;
   const count = notebookTypes.size + notebookTags.size + Number(aiFilter !== '全部') + Number(notebookPeriod !== 'profile');
   const toolbar = detail ? `<div class="notebook-toolbar notebook-detail-tools">
     <button type="button" class="secondary" id="notebook-toggle-filters" aria-expanded="${notebookFiltersOpen}" aria-controls="notebook-facet-panel">筛选${count ? ' · '+count : ''} <span class="filter-chevron" aria-hidden="true">▾</span></button>
@@ -480,7 +480,7 @@ function notebook(){
     </div>`;
   const subjectList=[...new Set([...getQuickSubjects(),...data.questions.map(q=>q.subject)])];
   const head = detail ? `<div class="subject-detail-head"><div class="subject-detail-title"><button type="button" class="text-button" id="notebook-back" aria-label="返回科目列表"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m7-7-7 7 7 7"/></svg></button><h1>${esc(filter)}错题本</h1></div>${status}</div>` : notebookWorkspaceSwitch('notebook');
-  return head+toolbar+tools+notebookPrintOptions()+(detail?facets+`<div class="section-title"><h2>题目</h2><span class="muted">${shown.length} 题</span></div>`+cards(shown):`<div class="subject-notebook-list">${subjectList.map((subject,i)=>{const n=shown.filter(q=>q.subject===subject).length;return `<button type="button" class="subject-notebook-card" data-notebook-subject="${subject}"><span class="subject-book-icon tone-${i%4}">▤</span><span class="subject-book-copy"><strong>${subject}错题本</strong><small>${n} 道错题</small></span><span class="subject-book-arrow">›</span></button>`}).join('')}</div>${query?'<div class="section-title"><h2>搜索结果</h2></div>'+cards(shown):''}`);
+  return head+toolbar+notebookPrintOptions()+(detail?facets+`<div class="section-title"><h2>题目</h2><span class="muted">${shown.length} 题</span></div>`+cards(shown):`<div class="subject-notebook-list">${subjectList.map((subject,i)=>{const n=shown.filter(q=>q.subject===subject).length;return `<button type="button" class="subject-notebook-card" data-notebook-subject="${subject}"><span class="subject-book-icon tone-${i%4}">▤</span><span class="subject-book-copy"><strong>${subject}错题本</strong><small>${n} 道错题</small></span><span class="subject-book-arrow">›</span></button>`}).join('')}</div>${query?'<div class="section-title"><h2>搜索结果</h2></div>'+cards(shown):''}`);
 }
 function bindNotebookWorkspace(){
   document.querySelectorAll('[data-notebook-subject]').forEach(button => {
@@ -508,7 +508,8 @@ function bindNotebookWorkspace(){
     panel.toggleAttribute('data-expanded', notebookFiltersOpen);
     panel.inert = !notebookFiltersOpen;
   };
-  $('#notebook-period').onchange = event => {
+  const period = $('#notebook-period');
+  if (period) period.onchange = event => {
     notebookPeriod = event.target.value;
     clearNotebookFacets();
     render();
@@ -668,6 +669,16 @@ function textModelName(provider) {
   return provider === 'qwen' ? cfg.qwenModel || 'qwen-plus' : cfg.model || 'deepseek-chat';
 }
 
+function selectedExamModel() {
+  const provider = examModelProvider || defaultTextProvider();
+  return { provider, model: examCustomModels[provider].trim() || textModelName(provider) };
+}
+
+function examModelDescription() {
+  const { provider, model } = selectedExamModel();
+  return `${provider === 'qwen' ? '千问' : 'DeepSeek'} · ${model}`;
+}
+
 function examModelControls() {
   const provider = examModelProvider || defaultTextProvider();
   return `<div class="exam-model-controls">
@@ -694,10 +705,6 @@ const insufficient=examMode==='original'&&available<examCount;
 return renderStageBanner() +
 `<h1 class="visually-hidden">练习</h1>
 <section class="card" id="exam-builder">
-<div class="segmented exam-source-tabs" role="group" aria-label="练习模式">
-<button type="button" data-exam-mode="original" aria-pressed="${examMode === 'original'}" class="${examMode === 'original'? 'active': ''}">错题重练</button>
-<button type="button" data-exam-mode="ai" aria-pressed="${examMode === 'ai'}" class="${examMode === 'ai'? 'active': ''}">AI 扩展</button>
-</div>
 ${subjectPicker('exam', examSubjList, examSubject)}
 ${renderSubjectConfigModal()}
 <div class="form-row">
@@ -716,7 +723,12 @@ ${countOptions.map(n => `<option value="${n}" ${examCount === n? 'selected': ''}
 </label>
 </div>
 <p class="notice" id="exam-availability">当前范围可用原题 ${available} 道，目标题量 ${examCount} 道。${insufficient?'原题不足，请减少题量，或切换 AI 扩展生成新题。':examMode==='ai'?'将围绕母题生成指定数量的新题。':''}</p>
-${insufficient&&available?`<button type="button" class="secondary" id="exam-use-ai">切换 AI 扩展，生成 ${[3,5,8,10].includes(examCount)?examCount:5} 道新题</button>`:''}
+<div class="segmented exam-source-tabs" role="group" aria-label="练习模式">
+  <button type="button" data-exam-mode="original" aria-pressed="${examMode === 'original'}" class="${examMode === 'original' ? 'active' : ''}">错题重练</button>
+  <button type="button" data-exam-mode="ai" aria-pressed="${examMode === 'ai'}" class="${examMode === 'ai' ? 'active' : ''}">
+    <span>AI 扩展</span><small id="exam-current-model">${esc(examModelDescription())}</small>
+  </button>
+</div>
 ${examMode === 'ai' ? examModelControls() : ''}
 <button class="primary" id="build-exam" ${insufficient?'disabled':''}>${insufficient?'原题不足（'+available+'/'+examCount+'）':'生成 '+examCount+' 道题'}</button>
 </section>
@@ -1435,25 +1447,31 @@ function bindPractice() {
   });
 
   document.querySelectorAll('[data-exam-mode]').forEach(b => b.onclick = () => {
-    if(!['original','ai'].includes(b.dataset.examMode))return;
-    examMode = b.dataset.examMode;
-    examCount = 5;
-    examSheet=null;
-    render();
+    const mode = b.dataset.examMode;
+    if (mode !== examMode) {
+      examMode = mode;
+      examSheet = null;
+      render();
+      $(`[data-exam-mode="${mode}"]`)?.focus();
+    } else if (mode === 'ai') {
+      $('#exam-model-provider')?.focus();
+    }
   });
   if ($('#exam-scope')) $('#exam-scope').onchange = e => { examScope = e.target.value;examSheet=null;render(); };
   if ($('#exam-count')) $('#exam-count').onchange = e => { examCount = Number(e.target.value);examSheet=null;render(); };
-  if ($('#exam-use-ai')) $('#exam-use-ai').onclick=()=>{examMode='ai';if(![3,5,8,10].includes(examCount))examCount=5;examSheet=null;render()};
   const modelProvider = $('#exam-model-provider'), modelName = $('#exam-model-name');
   if (modelProvider && modelName) {
+    const summary = $('#exam-current-model');
     modelProvider.onchange = () => {
       examModelProvider = modelProvider.value;
       const provider = examModelProvider || defaultTextProvider();
       modelName.value = examCustomModels[provider];
       modelName.placeholder = textModelName(provider);
+      summary.textContent = examModelDescription();
     };
     modelName.oninput = () => {
       examCustomModels[examModelProvider || defaultTextProvider()] = modelName.value;
+      summary.textContent = examModelDescription();
     };
   }
 
@@ -1487,8 +1505,7 @@ function bindPractice() {
         analysis: q.analysis
       }));
     } else {
-      const provider = examModelProvider || defaultTextProvider();
-      const model = examCustomModels[provider].trim();
+      const { provider, model } = selectedExamModel();
       const seedCount = Math.min(chosen.length, 3);
       const seeds = chosen.slice(0, seedCount);
       const promptSeeds = seeds.map((q, i) => `【母题${i + 1}（${q.subject} · 历史标签:${inferAiVerdict(q)}）】${q.text}（知识点：${(q.tags || []).join('，') || '课内巩固'}）`).join('\n');
