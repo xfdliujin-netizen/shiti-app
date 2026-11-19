@@ -73,12 +73,10 @@ let data = { version: 1, questions: [], practices: [], deleted: {} },
     practiceSubject = '全部',
     practiceAiFilter = '全部',
     examSheet = null,
-    examMode = 'original',
     examSubject = '语文',
     examScope = 'unmastered',
     examCount = 5,
     examModelProvider = '',
-    examCustomModels = { deepseek: '', qwen: '' },
     examShowAnswers = false,
     editingId = null,
     selectedPracticeId = '',
@@ -669,38 +667,21 @@ function textModelName(provider) {
   return provider === 'qwen' ? cfg.qwenModel || 'qwen-plus' : cfg.model || 'deepseek-chat';
 }
 
-function selectedExamModel() {
-  const provider = examModelProvider || defaultTextProvider();
-  return { provider, model: examCustomModels[provider].trim() || textModelName(provider) };
-}
-
-function examModelDescription() {
-  const { provider, model } = selectedExamModel();
-  return `${provider === 'qwen' ? '千问' : 'DeepSeek'} · ${model}`;
-}
-
-function examModelControls() {
-  const provider = examModelProvider || defaultTextProvider();
-  return `<div class="exam-model-controls">
-    <label class="field"><span>生成模型</span>
-      <select id="exam-model-provider">
-        <option value="">跟随设置（${defaultTextProvider() === 'qwen' ? '千问' : 'DeepSeek'}）</option>
-        <option value="deepseek" ${examModelProvider === 'deepseek' ? 'selected' : ''}>DeepSeek</option>
-        <option value="qwen" ${examModelProvider === 'qwen' ? 'selected' : ''}>千问</option>
-      </select>
-    </label>
-    ${field('自定义模型名称（选填）', 'exam-model-name', examCustomModels[provider], 'text', textModelName(provider))}
-  </div>`;
+function examQuestionPool() {
+  return data.questions.filter(q => q.subject === examSubject && (examScope !== 'unmastered' || !q.mastered));
 }
 
 function examPage() {
-if(!['original','ai'].includes(examMode))examMode='original';
 const examSubjList = getQuickSubjects();
 if (!examSubjList.includes(examSubject)) examSubject = examSubjList[0] || '语文';
-const available=data.questions.filter(q=>q.subject===examSubject&&(examScope!=='unmastered'||!q.mastered)).length;
-const countOptions = examMode === 'original'? [...new Set([...(available>0&&available<5?[available]:[]),5,10,15,20])]: [3, 5, 8, 10];
+const available = examQuestionPool().length;
+const countOptions = [3, 5, 8, 10, 15, 20];
+if (available > 0 && available < 5 && !countOptions.includes(available)) {
+  countOptions.push(available);
+  countOptions.sort((a, b) => a - b);
+}
 if (!countOptions.includes(examCount)) examCount = 5;
-const insufficient=examMode==='original'&&available<examCount;
+const insufficient = available < examCount;
 
 return renderStageBanner() +
 `<h1 class="visually-hidden">练习</h1>
@@ -718,19 +699,20 @@ ${renderSubjectConfigModal()}
 <label class="field">
 <span>目标题量</span>
 <select id="exam-count">
-${countOptions.map(n => `<option value="${n}" ${examCount === n? 'selected': ''}>${n} 题${n === 10 && examMode === 'original'? '（标准周测 · 约20分钟）': n === 5 && examMode === 'ai'? '（推荐 · 约15分钟）': ''}</option>`).join('')}
+${countOptions.map(n => `<option value="${n}" ${examCount === n ? 'selected' : ''}>${n} 题</option>`).join('')}
 </select>
 </label>
 </div>
-<p class="notice" id="exam-availability">当前范围可用原题 ${available} 道，目标题量 ${examCount} 道。${insufficient?'原题不足，请减少题量，或切换 AI 扩展生成新题。':examMode==='ai'?'将围绕母题生成指定数量的新题。':''}</p>
-<div class="segmented exam-source-tabs" role="group" aria-label="练习模式">
-  <button type="button" data-exam-mode="original" aria-pressed="${examMode === 'original'}" class="${examMode === 'original' ? 'active' : ''}">错题重练</button>
-  <button type="button" data-exam-mode="ai" aria-pressed="${examMode === 'ai'}" class="${examMode === 'ai' ? 'active' : ''}">
-    <span>AI 扩展</span><small id="exam-current-model">${esc(examModelDescription())}</small>
-  </button>
+<p class="notice" id="exam-availability">当前范围可用原题 ${available} 道，目标题量 ${examCount} 道。${!available ? '请选择有错题的科目或范围。' : insufficient ? '原题不足，可减少题量或使用 AI 扩展。' : ''}</p>
+<div class="exam-generation-actions" role="group" aria-label="生成练习">
+  <button type="button" class="primary" data-build-exam="original" ${insufficient ? 'disabled' : ''}>错题重练</button>
+  <button type="button" class="secondary" data-build-exam="ai" ${!available ? 'disabled' : ''}>AI 扩展</button>
+  <select id="exam-model-provider" aria-label="AI 扩展模型">
+    <option value="">跟随设置 · ${esc(textModelName(defaultTextProvider()))}</option>
+    <option value="deepseek" ${examModelProvider === 'deepseek' ? 'selected' : ''}>DeepSeek · ${esc(textModelName('deepseek'))}</option>
+    <option value="qwen" ${examModelProvider === 'qwen' ? 'selected' : ''}>千问 · ${esc(textModelName('qwen'))}</option>
+  </select>
 </div>
-${examMode === 'ai' ? examModelControls() : ''}
-<button class="primary" id="build-exam" ${insufficient?'disabled':''}>${insufficient?'原题不足（'+available+'/'+examCount+'）':'生成 '+examCount+' 道题'}</button>
 </section>
 
 <div id="exam-area">${examSheet ? renderExamSheet() : ''}</div>
@@ -989,7 +971,7 @@ async function ai(prompt, img, options = {}) {
   const key = getStoredKey(qwen ? 'shiti-qwen-key' : 'shiti-key');
   if (!viaProxy && !key) throw Error(`请先在设置填写 ${qwen ? '百炼' : 'DeepSeek'} API Key`);
   const endpoint = qwen ? cfg.qwenEndpoint || 'https://dashscope.aliyuncs.com/compatible-mode/v1' : cfg.endpoint || 'https://api.deepseek.com';
-  const model = (textRequest && options.model) || textModelName(provider);
+  const model = textModelName(provider);
   if (!viaProxy && !/^https:\/\//.test(endpoint) && !/^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(endpoint)) throw Error('API 地址需要使用 HTTPS');
   const studentCtx = options.ocr ? '' : getStudentPromptContext();
   const history=!options.ocr&&options.learning&&typeof buildLearningContext==='function'?buildLearningContext(options.learning,learningIndex(),getStudentProfile()):'';
@@ -1446,34 +1428,10 @@ function bindPractice() {
     render();
   });
 
-  document.querySelectorAll('[data-exam-mode]').forEach(b => b.onclick = () => {
-    const mode = b.dataset.examMode;
-    if (mode !== examMode) {
-      examMode = mode;
-      examSheet = null;
-      render();
-      $(`[data-exam-mode="${mode}"]`)?.focus();
-    } else if (mode === 'ai') {
-      $('#exam-model-provider')?.focus();
-    }
-  });
   if ($('#exam-scope')) $('#exam-scope').onchange = e => { examScope = e.target.value;examSheet=null;render(); };
   if ($('#exam-count')) $('#exam-count').onchange = e => { examCount = Number(e.target.value);examSheet=null;render(); };
-  const modelProvider = $('#exam-model-provider'), modelName = $('#exam-model-name');
-  if (modelProvider && modelName) {
-    const summary = $('#exam-current-model');
-    modelProvider.onchange = () => {
-      examModelProvider = modelProvider.value;
-      const provider = examModelProvider || defaultTextProvider();
-      modelName.value = examCustomModels[provider];
-      modelName.placeholder = textModelName(provider);
-      summary.textContent = examModelDescription();
-    };
-    modelName.oninput = () => {
-      examCustomModels[examModelProvider || defaultTextProvider()] = modelName.value;
-      summary.textContent = examModelDescription();
-    };
-  }
+  const modelProvider = $('#exam-model-provider');
+  if (modelProvider) modelProvider.onchange = () => { examModelProvider = modelProvider.value; };
 
   document.querySelectorAll('[data-exam-record]').forEach(button => {
     button.onclick = () => {
@@ -1482,11 +1440,11 @@ function bindPractice() {
     };
   });
 
-  if ($('#build-exam')) $('#build-exam').onclick = e => run(e.target, async () => {
-    const mode = examMode, count = examCount, subjLabel = examSubject;
-    const pool = data.questions.filter(q => q.subject === subjLabel && (examScope !== 'unmastered' || !q.mastered));
+  const buildExam = async mode => {
+    const count = examCount, subjLabel = examSubject;
+    const pool = examQuestionPool();
     if (!pool.length) throw Error(examScope === 'unmastered' ? '本科目暂无待巩固错题，请切换科目或选择全部错题' : '本科目暂无可用错题，请先录题或切换科目');
-    if(mode==='original'&&pool.length<count)throw Error(`当前只有 ${pool.length} 道原题，无法整理为 ${count} 道；请减少题量或切换 AI 扩展`);
+    if (mode === 'original' && pool.length < count) throw Error(`当前只有 ${pool.length} 道原题，请减少题量或使用 AI 扩展`);
 
     const chosen = pool.sort((a, b) => Number(a.mastered) - Number(b.mastered) || b.created.localeCompare(a.created)).slice(0, count);
     const prof = getStudentProfile();
@@ -1505,11 +1463,11 @@ function bindPractice() {
         analysis: q.analysis
       }));
     } else {
-      const { provider, model } = selectedExamModel();
+      const provider = examModelProvider || defaultTextProvider();
       const seedCount = Math.min(chosen.length, 3);
       const seeds = chosen.slice(0, seedCount);
       const promptSeeds = seeds.map((q, i) => `【母题${i + 1}（${q.subject} · 历史标签:${inferAiVerdict(q)}）】${q.text}（知识点：${(q.tags || []).join('，') || '课内巩固'}）`).join('\n');
-      const r = await ai(`请为【${prof.stageName}${prof.grade} · 地区教材背景：${prof.region}】学生命制【${subjLabel}】单科试卷，所有题目 subject 必须为“${subjLabel}”，不能混入其他科目。基于以下 ${seedCount} 道学生错题命制共 ${count} 道扩展训练题（若母题不足，请围绕本科目薄弱知识点补充同类新题）。要求：题干完整清晰、不要照抄原题数字或选项、难度贴合${prof.grade}、条件充分、答案准确。返回严格 JSON：{"items":[{"subject":"${subjLabel}","text":"完整题干（含选项）","answer":"标准答案","analysis":"分步解析"}]}。\n\n错题母题：\n${promptSeeds}`, undefined, {provider,model,learning:{subject:subjLabel,text:seeds.map(q=>q.text).join(' '),tags:seeds.flatMap(q=>q.tags||[]),excludeIds:seeds.map(q=>q.id)}});
+      const r = await ai(`请为【${prof.stageName}${prof.grade} · 地区教材背景：${prof.region}】学生命制【${subjLabel}】单科试卷，所有题目 subject 必须为“${subjLabel}”，不能混入其他科目。基于以下 ${seedCount} 道学生错题命制共 ${count} 道扩展训练题（若母题不足，请围绕本科目薄弱知识点补充同类新题）。要求：题干完整清晰、不要照抄原题数字或选项、难度贴合${prof.grade}、条件充分、答案准确。返回严格 JSON：{"items":[{"subject":"${subjLabel}","text":"完整题干（含选项）","answer":"标准答案","analysis":"分步解析"}]}。\n\n错题母题：\n${promptSeeds}`, undefined, {provider,learning:{subject:subjLabel,text:seeds.map(q=>q.text).join(' '),tags:seeds.flatMap(q=>q.tags||[]),excludeIds:seeds.map(q=>q.id)}});
       if (!Array.isArray(r.items) || r.items.length!==count || r.items.some(x=>!x?.text||!x.answer||!x.analysis||(x.subject&&x.subject!==subjLabel))) throw Error('AI 返回的题量、科目或题目内容不符合要求，未采用此结果');
       items = r.items.map(x => ({
         subject: subjLabel,
@@ -1533,6 +1491,9 @@ function bindPractice() {
     await persist({ ...data, examHistory: [...(data.examHistory || []), record] });
     if (current() === 'exam') openExamSheet(record);
     toast(`✓ 已生成并保存 ${items.length} 道练习题`);
+  };
+  document.querySelectorAll('[data-build-exam]').forEach(button => {
+    button.onclick = () => run(button, () => buildExam(button.dataset.buildExam));
   });
 
   if ($('#toggle-exam-ans')) $('#toggle-exam-ans').onclick = () => {

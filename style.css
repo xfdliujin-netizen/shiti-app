@@ -2228,7 +2228,6 @@ dialog.image-lightbox .image-view-stage img { max-width:100%; max-height:100%; w
 #printable-exam .subtitle { color:#6b7280 !important; }
 #printable-exam .secondary { background:#eef2f6; color:#374151 !important; }
 #exam-use-ai { margin:0 8px 10px 0; font-size:13px; }
-#build-exam:disabled { opacity:.55; cursor:default; }
 .learning-row { display:flex; flex-direction:column; gap:5px; padding:14px 0; border-bottom:1px solid var(--line); }
 .learning-row span,.learning-row small { color:var(--muted); font-size:12px; }
 .practice-source-tabs { margin:0 0 16px; }
