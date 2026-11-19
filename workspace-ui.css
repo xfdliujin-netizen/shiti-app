@@ -340,7 +340,7 @@ button.secondary:active:not(:disabled),
     box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.08) !important;
     padding: 6px 6px max(6px, env(safe-area-inset-bottom));
   }
-  .main-nav { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; }
+  .main-nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; }
   .main-nav a { padding: 7px 1px; font-size: 10px; gap: 3px; min-width: 0; border-radius: 14px; }
   .main-nav a svg { width: 20px; height: 20px; }
   .notebook-title h1 { font-size: 22px; }
@@ -482,7 +482,6 @@ button.secondary:active:not(:disabled),
 .library-pick { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
 
 @media (max-width: 767px) {
-  .main-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .notebook-title { flex-wrap: wrap; gap: 6px; }
   .notebook-title .section-switch { font-size: 11px; padding: 6px 8px; }
   .page-head:has(.library-head-actions) { flex-wrap: wrap; gap: 12px; }
@@ -633,7 +632,9 @@ button.secondary:active:not(:disabled),
 }
 
 .subject-detail-head { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; }
-.subject-detail-head h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+.subject-detail-title { display:flex; align-items:center; gap:4px; min-width:0; }
+.subject-detail-title h1 { font-size:22px; font-weight:800; letter-spacing:-0.02em; margin:0; }
+.subject-detail-title #notebook-back { display:grid; place-items:center; flex-shrink:0; width:44px; min-height:44px; padding:0; }
 .subject-detail-head .notebook-status { margin-inline-start:auto !important; }
 .notebook-toolbar.notebook-detail-tools { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:8px; margin-bottom:8px; }
 .notebook-detail-tools .search { width:100%; max-width:none; }
@@ -676,11 +677,9 @@ dialog.question-actions-dialog[open] { position:fixed; inset:0; margin:auto; wid
   .library-head-actions { gap: 6px; }
   .library-head-actions .small-button { font-size: 11px !important; padding: 7px 8px !important; }
   .subject-detail-head { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:8px; row-gap:2px; margin-bottom:12px; }
-  .subject-detail-head #notebook-back { grid-column:1 / -1; justify-self:start; }
-  .subject-detail-head h2 { font-size: clamp(16px, 4.6vw, 19px); }
+  .subject-detail-title h1 { font-size:clamp(16px, 4.6vw, 19px); }
   .subject-detail-head .notebook-status { gap:2px; }
   .subject-detail-head .status-stat { min-width:46px; padding:5px 3px; font-size:10px; }
-  .subject-detail-head #notebook-back { padding: 6px 0; font-size: 12px; }
   .notebook-facets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .exam-mode-row { gap: 8px; }
   .exam-mode-row .exam-print-hint { font-size: 10px; padding: 6px; }
@@ -926,14 +925,22 @@ dialog#detail .detail-head {
   margin-bottom:10px;
 }
 .detail-head .detail-subject-select {
-  width:66px;
+  width:86px;
   min-width:0;
   max-width:none;
   height:36px;
   min-height:36px;
-  padding:4px 6px;
+  padding:4px 8px;
   font-size:13px;
+  font-weight:600;
 }
+.detail-head .detail-subject-select option { font-size:13px; }
+.exam-history summary { cursor:pointer; font-weight:700; }
+.exam-history summary span { margin-inline-start:8px; font-size:13px; font-weight:400; }
+.exam-history ul { display:grid; gap:8px; list-style:none; margin:12px 0 0; padding:0; }
+.exam-history-entry { display:grid; gap:4px; width:100%; text-align:start; white-space:normal; }
+.exam-history-entry span { font-size:12px; }
+.exam-history p { margin:12px 0 0; }
 .detail-head .detail-number { min-width:0; font-variant-numeric:tabular-nums; }
 .detail-verdict-row {
   display:grid;
