@@ -8,6 +8,12 @@ D1 已初始化，shiti-data Worker 已部署并启用，绑定 api.86518925.xyz
 
 上线验证：匿名 GET/PUT 均 302 跳转 Access 登录，OPTIONS 为 204，精确来源与 credentials 响应正确。后端 SQLite/JWT、两设备同步和核心检查通过。尚待用户邮箱验证码登录后的真实题库同步验收；验证码不应提供给代理或写入代码。首次同步前请先导出 JSON 备份。
 
+## 双库部署（2026-11-19）
+
+- `shiti-notebook`（`DB`）保存错题、已归档的作答练习、学情档案、同步信息及限额。生成的试卷历史仍保存在浏览器。
+- `shiti-images`（`IMAGES_DB`）保存压缩后的题图，按 SHA-256 去重。题目记录只保存题图编号。图片写入使用新库，读取优先使用新库，旧库作为旧图片的兼容来源。
+- 部署前将旧库的 2 张题图复制到新库，并比较了两库中的编号、类型和完整字节。旧库的原始题图保留作为回退副本。
+
 ## 已实现
 
 - 设置页提供云端登录和手动增量同步。IndexedDB 保留离线题库，原有 GitHub 同步与 JSON 导出仍可用。
@@ -24,12 +30,14 @@ D1 已初始化，shiti-data Worker 已部署并启用，绑定 api.86518925.xyz
 ```powershell
 npx wrangler login
 npx wrangler d1 create shiti-notebook
+npx wrangler d1 create shiti-images
 ```
 
 把返回的 database_id 填入 wrangler.toml，然后初始化专用数据库：
 
 ```powershell
 npx wrangler d1 execute shiti-notebook --remote --file=./schema.sql
+npx wrangler d1 execute shiti-images --remote --file=./images-schema.sql
 ```
 
 1. 在 Cloudflare Zero Trust 创建 Access Self-hosted 应用，覆盖 api.86518925.xyz 全路径；仅允许你的邮箱登录，禁止 Everyone/Bypass 放行业务接口。记录 team domain 与应用 AUD。
@@ -48,7 +56,7 @@ node cloud/client-check.mjs
 node check.cjs
 ```
 
-后端测试用真实 SQLite 执行 schema 和 SQL、真实 RSA 签名测试 JWT，无开发免登录后门。浏览器同步测试模拟两设备和服务端版本锁。尚未验证真实 D1 网络、Access 登录/CORS、真实浏览器图片清晰度与缩图结果，因此不宣称已上线。
+后端测试用两个 SQLite 数据库执行分库 SQL，使用 RSA 签名测试 JWT。浏览器同步测试模拟两设备和服务端版本锁。双库 Worker 已在现有域名部署，线上匿名请求返回 302，图片上传预检返回 204，尚未使用用户的邮箱会话进行线上同步验收。
 
 ## 防攻击与维护边界
 
