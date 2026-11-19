@@ -1397,15 +1397,15 @@ function bindPractice() {
 
     if (mode === 'original') {
       items = chosen.map(q => ({
-          recordId: q.id,
-          subject: q.subject,
-          source: q.source || `#${shortQuestionNumber(q.number)}`,
-          text: q.text,
-          questionType: q.questionType,
-          image: q.image || '',
-          figureRegion: q.figureRegion,
-          answer: q.answer,
-          analysis: q.analysis
+        recordId: q.id,
+        subject: q.subject,
+        source: q.source || `#${shortQuestionNumber(q.number)}`,
+        text: q.text,
+        questionType: q.questionType,
+        image: q.image || '',
+        figureRegion: q.figureRegion,
+        answer: q.answer,
+        analysis: q.analysis
       }));
     } else {
       const seedCount = Math.min(chosen.length, 3);
@@ -1414,12 +1414,12 @@ function bindPractice() {
       const r = await ai(`请为【${prof.stageName}${prof.grade} · 地区教材背景：${prof.region}】学生命制【${subjLabel}】单科试卷，所有题目 subject 必须为“${subjLabel}”，不能混入其他科目。基于以下 ${seedCount} 道学生错题命制共 ${count} 道扩展训练题（若母题不足，请围绕本科目薄弱知识点补充同类新题）。要求：题干完整清晰、不要照抄原题数字或选项、难度贴合${prof.grade}、条件充分、答案准确。返回严格 JSON：{"items":[{"subject":"${subjLabel}","text":"完整题干（含选项）","answer":"标准答案","analysis":"分步解析"}]}。\n\n错题母题：\n${promptSeeds}`, undefined, {learning:{subject:subjLabel,text:seeds.map(q=>q.text).join(' '),tags:seeds.flatMap(q=>q.tags||[]),excludeIds:seeds.map(q=>q.id)}});
       if (!Array.isArray(r.items) || r.items.length!==count || r.items.some(x=>!x?.text||!x.answer||!x.analysis||(x.subject&&x.subject!==subjLabel))) throw Error('AI 返回的题量、科目或题目内容不符合要求，未采用此结果');
       items = r.items.map(x => ({
-          subject: subjLabel,
-          source: 'AI 扩展变式',
-          text: String(x.text || ''),
-          image: '',
-          answer: String(x.answer || ''),
-          analysis: String(x.analysis || '')
+        subject: subjLabel,
+        source: 'AI 扩展变式',
+        text: String(x.text),
+        image: '',
+        answer: String(x.answer),
+        analysis: String(x.analysis)
       }));
     }
     const created = stamp();
@@ -1559,7 +1559,8 @@ function validate(d) {
     for (const record of d.examHistory) {
       if (typeof record?.id !== 'string' || !record.id || typeof record.title !== 'string' ||
           typeof record.stageName !== 'string' || typeof record.grade !== 'string' ||
-          !Number.isFinite(Date.parse(record.created)) || !Number.isFinite(Date.parse(record.updated)) ||
+          typeof record.created !== 'string' || !Number.isFinite(Date.parse(record.created)) ||
+          typeof record.updated !== 'string' || !Number.isFinite(Date.parse(record.updated)) ||
           !Array.isArray(record.items) || !record.items.length ||
           record.items.some(item => typeof item?.text !== 'string' || !subjects.includes(item.subject) || (item.image && !isStudyImage(item.image)))) {
         throw Error('备份中存在无效练习记录');

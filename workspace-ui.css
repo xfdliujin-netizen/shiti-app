@@ -931,10 +931,10 @@ dialog#detail .detail-head {
   height:36px;
   min-height:36px;
   padding:4px 8px;
-  font-size:13px;
+  font-size:12px;
   font-weight:600;
 }
-.detail-head .detail-subject-select option { font-size:13px; }
+.detail-head .detail-subject-select option { font-size:12px; }
 .exam-history summary { cursor:pointer; font-weight:700; }
 .exam-history summary span { margin-inline-start:8px; font-size:13px; font-weight:400; }
 .exam-history ul { display:grid; gap:8px; list-style:none; margin:12px 0 0; padding:0; }
