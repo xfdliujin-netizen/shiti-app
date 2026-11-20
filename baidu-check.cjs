@@ -29,7 +29,10 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
     }
     assert.equal(url, 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions');
     assert.equal(options.headers.Authorization, 'Bearer server-qwen-credential');
-    assert.equal(payload.model, 'qwen-plus');
+    assert.equal(payload.model, Array.isArray(payload.messages[1].content) ? 'qwen3-vl-plus' : 'qwen-plus');
+    if (Array.isArray(payload.messages[1].content)) assert.deepEqual(payload.messages[1].content, [
+      { type: 'text', text: '识别题目' }, { type: 'image_url', image_url: { url: image } }
+    ]);
     assert.equal(payload.enable_thinking, false);
     completions++;
     return Response.json({ choices: [{ message: { content: '{"ok":true}' } }], usage: { total_tokens: 25 } });
@@ -50,7 +53,12 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
   assert.equal((await invoke({ action: 'qwen-completion', payload }, { token: 'wrong' })).status, 401);
   assert.equal((await invoke({ action: 'qwen-completion', payload: {...payload, max_tokens: 9000} })).status, 400);
   assert.equal((await (await invoke({ action: 'qwen-completion', payload })).json()).usage.total_tokens, 25);
-  assert.deepEqual([submissions, polls, completions], [1, 2, 1]);
+  const vision = url => ({...payload, model:'qwen3-vl-plus', messages:[
+    payload.messages[0], { role:'user', content:[{type:'text',text:'识别题目'}, {type:'image_url',image_url:{url}}] }
+  ]});
+  assert.equal((await invoke({action:'qwen-completion', payload:vision('https://example.com/image.jpg')})).status,400);
+  assert.equal((await (await invoke({action:'qwen-completion', payload:vision(image)})).json()).usage.total_tokens,25);
+  assert.deepEqual([submissions, polls, completions], [1, 2, 2]);
   const controls={'#subject':{value:'语文'},'#source':{value:'课堂练习'},'#mistake':{value:''},'#paper-progress':{},'#paper-area':{scrollIntoView(){}}};let fetches=0;
   const c={assert,console,AbortSignal,TextEncoder,TextDecoder,crypto:globalThis.crypto,setTimeout,clearTimeout,confirm:()=>true,location:{hash:'#capture'},localStorage:{getItem:()=>null},sessionStorage:{getItem:k=>k==='shiti-ocr-token'?env.OCR_PROXY_TOKEN:null},window:{addEventListener(){}},document:{querySelector:s=>controls[s]||null,querySelectorAll:()=>[]},fetch:async(url,options)=>{fetches++;assert.equal(url,'https://proxy.example/api/ocr');assert.deepEqual(JSON.parse(options.body),{image:'data:image/png;base64,Q1JPUA==',mode:'accurate'});assert.equal(options.headers['X-OCR-Token'],env.OCR_PROXY_TOKEN);return Response.json({words_result:words,log_id:123})}};
   vm.createContext(c);vm.runInContext(fs.readFileSync(__dirname+'/ocr-layout.js','utf8'),c);for(const p of ['crop.js','paper.js','baidu.js','app.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+p,'utf8').replace(/window\.addEventListener\('hashchange',\s*render\);\s*boot\(\);\s*$/,''),c);

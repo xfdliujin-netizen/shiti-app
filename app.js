@@ -335,7 +335,7 @@ function notebookWorkspaceSwitch(active) {
 function capture() {
   const quickSubjects = getQuickSubjects();
   const displaySubjects = quickSubjects.includes(currentSubject) ? quickSubjects : [...quickSubjects, currentSubject];
-  const hasBaidu = typeof usesBaidu === 'function' ? usesBaidu() : false;
+  const ocrProvider = cfg.ocrProvider || 'baidu';
   const pView = typeof paperView === 'function' ? paperView() : '';
   const cView = typeof cropView === 'function' && image ? cropView() : '';
 
@@ -343,8 +343,9 @@ function capture() {
     <section class="card capture-card">
       <div class="card-head capture-head">
         <h2>录入新错题</h2>
-        <div class="ocr-switch" role="group" aria-label="图片识别服务"><button type="button" data-ocr-provider="baidu" aria-pressed="${hasBaidu}" class="${hasBaidu?'active':''}">百度 OCR</button><button type="button" data-ocr-provider="deepseek" aria-pressed="${!hasBaidu}" class="${!hasBaidu?'active':''}">DeepSeek</button></div>
+        <div class="ocr-switch" role="group" aria-label="图片识别服务">${[['baidu', '百度 OCR'], ['deepseek', 'DeepSeek'], ['qwen', '千问']].map(([provider, label]) => `<button type="button" data-ocr-provider="${provider}" aria-pressed="${ocrProvider === provider}" class="${ocrProvider === provider ? 'active' : ''}">${label}</button>`).join('')}</div>
       </div>
+      ${typeof homeworkGradingButton === 'function' ? homeworkGradingButton() : ''}
       
       <select id="subject" hidden>${opts(currentSubject)}</select>
       <div id="capture-input">
@@ -874,7 +875,7 @@ function settings() {
   const st = stageConfig[p.stage];
   const gradeOptions = stageConfig[p.stage].grades;
   const bSettings = typeof baiduSettings === 'function' ? baiduSettings() : '';
-  const ocrLabel = (cfg.ocrProvider || 'baidu') === 'baidu' ? '百度高精度 OCR' : 'DeepSeek 图片转录';
+  const ocrLabel = ({deepseek:'DeepSeek 图片转录',qwen:'千问图片转录'})[cfg.ocrProvider] || '百度高精度 OCR';
   const ghLabel = cfg.owner && cfg.repo ? cfg.owner + '/' + cfg.repo : '未配置';
   const cloudLabel = cfg.cloudEndpoint || 'api.86518925.xyz';
   return `<div class="settings-page">` + heading('YOUR PREFERENCES', '设置', '学情档案、识别、同步与数据，都在这里管理。') + `
@@ -996,13 +997,15 @@ function qwenUsageText() {
 
 async function ai(prompt, img, options = {}) {
   const textRequest = !options.ocr && !img;
-  const provider = textRequest ? options.provider || defaultTextProvider() : 'deepseek';
+  const provider = options.ocr ? options.provider || 'deepseek' : textRequest ? options.provider || defaultTextProvider() : 'deepseek';
   const qwen = provider === 'qwen';
   const viaProxy = qwen && cfg.qwenViaProxy;
   const key = getStoredKey(qwen ? 'shiti-qwen-key' : 'shiti-key');
   if (!viaProxy && !key) throw Error(`请先在设置填写 ${qwen ? '百炼' : 'DeepSeek'} API Key`);
   const endpoint = qwen ? cfg.qwenEndpoint || 'https://dashscope.aliyuncs.com/compatible-mode/v1' : cfg.endpoint || 'https://api.deepseek.com';
-  const model = textModelName(provider);
+  const model = options.ocr && img
+    ? qwen ? cfg.qwenVisionModel || 'qwen3-vl-plus' : cfg.ocrVisionModel || (new URL(endpoint).hostname === 'api.deepseek.com' ? 'deepseek-flash' : textModelName(provider))
+    : textModelName(provider);
   if (!viaProxy && !/^https:\/\//.test(endpoint) && !/^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(endpoint)) throw Error('API 地址需要使用 HTTPS');
   const studentCtx = options.ocr ? '' : getStudentPromptContext();
   const history=!options.ocr&&options.learning&&typeof buildLearningContext==='function'?buildLearningContext(options.learning,learningIndex(),getStudentProfile()):'';
@@ -1011,12 +1014,12 @@ async function ai(prompt, img, options = {}) {
   const textBudget=typeof LEARNING_LIMITS==='undefined'?24000:LEARNING_LIMITS.inputTextBytes;
   if(new TextEncoder().encode(systemPrompt+userPrompt).length>textBudget)throw Error('本次题目文字超过输入预算，请按小题拆分或减少组卷母题；没有发送请求');
   const payload = {
-    model: options.ocr && img ? cfg.ocrVisionModel || (new URL(endpoint).hostname === 'api.deepseek.com' ? 'deepseek-flash' : model) : model,
+    model,
     messages: [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: img ? [{ type: 'text', text: userPrompt }, ...(Array.isArray(img) ? img : [img]).map(url => ({ type: 'image_url', image_url: { url, detail: 'original' } }))] : userPrompt }
+      { role: 'user', content: img ? [{ type: 'text', text: userPrompt }, ...(Array.isArray(img) ? img : [img]).map(url => ({ type: 'image_url', image_url: qwen ? { url } : { url, detail: 'original' } }))] : userPrompt }
     ],
-    ...(options.ocr && new URL(endpoint).hostname === 'api.deepseek.com' ? { thinking: { type: 'disabled' } } : {}),
+    ...(options.ocr && !qwen && new URL(endpoint).hostname === 'api.deepseek.com' ? { thinking: { type: 'disabled' } } : {}),
     ...(qwen ? { enable_thinking: false } : {}),
     response_format: { type: 'json_object' },
     max_tokens: options.maxTokens || 8000,
@@ -1680,6 +1683,7 @@ function saveConfig() {
     branch: $('#branch') ? $('#branch').value.trim() : cfg.branch,
     ocrProvider: $('#ocr-provider') ? $('#ocr-provider').value : cfg.ocrProvider,
     ocrVisionModel:$('#ocr-vision-model')?$('#ocr-vision-model').value.trim():(cfg.ocrVisionModel||''),
+    qwenVisionModel: $('#qwen-vision-model') ? $('#qwen-vision-model').value.trim() : cfg.qwenVisionModel,
     ocrMode: $('#ocr-mode') ? $('#ocr-mode').value : (cfg.ocrMode || 'accurate'),
     ocrProxy: $('#ocr-proxy') ? $('#ocr-proxy').value.trim() : cfg.ocrProxy
   };

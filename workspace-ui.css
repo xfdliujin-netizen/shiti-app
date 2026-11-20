@@ -359,7 +359,8 @@ button.secondary:active:not(:disabled),
 @media print { html, body { background: #fff !important; background-image: none !important; color: #111 !important; } }
 
 /* v32: one inline image editor and fewer duplicate controls. */
-.capture-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.capture-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.capture-homework-entry { margin-bottom:10px; }
 .capture-head .ocr-switch {
   margin: 0;
   flex-shrink: 0;

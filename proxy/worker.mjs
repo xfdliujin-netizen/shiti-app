@@ -77,13 +77,21 @@ export function createOCRService(fetcher = globalThis.fetch) {
   async function completeWithQwen(payload, env, reply) {
     if (!env.QWEN_API_KEY) return reply(503, { error: '代理尚未配置 QWEN_API_KEY' });
     const { model, messages, max_tokens } = payload || {};
+    const system = messages?.[0], user = messages?.[1];
+    const parts = user?.content;
+    const image = Array.isArray(parts) && parts[1]?.type === 'image_url' ? parts[1].image_url?.url : null;
+    const validImage = typeof image === 'string' && /^data:image\/(?:jpeg|png);base64,[A-Za-z0-9+/]+={0,2}$/.test(image) &&
+      (image.length - image.indexOf(',') - 1) % 4 === 0;
+    const text = typeof parts === 'string' ? parts : Array.isArray(parts) && parts.length === 2 &&
+      parts[0]?.type === 'text' && validImage
+      ? parts[0].text : null;
     if (typeof model !== 'string' || !/^[A-Za-z0-9_.:-]{1,100}$/.test(model) ||
         !Array.isArray(messages) || messages.length !== 2 ||
-        messages[0]?.role !== 'system' || messages[1]?.role !== 'user' ||
-        messages.some(message => typeof message.content !== 'string') ||
-        new TextEncoder().encode(messages.map(message => message.content).join('')).length > 24000 ||
+        system?.role !== 'system' || typeof system.content !== 'string' ||
+        user?.role !== 'user' || typeof text !== 'string' ||
+        new TextEncoder().encode(system.content + text).length > 24000 ||
         !Number.isInteger(max_tokens) || max_tokens < 1 || max_tokens > 8000) {
-      return reply(400, { error: '千问请求的模型、文字内容或输出预算无效' });
+      return reply(400, { error: '千问请求的模型、文字、图片或输出预算无效' });
     }
     try {
       const base = new URL(env.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1');
@@ -97,7 +105,10 @@ export function createOCRService(fetcher = globalThis.fetch) {
         redirect: 'error',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.QWEN_API_KEY },
         body: JSON.stringify({
-          model, messages: messages.map(({ role, content }) => ({ role, content })), max_tokens,
+          model, max_tokens, messages: [
+            { role: 'system', content: system.content },
+            { role: 'user', content: image ? [{ type: 'text', text }, { type: 'image_url', image_url: { url: image } }] : text }
+          ],
           enable_thinking: false, response_format: { type: 'json_object' }, temperature: 0, stream: false
         }),
         signal: AbortSignal.timeout(150000)

@@ -2,16 +2,19 @@ const baiduUsage = { calls: 0 };
 let homeworkTask = null, homeworkResult = null;
 
 function baiduGradingSettings() {
-  return `<p class="notice">作业批改使用「图片文字识别」中配置的百度代理和访问口令。百度应用需开通智能作业批改权限。</p>
+  return `<p class="notice">在「录题」点击「百度智能作业批改」，上传整张含学生作答的图片，再点击同一按钮提交。作业批改使用「图片文字识别」中配置的百度代理和访问口令。百度应用需开通智能作业批改权限。</p>
     <p class="result-note">本机已提交 ${Number(cfg.baiduHomeworkCalls) || 0} 次批改。账户免费余量请在百度控制台查看。</p>
     <a href="https://console.bce.baidu.com/ai/#/ai/ocr/overview/index" target="_blank" rel="noopener">打开百度文字识别控制台</a>`;
+}
+
+function homeworkGradingButton() {
+  return `<div class="capture-homework-entry"><button type="button" class="secondary small-button" id="grade-homework">${homeworkTask ? '继续查询百度批改' : '百度智能作业批改'}</button></div>`;
 }
 
 function homeworkGradingView() {
   if (!image && !homeworkTask && !homeworkResult) return '';
   const verdicts = { 0: '未批改', 1: '正确', 2: '错误', 3: '未作答', 5: '批改失败' };
   return `<div class="homework-grading">
-    ${image || homeworkTask ? `<button type="button" class="secondary" id="grade-homework">${homeworkTask ? '继续查询百度批改' : '百度批改整张作业图'}</button>` : ''}
     <p class="hint" id="homework-status" role="status">${homeworkTask ? '已提交，等待百度返回结果。' : '提交后由百度返回逐题批改，结果请人工核对。'}</p>
     ${homeworkResult ? `<section aria-label="百度作业批改结果">
       <h3>上次百度批改结果 · ${homeworkResult.length} 题</h3>
@@ -61,38 +64,46 @@ async function requestHomeworkGrading(connection, body) {
 function bindHomeworkGrading() {
   const button = $('#grade-homework');
   if (!button) return;
-  button.onclick = () => run(button, async () => {
-    try {
-      if (!homeworkTask) {
-        const warning = ocrLocalFileWarning();
-        if (warning) throw Error(warning);
-        const connection = { endpoint: (cfg.ocrProxy || defaultOCRProxy()).trim(), token: getOcrToken() };
-        if (connection.token.length < 24) throw Error('请先在设置的「图片文字识别」中填写代理访问口令');
-        if (!image) throw Error('请先上传作业图片');
-        const encoded = await prepareHomeworkImage(image);
-        $('#homework-status')?.replaceChildren('正在向百度提交整张作业图…');
-        const result = await requestHomeworkGrading(connection, { action: 'homework-create', image: encoded });
-        if (typeof result.task_id !== 'string' || !result.task_id) throw Error('代理未返回批改任务编号，请确认代理已更新');
-        homeworkTask = { ...connection, id: result.task_id };
-        homeworkResult = null;
-        cfg.baiduHomeworkCalls = (Number(cfg.baiduHomeworkCalls) || 0) + 1;
-        saveLocalConfig();
-      }
-      $('#homework-status')?.replaceChildren('已提交，等待百度返回批改结果…');
-      for (let attempt = 0; attempt < 8; attempt++) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        const result = await requestHomeworkGrading(homeworkTask, { action: 'homework-result', task_id: homeworkTask.id });
-        if (result.status === 'pending') continue;
-        if (result.status !== 'complete' || !Array.isArray(result.questions)) throw Error('批改结果格式不正确，请继续查询');
-        homeworkResult = result.questions;
-        homeworkTask = null;
-        return;
-      }
-      toast('百度仍在批改，可以稍后继续查询');
-    } finally {
-      if (current() === 'capture') render();
+  button.onclick = () => {
+    if (!image && !homeworkTask) {
+      const photo = $('#photo');
+      if (photo) photo.click();
+      else toast('请先上传整张作业图片');
+      return;
     }
-  });
+    return run(button, async () => {
+      try {
+        if (!homeworkTask) {
+          const warning = ocrLocalFileWarning();
+          if (warning) throw Error(warning);
+          const connection = { endpoint: (cfg.ocrProxy || defaultOCRProxy()).trim(), token: getOcrToken() };
+          if (connection.token.length < 24) throw Error('请先在设置的「图片文字识别」中填写代理访问口令');
+          if (!image) throw Error('请先上传作业图片');
+          const encoded = await prepareHomeworkImage(image);
+          $('#homework-status')?.replaceChildren('正在向百度提交整张作业图…');
+          const result = await requestHomeworkGrading(connection, { action: 'homework-create', image: encoded });
+          if (typeof result.task_id !== 'string' || !result.task_id) throw Error('代理未返回批改任务编号，请确认代理已更新');
+          homeworkTask = { ...connection, id: result.task_id };
+          homeworkResult = null;
+          cfg.baiduHomeworkCalls = (Number(cfg.baiduHomeworkCalls) || 0) + 1;
+          saveLocalConfig();
+        }
+        $('#homework-status')?.replaceChildren('已提交，等待百度返回批改结果…');
+        for (let attempt = 0; attempt < 8; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          const result = await requestHomeworkGrading(homeworkTask, { action: 'homework-result', task_id: homeworkTask.id });
+          if (result.status === 'pending') continue;
+          if (result.status !== 'complete' || !Array.isArray(result.questions)) throw Error('批改结果格式不正确，请继续查询');
+          homeworkResult = result.questions;
+          homeworkTask = null;
+          return;
+        }
+        toast('百度仍在批改，可以稍后继续查询');
+      } finally {
+        if (current() === 'capture') render();
+      }
+    });
+  };
 }
 
 function ocrLocalFileWarning() {
@@ -119,10 +130,12 @@ function baiduSettings() {
       <select id="ocr-provider">
         <option value="baidu" ${(cfg.ocrProvider || 'baidu') === 'baidu' ? 'selected' : ''}>百度高精度 OCR → 校对 → 文字模型分析</option>
         <option value="deepseek" ${cfg.ocrProvider === 'deepseek' ? 'selected' : ''}>DeepSeek 视觉转录</option>
+        <option value="qwen" ${cfg.ocrProvider === 'qwen' ? 'selected' : ''}>千问视觉转录</option>
       </select>
     </label>
     <label class="field"><span>百度接口</span><select id="ocr-mode"><option value="accurate" ${(cfg.ocrMode||'accurate')==='accurate'?'selected':''}>高精度含位置版（用于恢复行顺序）</option><option value="basic" ${cfg.ocrMode==='basic'?'selected':''}>高精度纯文字版（兼容旧权限）</option></select></label><p class="notice">含位置版需要百度单独开通相应接口权限，额度与费用以百度控制台为准。失败不会自动重复调用。位置只能恢复排版，不能区分印刷、手写和批注。</p>
     ${field('DeepSeek 图片转录模型（兼容接口可自定义）','ocr-vision-model',cfg.ocrVisionModel||'','text','官方接口默认 deepseek-flash；其他接口默认使用文字模型配置')}
+    ${field('千问图片转录模型','qwen-vision-model',cfg.qwenVisionModel||'','text','默认 qwen3-vl-plus，使用已配置的百炼密钥或代理')}
     ${field('OCR 代理完整地址', 'ocr-proxy', cfg.ocrProxy || defaultOCRProxy(), 'url', 'https://ocr.86518925.xyz/api/ocr')}
     ${field('代理访问口令（已支持设备持久保存）', 'ocr-token', getOcrToken(), 'password', '与 Worker 中的 OCR_PROXY_TOKEN 一致')}
     <div id="ocr-test-result" class="result-note" style="margin:6px 0"></div>
