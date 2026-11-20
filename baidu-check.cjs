@@ -24,7 +24,8 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
       assert.deepEqual(payload, { task_id: taskId });
       if (++polls === 1) return Response.json({ error_code: 60, result: { status: 'Running' } });
       return Response.json({ error_code: 0, result: { status: 'Success', imageResults: [
-        { result: [{ seqence: 0, correctResult: 2, cropUrl: 'https://private.example/image', slot: [{ reason: '核对进位' }] }] }
+        { resize_ratio: 0.5, result: [{ seqence: 0, correctResult: 2, cropUrl: 'https://private.example/image',
+          questionArea: [{ left_x: 20, left_y: 30, right_x: 150, right_y: 55 }], slot: [{ reason: '核对进位' }] }] }
       ] } });
     }
     assert.equal(url, 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions');
@@ -45,7 +46,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
   assert.deepEqual(await (await invoke({ action: 'homework-create', image })).json(), { task_id: taskId });
   assert.deepEqual(await (await invoke({ action: 'homework-result', task_id: taskId })).json(), { status: 'pending' });
   assert.deepEqual(await (await invoke({ action: 'homework-result', task_id: taskId })).json(), {
-    status: 'complete', questions: [{ number: 1, verdict: 2, reasons: ['核对进位'] }]
+    status: 'complete', questions: [{ number: 1, verdict: 2, reasons: ['核对进位'], boxes: [{ left: 40, top: 60, right: 300, bottom: 110 }] }]
   });
   const payload = { model: 'qwen-plus', max_tokens: 8000, messages: [
     { role: 'system', content: 'JSON' }, { role: 'user', content: '题目' }

@@ -59,13 +59,28 @@ export function createOCRService(fetcher = globalThis.fetch) {
         return reply(200, { task_id: result.task_id });
       }
       if (action === 'get_result' && result?.status === 'Success' && Array.isArray(result.imageResults)) {
-        const questions = result.imageResults.flatMap(page => Array.isArray(page?.result) ? page.result : [])
-          .filter(question => question && typeof question === 'object')
-          .map((question, index) => ({
-            number: Number.isSafeInteger(question.seqence) && question.seqence >= 0 ? question.seqence + 1 : index + 1,
-            verdict: Number(question.correctResult),
-            reasons: Array.isArray(question.slot) ? question.slot.map(slot => slot?.reason).filter(reason => typeof reason === 'string' && reason.trim()) : []
-          }));
+        const questions = [];
+        for (const page of result.imageResults) {
+          if (!Array.isArray(page?.result)) continue;
+          const ratio = Number(page.resize_ratio);
+          const scale = Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+          for (const question of page.result) {
+            if (!question || typeof question !== 'object') continue;
+            const areas = Array.isArray(question.questionArea) ? question.questionArea : [question.questionArea];
+            const boxes = areas.flatMap(area => {
+              const coordinates = [area?.left_x, area?.left_y, area?.right_x, area?.right_y];
+              if (!coordinates.every(Number.isFinite)) return [];
+              const [left, top, right, bottom] = coordinates.map(value => value / scale);
+              return right > left && bottom > top ? [{ left, top, right, bottom }] : [];
+            });
+            questions.push({
+              number: Number.isSafeInteger(question.seqence) && question.seqence >= 0 ? question.seqence + 1 : questions.length + 1,
+              verdict: Number(question.correctResult),
+              reasons: Array.isArray(question.slot) ? question.slot.map(slot => slot?.reason).filter(reason => typeof reason === 'string' && reason.trim()) : [],
+              ...(boxes.length ? { boxes } : {})
+            });
+          }
+        }
         return reply(200, { status: 'complete', questions });
       }
       return reply(502, { error: '百度作业批改返回了无法识别的结果' });

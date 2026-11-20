@@ -944,6 +944,11 @@ dialog#detail .detail-head {
 .homework-grading h3 { margin:12px 0 6px; }
 .homework-grading details { border-bottom:1px solid var(--line); padding:8px 0; }
 .homework-grading summary { cursor:pointer; }
+.homework-photo { position:relative; overflow:hidden; border-radius:12px; }
+.homework-photo img { display:block; width:100%; height:auto; }
+.homework-mark { position:absolute; left:clamp(0px,var(--mark-x),calc(100% - 44px)); top:clamp(0px,var(--mark-y),calc(100% - 28px)); min-width:40px; min-height:28px; padding:3px 6px; border:1px solid white; border-radius:8px; background:#475569; color:white; font-size:13px; font-weight:700; cursor:pointer; }
+.homework-mark[data-verdict="1"] { background:#067447; }
+.homework-mark[data-verdict="2"] { background:#b42318; }
 .detail-head .detail-number { min-width:0; font-variant-numeric:tabular-nums; }
 .detail-verdict-row {
   display:grid;

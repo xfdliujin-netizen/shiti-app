@@ -1,4 +1,5 @@
 const baiduUsage = { calls: 0 };
+const homeworkVerdicts = { 0: ['未批改', '?'], 1: ['正确', '✓'], 2: ['错误', '×'], 3: ['未作答', '—'], 5: ['批改失败', '?'] };
 let homeworkTask = null, homeworkResult = null;
 
 function baiduGradingSettings() {
@@ -13,15 +14,30 @@ function homeworkGradingButton() {
 
 function homeworkGradingView() {
   if (!image && !homeworkTask && !homeworkResult) return '';
-  const verdicts = { 0: '未批改', 1: '正确', 2: '错误', 3: '未作答', 5: '批改失败' };
+  const questions = homeworkResult?.questions || [];
   return `<div class="homework-grading">
     <p class="hint" id="homework-status" role="status">${homeworkTask ? '已提交，等待百度返回结果。' : '提交后由百度返回逐题批改，结果请人工核对。'}</p>
     ${homeworkResult ? `<section aria-label="百度作业批改结果">
-      <h3>上次百度批改结果 · ${homeworkResult.length} 题</h3>
-      ${homeworkResult.length ? homeworkResult.map(question => `<details><summary>第 ${esc(question.number)} 题 · ${verdicts[question.verdict] || '待核对'}</summary>
+      <h3>上次百度批改结果 · ${questions.length} 题</h3>
+      ${renderHomeworkMarks(homeworkResult.photo, questions)}
+      ${questions.length ? questions.map((question, index) => `<details id="homework-question-${index}"><summary>识别第 ${esc(question.number)} 题 · ${homeworkVerdicts[question.verdict]?.[0] || '待核对'}</summary>
         ${question.reasons.length ? question.reasons.map(reason => `<p class="prose">${esc(reason)}</p>`).join('') : '<p class="muted">百度未提供批改说明。</p>'}</details>`).join('') : '<p class="muted">百度未返回可批改的题目。</p>'}
     </section>` : ''}
   </div>`;
+}
+
+function renderHomeworkMarks(photo, questions) {
+  if (!photo || !questions.length) return '';
+  const marks = questions.map((question, index) => {
+    const box = question.boxes?.find(box => [box.left, box.top, box.right, box.bottom].every(Number.isFinite) &&
+      box.left < photo.width && box.top < photo.height && box.right > 0 && box.bottom > 0);
+    if (!box) return '';
+    const [label, icon] = homeworkVerdicts[question.verdict] || ['待核对', '?'];
+    const left = Math.max(0, box.left) / photo.width * 100;
+    const top = Math.max(0, box.top) / photo.height * 100;
+    return `<button type="button" class="homework-mark" data-homework-mark="${index}" data-verdict="${Number(question.verdict)}" style="--mark-x:${left}%;--mark-y:${top}%" aria-label="识别第 ${esc(question.number)} 题，${label}">${esc(question.number)} ${icon}</button>`;
+  }).join('');
+  return `<div class="homework-photo"><img alt="本次提交批改的作业图" src="${esc(photo.src)}" width="${photo.width}" height="${photo.height}">${marks}</div>`;
 }
 
 async function prepareHomeworkImage(source) {
@@ -41,7 +57,7 @@ async function prepareHomeworkImage(source) {
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(photo, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg', 0.84);
+  return { src: canvas.toDataURL('image/jpeg', 0.84), width: canvas.width, height: canvas.height };
 }
 
 async function requestHomeworkGrading(connection, body) {
@@ -62,6 +78,15 @@ async function requestHomeworkGrading(connection, body) {
 }
 
 function bindHomeworkGrading() {
+  document.querySelectorAll('[data-homework-mark]').forEach(mark => {
+    mark.onclick = () => {
+      const detail = $(`#homework-question-${mark.dataset.homeworkMark}`);
+      if (!detail) return;
+      detail.open = true;
+      detail.scrollIntoView({ block: 'nearest' });
+      detail.querySelector('summary')?.focus({ preventScroll: true });
+    };
+  });
   const button = $('#grade-homework');
   if (!button) return;
   button.onclick = () => {
@@ -79,11 +104,11 @@ function bindHomeworkGrading() {
           const connection = { endpoint: (cfg.ocrProxy || defaultOCRProxy()).trim(), token: getOcrToken() };
           if (connection.token.length < 24) throw Error('请先在设置的「图片文字识别」中填写代理访问口令');
           if (!image) throw Error('请先上传作业图片');
-          const encoded = await prepareHomeworkImage(image);
+          const photo = await prepareHomeworkImage(image);
           $('#homework-status')?.replaceChildren('正在向百度提交整张作业图…');
-          const result = await requestHomeworkGrading(connection, { action: 'homework-create', image: encoded });
+          const result = await requestHomeworkGrading(connection, { action: 'homework-create', image: photo.src });
           if (typeof result.task_id !== 'string' || !result.task_id) throw Error('代理未返回批改任务编号，请确认代理已更新');
-          homeworkTask = { ...connection, id: result.task_id };
+          homeworkTask = { ...connection, id: result.task_id, photo };
           homeworkResult = null;
           cfg.baiduHomeworkCalls = (Number(cfg.baiduHomeworkCalls) || 0) + 1;
           saveLocalConfig();
@@ -94,7 +119,7 @@ function bindHomeworkGrading() {
           const result = await requestHomeworkGrading(homeworkTask, { action: 'homework-result', task_id: homeworkTask.id });
           if (result.status === 'pending') continue;
           if (result.status !== 'complete' || !Array.isArray(result.questions)) throw Error('批改结果格式不正确，请继续查询');
-          homeworkResult = result.questions;
+          homeworkResult = { photo: homeworkTask.photo, questions: result.questions };
           homeworkTask = null;
           return;
         }
