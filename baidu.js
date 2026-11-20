@@ -16,6 +16,7 @@ function eduTutorSettings() {
   return `<p class="notice">在百炼开通「通义拍照解题辅导」后，由代理配置业务空间和具有切题、解题权限的 RAM 密钥。连接成功后，在「批改」上传照片，点击「通义切题」，再展开单题获取参考解析。</p>
     <button type="button" class="secondary" id="test-edututor">检查通义连接配置</button>
     <p class="hint" id="edututor-status" role="status"></p>
+    <p><a href="https://bailian-legacy.console.aliyun.com/cn-beijing/?tab=app#/app/app-market/edututor" target="_blank" rel="noopener">前往百炼开通 EduTutor</a></p>
     <a href="https://help.aliyun.com/zh/model-studio/brief-introduction-of-edu-tutor" target="_blank" rel="noopener">查看阿里云开通说明</a>`;
 }
 
