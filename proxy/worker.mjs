@@ -1,3 +1,5 @@
+import { handleEduTutor, serveEduTutorPhoto } from './edututor.mjs';
+
 // Cloudflare Worker / Node 共用，凭据只取服务端环境变量，不接受客户端指定上游。
 const MAX_IMAGE = 10 * 1024 * 1024, MAX_BODY = MAX_IMAGE + 2048;
 
@@ -164,6 +166,9 @@ export function createOCRService(fetcher = globalThis.fetch) {
     });
 
     const pathname = new URL(request.url).pathname.replace(/\/+$/, '');
+    if (pathname.startsWith('/api/edututor-photo/')) {
+      return serveEduTutorPhoto(request, env, pathname);
+    }
     if (pathname !== '/api/ocr') {
       return reply(404, { error: '接口路径不存在，请确认地址以 /api/ocr 结尾' });
     }
@@ -215,6 +220,7 @@ export function createOCRService(fetcher = globalThis.fetch) {
 
     if (!body || typeof body !== 'object') return reply(400, { error: 'JSON 格式错误' });
     if (body.action === 'qwen-completion') return completeWithQwen(body.payload, env, reply);
+    if (['edututor-status', 'edututor-cut', 'edututor-answer'].includes(body.action)) return handleEduTutor(body, env, fetcher, reply);
     if (!env.BAIDU_API_KEY || !env.BAIDU_SECRET_KEY) {
       return reply(503, { error: '代理尚未配置 BAIDU_API_KEY 或 BAIDU_SECRET_KEY' });
     }

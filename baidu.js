@@ -12,15 +12,41 @@ function baiduGradingSettings() {
     <a href="https://console.bce.baidu.com/ai/#/ai/ocr/overview/index" target="_blank" rel="noopener">打开百度文字识别控制台</a>`;
 }
 
+function eduTutorSettings() {
+  return `<p class="notice">在百炼开通「通义拍照解题辅导」后，由代理配置业务空间和具有切题、解题权限的 RAM 密钥。连接成功后，在「批改」上传照片，点击「通义切题」，再展开单题获取参考解析。</p>
+    <button type="button" class="secondary" id="test-edututor">检查通义连接配置</button>
+    <p class="hint" id="edututor-status" role="status"></p>
+    <a href="https://help.aliyun.com/zh/model-studio/brief-introduction-of-edu-tutor" target="_blank" rel="noopener">查看阿里云开通说明</a>`;
+}
+
+function bindEduTutorSettings() {
+  const button = $('#test-edututor');
+  if (!button) return;
+  button.onclick = async () => {
+    const status = $('#edututor-status');
+    button.disabled = true;
+    status.textContent = '正在检查代理配置…';
+    try {
+      await requestEduTutor('edututor-status');
+      status.textContent = '代理配置已就绪。上传作业图进行首次切题可验证阿里云权限。';
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  };
+}
+
 function homeworkGradingPage() {
   const questions = homeworkResult?.questions || [];
+  const tutor = homeworkResult?.edututor;
   const preview = homeworkTask?.original || homeworkSource;
   const locked = busy || Boolean(homeworkTask);
-  const additional = homeworkResult && Object.keys(homeworkProviders).filter(key => key !== homeworkResult.primary && !homeworkResult.checks.includes(key));
+  const additional = homeworkResult && !tutor && Object.keys(homeworkProviders).filter(key => key !== homeworkResult.primary && !homeworkResult.checks.includes(key));
   const checks = additional || Object.keys(homeworkProviders).filter(key => key !== homeworkPrimary);
   return `<section class="card homework-grading">
     <header class="homework-heading"><h1>作业批改</h1></header>
-    ${homeworkResult && !checks.length ? '' : `<fieldset class="homework-models" ${locked ? 'disabled' : ''}>
+    ${tutor || (homeworkResult && !checks.length) ? '' : `<fieldset class="homework-models" ${locked ? 'disabled' : ''}>
       <legend>${homeworkResult ? '追加交叉验证' : '批改模型'}</legend>
       ${homeworkResult ? '' : `<div class="ocr-switch" role="group" aria-label="主批改模型">${Object.entries(homeworkProviders).map(([key, label]) => `<button type="button" data-homework-model="${key}" aria-pressed="${key === homeworkPrimary}" class="${key === homeworkPrimary ? 'active' : ''}">${label}</button>`).join('')}</div>`}
       <div class="homework-checks">${homeworkResult ? '' : '<span>交叉验证</span>'}${checks.map(key => `<label><input type="checkbox" data-homework-check="${key}" ${(homeworkTask?.providers || [...(homeworkResult?.selectedChecks || homeworkChecks)]).includes(key) ? 'checked' : ''}> ${homeworkProviders[key]}</label>`).join('')}</div>
@@ -30,17 +56,20 @@ function homeworkGradingPage() {
       <input type="file" id="homework-upload" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
       <button type="button" class="secondary" id="choose-homework" ${busy ? 'disabled' : ''}>${preview || homeworkResult ? '重新选图' : '上传作业图'}</button>
       ${homeworkResult ? '' : `<button type="button" class="primary" id="grade-homework" ${!homeworkSource && !homeworkTask ? 'disabled' : ''}>${homeworkTask ? '继续查询批改' : '开始批改'}</button>`}
+      ${!homeworkResult && !homeworkTask ? `<button type="button" class="secondary" id="cut-edututor" ${!homeworkSource || busy ? 'disabled' : ''}>通义切题</button>` : ''}
       ${additional?.length ? `<button type="button" class="primary" id="check-homework" ${!homeworkTask && !homeworkResult.selectedChecks.size ? 'disabled' : ''}>${homeworkTask ? '继续查询复核' : '开始复核'}</button>` : ''}
     </div>
     <p class="hint homework-status" id="homework-status" role="status">${homeworkTask ? '已提交，等待结果。' : homeworkResult ? '双指缩放照片，点标记可定位题目。' : preview ? '双指缩放照片，放大后可拖动。' : '上传一张包含题目和学生作答的整页照片。'}</p>
     ${!homeworkResult && preview ? renderHomeworkPhoto(preview, '待批改的作业图') : ''}
-    ${homeworkResult ? `<section aria-label="作业批改结果">
-      <div class="homework-result-head"><h2>批改结果 · ${questions.length} 题</h2><span>用时 ${Math.round(homeworkResult.elapsed / 1000)} 秒</span></div>
+    ${homeworkResult ? `<section aria-label="${tutor ? '通义切题结果' : '作业批改结果'}">
+      <div class="homework-result-head"><h2>${tutor ? '通义切题结果' : '批改结果'} · ${questions.length} 题</h2><span>用时 ${Math.round(homeworkResult.elapsed / 1000)} 秒</span></div>
+      ${tutor ? '<p class="hint">展开题目可获取参考答案及解析。请人工核对作答，再勾选要收录的题。</p>' : `
       <p class="hint">主批改结果 · ${homeworkProviders[homeworkResult.primary]}${homeworkResult.checks.length ? ' ｜ 已复核 · ' + homeworkResult.checks.map(key => homeworkProviders[key]).join('、') : ''}</p>
       ${[...homeworkResult.failures].map(([provider, reason]) => `<p class="hint">${homeworkProviders[provider]}未完成 · ${esc(reason)}</p>`).join('')}
       <div class="homework-totals">
         ${[[1, '正确'], [2, '错题'], [3, '未作答']].map(([verdict, label]) => `<div data-verdict="${verdict}"><span>${label}</span><strong>${questions.filter(q => q.verdict === verdict).length}</strong></div>`).join('')}
       </div>
+      `}
       ${questions.length ? '<button type="button" class="secondary homework-review-link" id="homework-open-review">校对并收录错题 ↓</button>' : ''}
       ${renderHomeworkMarks({ ...homeworkResult.photo, src: homeworkResult.original }, questions)}
       ${questions.length ? renderHomeworkReview(homeworkResult) : '<p class="muted">主批改模型未返回题目。</p>'}
@@ -92,7 +121,7 @@ function renderHomeworkReview(result) {
   const saved = result.questions.filter(q => q.saved).length;
   return `<section class="homework-review" aria-labelledby="homework-review-title">
     <h2 id="homework-review-title" tabindex="-1">校对并收录错题</h2>
-      <p class="hint">默认勾选判错且无分歧的题。展开题目可改判、重画选框或补充题干，也可手动勾选。</p>
+    <p class="hint">${result.edututor ? '可修改题干和切题范围，勾选需要收录的题。' : '默认勾选判错且无分歧的题。展开题目可改判、重画选框或补充题干，也可手动勾选。'}</p>
     <label class="field homework-subject"><span>收录科目</span><select id="homework-subject">
       <option value="" ${result.subject ? '' : 'selected'} disabled>请选择科目</option>${opts(result.subject)}
     </select></label>
@@ -107,10 +136,12 @@ function renderHomeworkReview(result) {
           <div class="homework-review-body">
             ${question.reasons.length ? `<p class="hint">${homeworkProviders[result.primary]}判定 · ${homeworkVerdicts[question.originalVerdict]?.[0] || '待核对'}</p><p class="prose">${esc(question.reasons.join('\n'))}</p>` : ''}
             ${question.checks?.map(check => `<p class="hint">${homeworkProviders[check.provider]}复核 · ${check.label}${check.reason ? ' · ' + esc(check.reason) : ''}</p>`).join('') || ''}
+            ${question.explanation ? `<h3>通义参考解析</h3><p class="prose">${esc(question.explanation)}</p>` : ''}
             ${question.saved ? '' : `<label class="field"><span>校对判定</span><select data-homework-verdict="${index}">
               ${Object.entries(homeworkVerdicts).map(([value, [name]]) => `<option value="${value}" ${Number(value) === question.verdict ? 'selected' : ''}>${name}</option>`).join('')}
             </select></label>
             <button type="button" class="secondary" data-homework-crop="${index}">${question.region ? '查看或调整切题范围' : '手动框选题目'}</button>
+            ${result.edututor && question.region && !question.explanation ? `<button type="button" class="secondary" data-edututor-answer="${index}">获取参考解析</button>` : ''}
             <label class="field"><span>补充题干（可选）</span><textarea rows="2" data-homework-text="${index}" placeholder="也可只收录题图">${esc(question.text)}</textarea></label>`}
           </div>
         </details>
@@ -172,6 +203,23 @@ async function requestHomeworkGrading(connection, body) {
   return result;
 }
 
+async function requestEduTutor(action, image) {
+  const warning = ocrLocalFileWarning();
+  if (warning) throw Error(warning);
+  const token = getOcrToken();
+  if (token.length < 24) throw Error('请先在设置的「图片文字识别」中填写代理访问口令');
+  const response = await fetch((cfg.ocrProxy || defaultOCRProxy()).trim(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-OCR-Token': token },
+    body: JSON.stringify({ action, image }),
+    signal: AbortSignal.timeout(75000)
+  });
+  const result = await response.json().catch(() => ({}));
+  if (response.status === 400 && result.error === '不支持的操作') throw Error('当前 OCR 代理尚未部署通义拍照解题');
+  if (!response.ok) throw Error(result.error || `通义拍照解题请求失败（${response.status}）`);
+  return result;
+}
+
 function homeworkReviewedQuestions(questions, photo) {
   return questions.map(question => {
     const verdict = Object.hasOwn(homeworkVerdicts, question.verdict) ? Number(question.verdict) : 0;
@@ -212,9 +260,9 @@ async function saveHomeworkQuestions(result) {
       term: profile.term,
       text: question.text.trim() || `识别第 ${question.number} 题 · 见题图`,
       image: cropped[index],
-      source: homeworkProviders[result.primary] + '作业批改',
+      source: result.edututor ? '通义拍照解题' : homeworkProviders[result.primary] + '作业批改',
       originalNumber: String(question.number),
-      analysis: question.verdict === 2 && question.originalVerdict === 2 ? question.reasons.join('\n') : '',
+      analysis: question.explanation || (question.verdict === 2 && question.originalVerdict === 2 ? question.reasons.join('\n') : ''),
       answerStatus: question.verdict === 3 && question.originalVerdict !== 3 ? 'unanswered' : 'unknown',
       evidenceVerified: false,
       diagnosisStatus: 'pending',
@@ -304,6 +352,19 @@ function bindHomeworkReview(result) {
       if (!region) return;
       question.region = region;
       redraw(index, `[data-homework-crop="${index}"]`);
+    };
+  });
+  document.querySelectorAll('[data-edututor-answer]').forEach(button => {
+    button.onclick = async () => {
+      const index = button.dataset.edututorAnswer;
+      const question = result.questions[index];
+      await run(button, async () => {
+        const image = await studyImageCopy(result.photo.src, 'original', question.region);
+        const response = await requestEduTutor('edututor-answer', image);
+        if (typeof response.explanation !== 'string' || !response.explanation.trim()) throw Error('未收到有效的参考解析');
+        question.explanation = response.explanation;
+      });
+      if (question.explanation) redraw(index, `#homework-question-${index} summary`);
     };
   });
   save.onclick = async () => {
