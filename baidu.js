@@ -4,6 +4,7 @@ const homeworkProviders = { baidu: '百度', qwen: '千问', deepseek: 'DeepSeek
 let homeworkPrimary = 'baidu';
 const homeworkChecks = new Set();
 let homeworkSource = '', homeworkTask = null, homeworkResult = null;
+let homeworkView = { scale: 1, x: 0, y: 0 };
 
 function baiduGradingSettings() {
   return `<p class="notice">在底部「批改」上传整张含学生作答的图片，再点击「开始批改」。作业批改使用「图片文字识别」中配置的百度代理和访问口令。百度应用需开通智能作业批改权限。</p>
@@ -15,39 +16,46 @@ function homeworkGradingPage() {
   const questions = homeworkResult?.questions || [];
   const preview = homeworkTask?.original || homeworkSource;
   const locked = busy || Boolean(homeworkTask);
+  const additional = homeworkResult && Object.keys(homeworkProviders).filter(key => key !== homeworkResult.primary && !homeworkResult.checks.includes(key));
+  const checks = additional || Object.keys(homeworkProviders).filter(key => key !== homeworkPrimary);
   return `<section class="card homework-grading">
     <header class="homework-heading"><h1>作业批改</h1></header>
-    ${homeworkResult ? '' : `<fieldset class="homework-models" ${locked ? 'disabled' : ''}>
-      <legend>批改模型</legend><label class="field"><span>主批改</span><select id="homework-model">${Object.entries(homeworkProviders).map(([key, label]) => `<option value="${key}" ${key === homeworkPrimary ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
-      <div class="homework-checks"><span>交叉复核</span>${Object.entries(homeworkProviders).filter(([key]) => key !== homeworkPrimary).map(([key, label]) => `<label><input type="checkbox" data-homework-check="${key}" ${homeworkChecks.has(key) ? 'checked' : ''}> ${label}</label>`).join('')}</div>
-      <p class="hint">每个已选服务会收到同一张照片，并独立计入该服务的用量。</p>
+    ${homeworkResult && !checks.length ? '' : `<fieldset class="homework-models" ${locked ? 'disabled' : ''}>
+      <legend>${homeworkResult ? '追加交叉验证' : '批改模型'}</legend>
+      ${homeworkResult ? '' : `<div class="ocr-switch" role="group" aria-label="主批改模型">${Object.entries(homeworkProviders).map(([key, label]) => `<button type="button" data-homework-model="${key}" aria-pressed="${key === homeworkPrimary}" class="${key === homeworkPrimary ? 'active' : ''}">${label}</button>`).join('')}</div>`}
+      <div class="homework-checks">${homeworkResult ? '' : '<span>交叉验证</span>'}${checks.map(key => `<label><input type="checkbox" data-homework-check="${key}" ${(homeworkTask?.providers || [...(homeworkResult?.selectedChecks || homeworkChecks)]).includes(key) ? 'checked' : ''}> ${homeworkProviders[key]}</label>`).join('')}</div>
+      <p class="hint">勾选的服务会收到同一张照片，并独立计入用量。</p>
     </fieldset>`}
     <div class="actions homework-actions">
       <input type="file" id="homework-upload" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
       <button type="button" class="secondary" id="choose-homework" ${busy ? 'disabled' : ''}>${preview || homeworkResult ? '重新选图' : '上传作业图'}</button>
       ${homeworkResult ? '' : `<button type="button" class="primary" id="grade-homework" ${!homeworkSource && !homeworkTask ? 'disabled' : ''}>${homeworkTask ? '继续查询批改' : '开始批改'}</button>`}
+      ${additional?.length ? `<button type="button" class="primary" id="check-homework" ${!homeworkTask && !homeworkResult.selectedChecks.size ? 'disabled' : ''}>${homeworkTask ? '继续查询复核' : '开始复核'}</button>` : ''}
     </div>
-    <p class="hint homework-status" id="homework-status" role="status">${homeworkTask ? '已提交，等待批改结果。' : homeworkResult ? '点照片可放大，点标记可定位题目。' : '上传一张包含题目和学生作答的整页照片。'}</p>
-    ${!homeworkResult && preview ? `<div class="homework-photo">${homeworkPhotoButton(preview, '待批改的作业图')}</div>` : ''}
+    <p class="hint homework-status" id="homework-status" role="status">${homeworkTask ? '已提交，等待结果。' : homeworkResult ? '双指缩放照片，点标记可定位题目。' : preview ? '双指缩放照片，放大后可拖动。' : '上传一张包含题目和学生作答的整页照片。'}</p>
+    ${!homeworkResult && preview ? renderHomeworkPhoto(preview, '待批改的作业图') : ''}
     ${homeworkResult ? `<section aria-label="作业批改结果">
       <div class="homework-result-head"><h2>批改结果 · ${questions.length} 题</h2><span>用时 ${Math.round(homeworkResult.elapsed / 1000)} 秒</span></div>
       <p class="hint">主批改结果 · ${homeworkProviders[homeworkResult.primary]}${homeworkResult.checks.length ? ' ｜ 已复核 · ' + homeworkResult.checks.map(key => homeworkProviders[key]).join('、') : ''}</p>
-      ${homeworkResult.failures.map(message => `<p class="hint">${esc(message)}</p>`).join('')}
+      ${[...homeworkResult.failures].map(([provider, reason]) => `<p class="hint">${homeworkProviders[provider]}未完成 · ${esc(reason)}</p>`).join('')}
       <div class="homework-totals">
         ${[[1, '正确'], [2, '错题'], [3, '未作答']].map(([verdict, label]) => `<div data-verdict="${verdict}"><span>${label}</span><strong>${questions.filter(q => q.verdict === verdict).length}</strong></div>`).join('')}
       </div>
       ${questions.length ? '<button type="button" class="secondary homework-review-link" id="homework-open-review">校对并收录错题 ↓</button>' : ''}
-      ${renderHomeworkMarks(homeworkResult.photo, questions)}
+      ${renderHomeworkMarks({ ...homeworkResult.photo, src: homeworkResult.original }, questions)}
       ${questions.length ? renderHomeworkReview(homeworkResult) : '<p class="muted">主批改模型未返回题目。</p>'}
     </section>` : ''}
   </section>`;
 }
 
-function homeworkPhotoButton(src, label, dimensions = '') {
-  return `<button type="button" class="homework-photo-open" aria-label="放大查看${label}" aria-haspopup="dialog"><img alt="${label}" src="${esc(src)}" ${dimensions}><span>放大查看</span></button>`;
+function renderHomeworkPhoto(src, label, marks = '', dimensions = '') {
+  return `<div class="homework-photo">
+    <div class="homework-photo-layer"><img alt="${label}" src="${esc(src)}" ${dimensions} draggable="false">${marks}</div>
+    <button type="button" class="homework-reset-zoom" aria-label="恢复照片原大小" hidden>恢复大小</button>
+  </div>`;
 }
 
-function renderHomeworkMarks(photo, questions, enlarged = false) {
+function renderHomeworkMarks(photo, questions) {
   if (!photo) return '';
   const marks = questions.map((question, index) => {
     const box = question.region;
@@ -56,13 +64,12 @@ function renderHomeworkMarks(photo, questions, enlarged = false) {
     return `<span class="homework-region" data-homework-region="${index}" data-verdict="${question.verdict}" hidden
       style="left:${box.x * 100}%;top:${box.y * 100}%;width:${box.w * 100}%;height:${box.h * 100}%"></span>
       <button type="button" class="homework-mark" data-homework-mark="${index}" data-verdict="${question.verdict}"
-        style="--mark-x:${box.x * 100}%;--mark-y:${box.y * 100}%" ${enlarged ? 'tabindex="-1"' : `aria-controls="homework-question-${index}"`}
+        style="--mark-x:${box.x * 100}%;--mark-y:${box.y * 100}%" aria-controls="homework-question-${index}"
         aria-label="识别第 ${esc(question.number)} 题，${label}${question.conflict ? '，判定有分歧' : ''}"><b aria-hidden="true">${icon}</b><span aria-hidden="true">${esc(question.number)}${question.conflict ? '!' : ''}</span></button>`;
   }).join('');
   const dimensions = `width="${photo.width}" height="${photo.height}"`;
-  const image = enlarged ? `<img alt="作业照片" src="${esc(photo.src)}" ${dimensions}>` : homeworkPhotoButton(photo.src, '批改后的作业图', dimensions);
-  return `<div class="homework-photo">${image}${enlarged ? `<div class="homework-view-marks" inert aria-hidden="true">${marks}</div>` : marks}</div>
-    ${!enlarged && !marks && questions.length ? '<p class="hint">没有可定位的题目坐标，请查看下方逐题结果。</p>' : ''}`;
+  return renderHomeworkPhoto(photo.src, '批改后的作业图', marks, dimensions) +
+    (!marks && questions.length ? '<p class="hint">没有可定位的题目坐标，请查看下方逐题结果。</p>' : '');
 }
 
 function homeworkQuestionRegion(boxes, photo) {
