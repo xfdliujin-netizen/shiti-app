@@ -5,7 +5,7 @@
 - 千问在「设置 → 文字分析与练习」配置。选择「千问」，填百炼 API Key 和对应地域的 OpenAI 兼容 Base URL。默认模型为 `qwen-plus`，自定义模型需支持非思考模式下的 JSON 输出。所选模型用于文字分析、AI 判题和出题。
 - 录题页可直接选择「千问」识别框选区域。图片转录默认使用 `qwen3-vl-plus`，可以在「设置 → 图片文字识别」改用其他支持图片和 JSON 输出的百炼模型。图片转录复用千问的 API Key 和代理选项。
 - 若浏览器直连受跨域或网络限制，可使用同一个代理。将 `QWEN_API_KEY` 作为 Worker Secret 配置，可选设置 `QWEN_BASE_URL`，然后在设置中勾选「通过已配置的代理调用千问」。本地运行时可在 `.env` 设置同名变量。
-- 百度作业批改复用现有 `/api/ocr` 代理和口令。线上使用前需将更新后的 `proxy/worker.mjs` 部署到现有 Worker，并确认百度应用已获「智能作业批改」权限。录题页上传整张作业图片后，点击「百度批改整张作业图」。应用展示逐题判断和返回的说明，供人工核对。
+- 百度作业批改复用现有 `/api/ocr` 代理和口令。百度应用需开通「智能作业批改」权限。在底部「批改」上传整张作业图片后，点击「开始批改」。完成后直接显示带标记的作业图，点标记可打开逐题说明。
 - 设置显示本设备记录的千问 Token 和百度已提交批改次数。平台账户余量请通过两个设置入口打开官方控制台。百炼的控制台数据为分钟级更新，官方 CLI 的 `bl usage free` 需要单独的控制台登录。
 
 官方文档：[百炼兼容接口](https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope) · [百炼免费额度](https://help.aliyun.com/zh/model-studio/new-free-quota/) · [百度智能作业批改 API](https://ai.baidu.com/ai-doc/OCR/omimjkvlz)

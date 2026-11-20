@@ -51,12 +51,13 @@ const regionList = [
 
 const paths = [
   '<path d="M12 5v14M5 12h14"/>',
+  '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="m8 12 3 3 5-6"/>',
   '<path d="M4 4h6a3 3 0 0 1 2 2 3 3 0 0 1 2-2h6v15h-6a3 3 0 0 0-2 2 3 3 0 0 0-2-2H4z"/>',
   '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h4"/><path d="M10 12h5M10 16h5"/>',
   '<path d="M4 4h16v16H4z"/><path d="M8 4v16M4 9h16M12 13h4M12 16h4"/>',
   '<circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/>'
 ];
-const tabs = [['capture', '录题'], ['notebook', '错题本'], ['exam', '练习'], ['libraries', '题库'], ['settings', '设置']];
+const tabs = [['capture', '录题'], ['grading', '批改'], ['notebook', '错题本'], ['exam', '练习'], ['libraries', '题库'], ['settings', '设置']];
 
 let data = { version: 1, questions: [], practices: [], deleted: {} },
     cfg = readConfig(),
@@ -282,7 +283,7 @@ function render() {
   if ($('#breadcrumb')) $('#breadcrumb').textContent = `${p.stageName}（${p.grade}） / ` + tabs.find(t => t[0] === parentTab)[1];
   const mobileBar = '';
   const mainEl = $('#main');
-  mainEl.innerHTML = mobileBar + ({ capture, notebook, variants: variantsPage, libraries:librariesPage, exam: examPage, settings })[tab]() + (draft ? draftForm() : '');
+  mainEl.innerHTML = mobileBar + ({ capture, grading: () => homeworkGradingPage(), notebook, variants: variantsPage, libraries:librariesPage, exam: examPage, settings })[tab]() + (draft ? draftForm() : '');
   mainEl.classList.remove('apple-view-swap');
   if (typeof mainEl.offsetWidth === 'number') void mainEl.offsetWidth;
   mainEl.classList.add('apple-view-swap');
@@ -345,7 +346,6 @@ function capture() {
         <h2>录入新错题</h2>
         <div class="ocr-switch" role="group" aria-label="图片识别服务">${[['baidu', '百度 OCR'], ['deepseek', 'DeepSeek'], ['qwen', '千问']].map(([provider, label]) => `<button type="button" data-ocr-provider="${provider}" aria-pressed="${ocrProvider === provider}" class="${ocrProvider === provider ? 'active' : ''}">${label}</button>`).join('')}</div>
       </div>
-      ${typeof homeworkGradingButton === 'function' ? homeworkGradingButton() : ''}
       
       <select id="subject" hidden>${opts(currentSubject)}</select>
       <div id="capture-input">
@@ -358,7 +358,6 @@ function capture() {
         <button class="primary" id="analyze">✧ 识别框内文字</button>
         <button class="secondary" id="manual">手动填表</button>
       </div>
-      ${typeof homeworkGradingView === 'function' ? homeworkGradingView() : ''}
 
     </section>
 
@@ -1067,13 +1066,13 @@ async function run(button, fn) {
   finally { busy = false; if (button.isConnected) { button.disabled = false; button.textContent = old; } if (typeof refreshCloudView === 'function') refreshCloudView(); }
 }
 
-async function loadImage(f) {
+async function loadImage(f, onLoad = source => { image = source; render(); }) {
   if (!f) return;
   if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(f.type) || f.size > 20 * 1024 * 1024) {
     return toast('请选择 20 MB 以内的 JPG、PNG、WebP 或 GIF');
   }
   const reader = new FileReader();
-  reader.onload = () => { image = reader.result; render(); };
+  reader.onload = () => onLoad(reader.result);
   reader.onerror = () => toast('图片读取失败');
   reader.readAsDataURL(f);
 }
@@ -1277,11 +1276,11 @@ function bind(tab) {
 
   }
   if (tab === 'settings') bindSettings();
+  if (tab === 'grading') bindHomeworkGrading();
   if (tab === 'variants' || tab === 'exam') bindPractice();
   if (tab === 'capture') {
     if (typeof bindPaper === 'function') bindPaper();
     if (typeof bindRecognition === 'function') bindRecognition();
-    if (typeof bindHomeworkGrading === 'function') bindHomeworkGrading();
     if ($('#paper-dialog-close')) $('#paper-dialog-close').onclick = () => $('#paper-dialog').close();
     if ($('#paper-dialog')) $('#paper-dialog').onclick = e => { if (e.target === $('#paper-dialog')) $('#paper-dialog').close(); };
     if ($('#open-paper')) $('#open-paper').onclick = () => { openPaperOnRender = true; render(); };

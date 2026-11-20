@@ -340,7 +340,7 @@ button.secondary:active:not(:disabled),
     box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.08) !important;
     padding: 6px 6px max(6px, env(safe-area-inset-bottom));
   }
-  .main-nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; }
+  .main-nav { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; }
   .main-nav a { padding: 7px 1px; font-size: 10px; gap: 3px; min-width: 0; border-radius: 14px; }
   .main-nav a svg { width: 20px; height: 20px; }
   .notebook-title h1 { font-size: 22px; }
@@ -360,7 +360,6 @@ button.secondary:active:not(:disabled),
 
 /* v32: one inline image editor and fewer duplicate controls. */
 .capture-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
-.capture-homework-entry { margin-bottom:10px; }
 .capture-head .ocr-switch {
   margin: 0;
   flex-shrink: 0;
@@ -940,8 +939,10 @@ dialog#detail .detail-head {
 .exam-history-entry { display:grid; gap:4px; width:100%; text-align:start; white-space:normal; }
 .exam-history-entry span { font-size:12px; }
 .exam-history p { margin:12px 0 0; }
-.homework-grading { border-top:1px solid var(--line); margin-top:12px; padding-top:12px; }
-.homework-grading h3 { margin:12px 0 6px; }
+.homework-grading h1 { margin:0; font-size:22px; }
+.homework-grading h2 { margin:12px 0 8px; font-size:17px; }
+.homework-actions { margin:12px 0 8px; gap:8px; }
+.homework-actions button:disabled { opacity:.55; }
 .homework-grading details { border-bottom:1px solid var(--line); padding:8px 0; }
 .homework-grading summary { cursor:pointer; }
 .homework-photo { position:relative; overflow:hidden; border-radius:12px; }

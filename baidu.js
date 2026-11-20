@@ -1,33 +1,35 @@
 const baiduUsage = { calls: 0 };
 const homeworkVerdicts = { 0: ['未批改', '?'], 1: ['正确', '✓'], 2: ['错误', '×'], 3: ['未作答', '—'], 5: ['批改失败', '?'] };
-let homeworkTask = null, homeworkResult = null;
+let homeworkSource = '', homeworkTask = null, homeworkResult = null;
 
 function baiduGradingSettings() {
-  return `<p class="notice">在「录题」点击「百度智能作业批改」，上传整张含学生作答的图片，再点击同一按钮提交。作业批改使用「图片文字识别」中配置的百度代理和访问口令。百度应用需开通智能作业批改权限。</p>
+  return `<p class="notice">在底部「批改」上传整张含学生作答的图片，再点击「开始批改」。作业批改使用「图片文字识别」中配置的百度代理和访问口令。百度应用需开通智能作业批改权限。</p>
     <p class="result-note">本机已提交 ${Number(cfg.baiduHomeworkCalls) || 0} 次批改。账户免费余量请在百度控制台查看。</p>
     <a href="https://console.bce.baidu.com/ai/#/ai/ocr/overview/index" target="_blank" rel="noopener">打开百度文字识别控制台</a>`;
 }
 
-function homeworkGradingButton() {
-  return `<div class="capture-homework-entry"><button type="button" class="secondary small-button" id="grade-homework">${homeworkTask ? '继续查询百度批改' : '百度智能作业批改'}</button></div>`;
-}
-
-function homeworkGradingView() {
-  if (!image && !homeworkTask && !homeworkResult) return '';
+function homeworkGradingPage() {
   const questions = homeworkResult?.questions || [];
-  return `<div class="homework-grading">
-    <p class="hint" id="homework-status" role="status">${homeworkTask ? '已提交，等待百度返回结果。' : '提交后由百度返回逐题批改，结果请人工核对。'}</p>
+  return `<section class="card homework-grading">
+    <h1>百度智能作业批改</h1>
+    <div class="actions homework-actions">
+      <input type="file" id="homework-upload" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+      <button type="button" class="secondary" id="choose-homework" ${homeworkTask ? 'disabled' : ''}>${homeworkSource || homeworkResult ? '重新选图' : '上传作业图'}</button>
+      ${homeworkResult ? '' : `<button type="button" class="primary" id="grade-homework" ${!homeworkSource && !homeworkTask ? 'disabled' : ''}>${homeworkTask ? '继续查询批改' : '开始批改'}</button>`}
+    </div>
+    <p class="hint" id="homework-status" role="status">${homeworkTask ? '已提交，等待百度返回结果。' : homeworkResult ? '点图上的标记查看对应说明，批改结果请人工核对。' : '上传一张包含题目和学生作答的整页照片。'}</p>
+    ${!homeworkResult && homeworkSource ? `<div class="homework-photo"><img alt="待批改的作业图" src="${esc(homeworkSource)}"></div>` : ''}
     ${homeworkResult ? `<section aria-label="百度作业批改结果">
-      <h3>上次百度批改结果 · ${questions.length} 题</h3>
+      <h2>批改结果 · ${questions.length} 题</h2>
       ${renderHomeworkMarks(homeworkResult.photo, questions)}
       ${questions.length ? questions.map((question, index) => `<details id="homework-question-${index}"><summary>识别第 ${esc(question.number)} 题 · ${homeworkVerdicts[question.verdict]?.[0] || '待核对'}</summary>
         ${question.reasons.length ? question.reasons.map(reason => `<p class="prose">${esc(reason)}</p>`).join('') : '<p class="muted">百度未提供批改说明。</p>'}</details>`).join('') : '<p class="muted">百度未返回可批改的题目。</p>'}
     </section>` : ''}
-  </div>`;
+  </section>`;
 }
 
 function renderHomeworkMarks(photo, questions) {
-  if (!photo || !questions.length) return '';
+  if (!photo) return '';
   const marks = questions.map((question, index) => {
     const box = question.boxes?.find(box => [box.left, box.top, box.right, box.bottom].every(Number.isFinite) &&
       box.left < photo.width && box.top < photo.height && box.right > 0 && box.bottom > 0);
@@ -37,7 +39,8 @@ function renderHomeworkMarks(photo, questions) {
     const top = Math.max(0, box.top) / photo.height * 100;
     return `<button type="button" class="homework-mark" data-homework-mark="${index}" data-verdict="${Number(question.verdict)}" style="--mark-x:${left}%;--mark-y:${top}%" aria-label="识别第 ${esc(question.number)} 题，${label}">${esc(question.number)} ${icon}</button>`;
   }).join('');
-  return `<div class="homework-photo"><img alt="本次提交批改的作业图" src="${esc(photo.src)}" width="${photo.width}" height="${photo.height}">${marks}</div>`;
+  return `<div class="homework-photo"><img alt="本次提交批改的作业图" src="${esc(photo.src)}" width="${photo.width}" height="${photo.height}">${marks}</div>
+    ${!marks && questions.length ? '<p class="hint">百度未返回可定位的题目坐标，请查看下方逐题结果。</p>' : ''}`;
 }
 
 async function prepareHomeworkImage(source) {
@@ -78,6 +81,19 @@ async function requestHomeworkGrading(connection, body) {
 }
 
 function bindHomeworkGrading() {
+  const upload = $('#homework-upload');
+  $('#choose-homework').onclick = () => {
+    if (!busy && !homeworkTask) upload.click();
+  };
+  upload.onchange = event => {
+    if (busy || homeworkTask) return;
+    loadImage(event.target.files[0], source => {
+      if (busy || homeworkTask) return;
+      homeworkSource = source;
+      homeworkResult = null;
+      if (current() === 'grading') render();
+    });
+  };
   document.querySelectorAll('[data-homework-mark]').forEach(mark => {
     mark.onclick = () => {
       const detail = $(`#homework-question-${mark.dataset.homeworkMark}`);
@@ -90,12 +106,6 @@ function bindHomeworkGrading() {
   const button = $('#grade-homework');
   if (!button) return;
   button.onclick = () => {
-    if (!image && !homeworkTask) {
-      const photo = $('#photo');
-      if (photo) photo.click();
-      else toast('请先上传整张作业图片');
-      return;
-    }
     return run(button, async () => {
       try {
         if (!homeworkTask) {
@@ -103,8 +113,8 @@ function bindHomeworkGrading() {
           if (warning) throw Error(warning);
           const connection = { endpoint: (cfg.ocrProxy || defaultOCRProxy()).trim(), token: getOcrToken() };
           if (connection.token.length < 24) throw Error('请先在设置的「图片文字识别」中填写代理访问口令');
-          if (!image) throw Error('请先上传作业图片');
-          const photo = await prepareHomeworkImage(image);
+          if (!homeworkSource) throw Error('请先上传作业图片');
+          const photo = await prepareHomeworkImage(homeworkSource);
           $('#homework-status')?.replaceChildren('正在向百度提交整张作业图…');
           const result = await requestHomeworkGrading(connection, { action: 'homework-create', image: photo.src });
           if (typeof result.task_id !== 'string' || !result.task_id) throw Error('代理未返回批改任务编号，请确认代理已更新');
@@ -121,11 +131,12 @@ function bindHomeworkGrading() {
           if (result.status !== 'complete' || !Array.isArray(result.questions)) throw Error('批改结果格式不正确，请继续查询');
           homeworkResult = { photo: homeworkTask.photo, questions: result.questions };
           homeworkTask = null;
+          homeworkSource = '';
           return;
         }
         toast('百度仍在批改，可以稍后继续查询');
       } finally {
-        if (current() === 'capture') render();
+        if (current() === 'grading') render();
       }
     });
   };
