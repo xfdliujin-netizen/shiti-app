@@ -894,7 +894,7 @@ function settings() {
         ${settingsRow('deepseek', '✦', 'orange', '文字分析与练习', '校对后的文字分析、变式、组卷与判题', cfg.textProvider === 'qwen' ? cfg.qwenModel || 'qwen-plus' : cfg.model || 'deepseek-chat')}
         ${typeof baiduGradingSettings === 'function' ? settingsRow('homework-grading', '✓', 'teal', '百度智能作业批改', '图片批改与免费额度查询入口', '') : ''}
       </div>
-      <p class="settings-footnote">识别默认走百度高精度 OCR，可在录题时切换 DeepSeek；图片转录需使用支持图片输入的模型。</p>
+      <p class="settings-footnote">识别默认使用百度高精度 OCR，可在录题页切换 DeepSeek 或千问。</p>
     </div>
 
     <div class="settings-group">
