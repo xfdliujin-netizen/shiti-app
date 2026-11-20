@@ -514,6 +514,24 @@ function bindHomeworkGrading() {
   });
   bindHomeworkPhoto($('.homework-photo'));
   if (homeworkResult) bindHomeworkReview(homeworkResult);
+  const cut = $('#cut-edututor');
+  if (cut) cut.onclick = async () => {
+    if (busy || !homeworkSource || homeworkTask) return;
+    const started = performance.now(), original = homeworkSource;
+    const status = $('#homework-status');
+    status.textContent = '正在用通义识别题目范围…';
+    status.classList.add('is-grading');
+    await run(cut, async () => {
+      const photo = await prepareHomeworkImage(original);
+      const result = await requestEduTutor('edututor-cut', photo.src);
+      if (!Array.isArray(result.questions) || !result.questions.length) throw Error('通义未找到可切出的题目');
+      const questions = homeworkReviewedQuestions(result.questions.map(question => ({ ...question, verdict: 0 })), photo);
+      questions.forEach((question, index) => { question.text = result.questions[index].text || ''; });
+      homeworkResult = { edututor: true, photo, original, questions, elapsed: performance.now() - started };
+      homeworkSource = '';
+    });
+    if (current() === 'grading') render();
+  };
   const button = $('#grade-homework') || $('#check-homework');
   if (!button) return;
   button.onclick = async () => {

@@ -2,6 +2,14 @@
 
 ## 千问文字模型与百度智能作业批改
 
+### 通义拍照解题辅导（EduTutor）
+
+在百炼应用实践开通「通义拍照解题辅导」，复制该业务空间 ID。使用专用 RAM 用户，授予 `edututor:CutQuestions` 和 `edututor:AnswerSSE` 两项权限，资源填 `*`。在 OCR Worker 中保存 `EDUTUTOR_ACCESS_KEY_ID`、`EDUTUTOR_ACCESS_KEY_SECRET` 两枚 Secret，以及 `EDUTUTOR_WORKSPACE_ID` 变量。通义拍照解题的 OpenAPI 使用 RAM AccessKey。
+
+在 OCR Worker 配置中绑定专用私有 R2 桶 `EDUTUTOR_PHOTOS`，关闭桶的公开访问，建议添加 1 天的生命周期规则处理异常中断产生的残留对象。阿里云通过 OCR Worker 读取 3 分钟有效的随机图片链接，代理正常完成后立即删除临时图片。部署 Worker 后，可在拾题设置的「通义拍照解题」检查代理配置。
+
+在「批改」上传照片，点击「通义切题」。展开切出的单题后点「获取参考解析」。切题结果供人工校对和勾选收录。
+
 - 千问在「设置 → 文字分析与练习」配置。选择「千问」，填百炼 API Key 和对应地域的 OpenAI 兼容 Base URL。默认模型为 `qwen-plus`，自定义模型需支持非思考模式下的 JSON 输出。所选模型用于文字分析、AI 判题和出题。
 - 录题页可直接选择「千问」识别框选区域。图片转录默认使用 `qwen3-vl-plus`，可以在「设置 → 图片文字识别」改用其他支持图片和 JSON 输出的百炼模型。图片转录复用千问的 API Key 和代理选项。
 - 若浏览器直连受跨域或网络限制，可使用同一个代理。将 `QWEN_API_KEY` 作为 Worker Secret 配置，可选设置 `QWEN_BASE_URL`，然后在设置中勾选「通过已配置的代理调用千问」。本地运行时可在 `.env` 设置同名变量。

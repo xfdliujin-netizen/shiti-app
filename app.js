@@ -892,6 +892,7 @@ function settings() {
         ${settingsRow('ocr', '◐', 'purple', '图片文字识别', '框选题目后用什么识别文字', ocrLabel)}
         ${settingsRow('deepseek', '✦', 'orange', '文字分析与练习', '校对后的文字分析、变式、组卷与判题', cfg.textProvider === 'qwen' ? cfg.qwenModel || 'qwen-plus' : cfg.model || 'deepseek-chat')}
         ${typeof baiduGradingSettings === 'function' ? settingsRow('homework-grading', '✓', 'teal', '百度智能作业批改', '图片批改与免费额度查询入口', '') : ''}
+        ${typeof eduTutorSettings === 'function' ? settingsRow('edututor', '▤', 'teal', '通义拍照解题', '试卷切题与参考解析', '') : ''}
       </div>
       <p class="settings-footnote">识别默认使用百度高精度 OCR，可在录题页切换 DeepSeek 或千问。</p>
     </div>
@@ -963,6 +964,7 @@ function settings() {
       <div class="actions"><button class="primary" id="save-settings">保存设置</button></div>
     `)}
     ${typeof baiduGradingSettings === 'function' ? settingsSheet('homework-grading', '百度智能作业批改', '', baiduGradingSettings()) : ''}
+    ${typeof eduTutorSettings === 'function' ? settingsSheet('edututor', '通义拍照解题', '', eduTutorSettings()) : ''}
 
     ${settingsSheet('cloud', '私人云端同步', '同步错题、练习和学情档案到自己的云端。首次使用请先导出 JSON 备份，再登录并同步。原图保留本机，云端题图会压缩。', typeof cloudSettings === 'function' ? cloudSettings() : '')}
 
@@ -1729,6 +1731,7 @@ function merge(a, b) {
 }
 
 function bindSettings() {
+  if (typeof bindEduTutorSettings === 'function') bindEduTutorSettings();
   if(typeof bindUnifiedProfile==='function')bindUnifiedProfile();
   if (typeof bindCloudSettings === 'function') bindCloudSettings();
   document.querySelectorAll('[data-open-sheet]').forEach(btn => {
