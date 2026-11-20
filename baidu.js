@@ -488,7 +488,11 @@ function bindHomeworkGrading() {
         throw error;
       }
     });
-    if (current() === 'grading') render();
+    if (current() === 'grading') {
+      const open = [...document.querySelectorAll('.homework-questions details[open]')].map(detail => detail.id);
+      render();
+      open.forEach(id => { const detail = document.getElementById(id); if (detail) detail.open = true; });
+    }
   };
 }
 
