@@ -175,12 +175,14 @@ async function requestHomeworkGrading(connection, body) {
 function homeworkReviewedQuestions(questions, photo) {
   return questions.map(question => {
     const verdict = Object.hasOwn(homeworkVerdicts, question.verdict) ? Number(question.verdict) : 0;
+    const region = homeworkQuestionRegion(question.boxes, photo);
     return {
       number: question.number,
       originalVerdict: verdict,
       verdict,
       reasons: Array.isArray(question.reasons) ? question.reasons.filter(reason => typeof reason === 'string' && reason.trim()) : [],
-      region: homeworkQuestionRegion(question.boxes, photo),
+      originalRegion: region,
+      region,
       text: '',
       include: verdict === 2
     };
@@ -271,7 +273,12 @@ function bindHomeworkReview(result) {
     };
   });
   document.querySelectorAll('[data-homework-include]').forEach(input => {
-    input.onchange = () => { result.questions[input.dataset.homeworkInclude].include = input.checked; updateSelection(); };
+    input.onchange = () => {
+      const question = result.questions[input.dataset.homeworkInclude];
+      question.include = input.checked;
+      question.selectionEdited = true;
+      updateSelection();
+    };
   });
   document.querySelectorAll('[data-homework-text]').forEach(input => {
     input.oninput = () => { result.questions[input.dataset.homeworkText].text = input.value; };
@@ -282,6 +289,7 @@ function bindHomeworkReview(result) {
       const question = result.questions[index];
       question.verdict = Number(select.value);
       question.include = question.verdict === 2;
+      question.selectionEdited = true;
       redraw(index, `[data-homework-verdict="${index}"]`);
     };
   });
@@ -363,7 +371,7 @@ function homeworkBoxesOverlap(a, b) {
 }
 
 function crossCheckHomework(questions, provider, others) {
-  const candidates = questions.map(question => others.filter(other => homeworkBoxesOverlap(question.region, other.region)));
+  const candidates = questions.map(question => others.filter(other => homeworkBoxesOverlap(question.originalRegion || question.region, other.region)));
   questions.forEach((question, index) => {
     const matches = candidates[index];
     const other = matches.length === 1 && candidates.filter(list => list.includes(matches[0])).length === 1 ? matches[0] : null;
@@ -372,7 +380,7 @@ function crossCheckHomework(questions, provider, others) {
     question.checks.push({ provider, label: other ? homeworkVerdicts[verdict][0] : '未能定位同一道题', reason: other?.reasons[0] });
     if ([1, 2, 3].includes(verdict) && [1, 2, 3].includes(question.originalVerdict) && verdict !== question.originalVerdict) {
       question.conflict = true;
-      question.include = false;
+      if (!question.saved && !question.selectionEdited) question.include = false;
     }
   });
 }
@@ -391,13 +399,23 @@ async function completeHomeworkBatch(task) {
     }
   }));
   if (task.providers.some(provider => !task.results.has(provider) && !task.failures.has(provider))) return null;
+  if (task.review) {
+    for (const [provider, reason] of task.failures) task.review.failures.set(provider, reason);
+    for (const [provider, questions] of task.results) {
+      crossCheckHomework(task.review.questions, provider, questions);
+      task.review.checks.push(provider);
+      task.review.failures.delete(provider);
+      task.review.selectedChecks.delete(provider);
+    }
+    if (task.results.size) toast(`已追加 ${task.results.size} 个模型的复核结果`);
+    return task.review;
+  }
   const primary = task.providers.find(provider => task.results.has(provider));
-  const failures = [...task.failures].map(([provider, reason]) => `${homeworkProviders[provider]}未完成 · ${reason}`);
-  if (!primary) throw Error(failures.join(' ｜ '));
+  if (!primary) throw Error([...task.failures].map(([provider, reason]) => `${homeworkProviders[provider]}未完成 · ${reason}`).join(' ｜ '));
   const questions = task.results.get(primary);
   const checks = task.providers.filter(provider => provider !== primary && task.results.has(provider));
   checks.forEach(provider => crossCheckHomework(questions, provider, task.results.get(provider)));
-  return { photo: task.photo, original: task.original, questions, primary, checks, failures, elapsed: performance.now() - task.started };
+  return { photo: task.photo, original: task.original, questions, primary, checks, failures: task.failures, selectedChecks: new Set(), elapsed: performance.now() - task.started };
 }
 
 function bindHomeworkGrading() {
@@ -412,42 +430,53 @@ function bindHomeworkGrading() {
       homeworkSource = source;
       homeworkTask = null;
       homeworkResult = null;
+      homeworkView = { scale: 1, x: 0, y: 0 };
       if (current() === 'grading') render();
     });
   };
-  const model = $('#homework-model');
-  if (model) model.onchange = () => {
-    homeworkPrimary = model.value;
-    homeworkChecks.delete(homeworkPrimary);
-    render();
-    $('#homework-model')?.focus();
-  };
-  document.querySelectorAll('[data-homework-check]').forEach(input => {
-    input.onchange = () => {
-      if (input.checked) homeworkChecks.add(input.dataset.homeworkCheck);
-      else homeworkChecks.delete(input.dataset.homeworkCheck);
+  document.querySelectorAll('[data-homework-model]').forEach(model => {
+    model.onclick = () => {
+      if (busy) return;
+      homeworkPrimary = model.dataset.homeworkModel;
+      homeworkChecks.delete(homeworkPrimary);
+      render();
+      $(`[data-homework-model="${homeworkPrimary}"]`)?.focus();
     };
   });
-  $('.homework-photo-open')?.addEventListener('click', () => openHomeworkPhoto(homeworkTask?.original || homeworkSource, homeworkResult));
+  const selected = homeworkResult?.selectedChecks || homeworkChecks;
+  document.querySelectorAll('[data-homework-check]').forEach(input => {
+    input.onchange = () => {
+      if (input.checked) selected.add(input.dataset.homeworkCheck);
+      else selected.delete(input.dataset.homeworkCheck);
+      if ($('#check-homework')) $('#check-homework').disabled = !selected.size;
+    };
+  });
+  bindHomeworkPhoto($('.homework-photo'));
   if (homeworkResult) bindHomeworkReview(homeworkResult);
-  const button = $('#grade-homework');
+  const button = $('#grade-homework') || $('#check-homework');
   if (!button) return;
   button.onclick = async () => {
     if (busy) return;
     const status = $('#homework-status');
     const choose = $('#choose-homework');
     choose.disabled = true;
-    $('#homework-model').closest('fieldset').disabled = true;
+    $('.homework-models').disabled = true;
     status.classList.add('is-grading');
     await run(button, async () => {
       if (!homeworkTask) {
-        if (!homeworkSource) throw Error('请先上传作业图片');
         const started = performance.now();
-        status.textContent = '正在处理照片…';
-        const photo = await prepareHomeworkImage(homeworkSource);
-        homeworkTask = { photo, original: homeworkSource, started, providers: [homeworkPrimary, ...homeworkChecks], results: new Map(), failures: new Map() };
+        if (homeworkResult) {
+          homeworkTask = { photo: homeworkResult.photo, original: homeworkResult.original, review: homeworkResult, providers: [...selected] };
+        } else {
+          if (!homeworkSource) throw Error('请先上传作业图片');
+          status.textContent = '正在处理照片…';
+          const photo = await prepareHomeworkImage(homeworkSource);
+          homeworkTask = { photo, original: homeworkSource, started, providers: [homeworkPrimary, ...homeworkChecks] };
+        }
+        homeworkTask.results = new Map();
+        homeworkTask.failures = new Map();
       }
-      status.textContent = '正在逐题批改…';
+      status.textContent = homeworkTask.review ? '正在对已有结果逐题复核…' : '正在逐题批改…';
       try {
         const result = await completeHomeworkBatch(homeworkTask);
         if (!result) return toast('批改还未结束，可以稍后继续查询');
@@ -463,71 +492,81 @@ function bindHomeworkGrading() {
   };
 }
 
-function openHomeworkPhoto(source, result) {
-  const src = result?.original || source;
-  if (!src) return;
-  const dialog = document.createElement('dialog');
-  dialog.className = 'homework-viewer homework-grading';
-  dialog.setAttribute('aria-label', '作业照片预览');
-  dialog.innerHTML = `<header>
-      <button type="button" class="secondary" data-close autofocus>关闭</button>
-      ${result ? '<button type="button" class="secondary" data-overlay aria-pressed="true">显示标记</button>' : ''}
-      <button type="button" class="secondary" data-out aria-label="缩小">−</button>
-      <button type="button" class="secondary" data-reset aria-label="重置缩放">100%</button>
-      <button type="button" class="secondary" data-in aria-label="放大">+</button>
-    </header>
-    <div class="homework-view-scroll" tabindex="0" aria-label="可滚动的作业照片">
-      ${result ? renderHomeworkMarks({ ...result.photo, src }, result.questions, true) : `<div class="homework-photo"><img alt="作业原图" src="${esc(src)}"></div>`}
-    </div>`;
-  const scroll = dialog.querySelector('.homework-view-scroll');
-  const photo = dialog.querySelector('.homework-photo');
-  const reset = dialog.querySelector('[data-reset]');
-  const shrink = dialog.querySelector('[data-out]');
-  const enlarge = dialog.querySelector('[data-in]');
-  let scale = 1, pinch;
-  function zoom(value, fromX = scroll.clientWidth / 2, fromY = scroll.clientHeight / 2, toX = fromX, toY = fromY) {
-    const before = scale;
-    scale = Math.max(1, Math.min(4, value));
-    photo.style.width = `${scale * 100}%`;
-    scroll.scrollLeft = (scroll.scrollLeft + fromX) * scale / before - toX;
-    scroll.scrollTop = (scroll.scrollTop + fromY) * scale / before - toY;
-    reset.textContent = `${Math.round(scale * 100)}%`;
-    shrink.disabled = scale === 1;
-    enlarge.disabled = scale === 4;
+function bindHomeworkPhoto(stage) {
+  if (!stage) return;
+  const layer = stage.querySelector('.homework-photo-layer');
+  const reset = stage.querySelector('.homework-reset-zoom');
+  let previous, mouse, suppressClickUntil = 0;
+  function draw() {
+    const { scale, x, y } = homeworkView;
+    layer.style.transform = `translate(${x * 100}%,${y * 100}%) scale(${scale})`;
+    stage.dataset.zoom = String(scale);
+    reset.hidden = scale === 1;
   }
-  const touchPoint = event => {
+  function shift(value, from, to) {
+    const scale = Math.max(1, Math.min(4, value));
+    const ratio = scale / homeworkView.scale;
+    const clamp = offset => Math.max(1 - scale, Math.min(0, offset));
+    homeworkView = {
+      scale,
+      x: clamp(to.x - (from.x - homeworkView.x) * ratio),
+      y: clamp(to.y - (from.y - homeworkView.y) * ratio)
+    };
+    draw();
+  }
+  function point(a, b = a) {
+    const bounds = stage.getBoundingClientRect();
+    return { x: ((a.clientX + b.clientX) / 2 - bounds.left) / bounds.width,
+      y: ((a.clientY + b.clientY) / 2 - bounds.top) / bounds.height,
+      distance: Math.max(1, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)) };
+  }
+  function touchStart(event) {
     const [a, b] = event.touches;
-    const bounds = scroll.getBoundingClientRect();
-    return { x: (a.clientX + b.clientX) / 2 - bounds.left, y: (a.clientY + b.clientY) / 2 - bounds.top,
-      distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) };
-  };
-  scroll.addEventListener('touchmove', event => {
-    if (event.touches.length !== 2) { pinch = null; return; }
-    event.preventDefault();
-    const next = touchPoint(event);
-    if (pinch?.distance > 0) zoom(scale * next.distance / pinch.distance, pinch.x, pinch.y, next.x, next.y);
-    pinch = next;
+    previous = a && (event.touches.length === 1 || event.touches.length === 2) ? point(a, b) : null;
+    if (event.type === 'touchstart' && event.touches.length === 2) {
+      suppressClickUntil = performance.now() + 400;
+      if (event.cancelable) event.preventDefault();
+    }
+  }
+  stage.addEventListener('touchstart', touchStart, { passive: false });
+  stage.addEventListener('touchmove', event => {
+    const [a, b] = event.touches;
+    if (!a || event.touches.length > 2 || (!b && homeworkView.scale === 1)) return;
+    const next = point(a, b);
+    if (event.cancelable) event.preventDefault();
+    if (previous) shift(homeworkView.scale * (b ? next.distance / previous.distance : 1), previous, next);
+    previous = next;
+    suppressClickUntil = performance.now() + 400;
   }, { passive: false });
-  scroll.addEventListener('touchend', () => { pinch = null; });
-  scroll.addEventListener('touchcancel', () => { pinch = null; });
-  scroll.ondblclick = event => {
-    const bounds = scroll.getBoundingClientRect();
-    zoom(scale > 1 ? 1 : 2, event.clientX - bounds.left, event.clientY - bounds.top);
+  stage.addEventListener('touchend', touchStart, { passive: true });
+  stage.addEventListener('touchcancel', () => { previous = null; });
+  stage.onpointerdown = event => {
+    if (event.pointerType === 'mouse' && event.button === 0 && homeworkView.scale > 1 && !reset.contains(event.target)) mouse = { id: event.pointerId, ...point(event) };
   };
-  dialog.querySelector('[data-close]').onclick = () => dialog.close();
-  const overlay = dialog.querySelector('[data-overlay]');
-  if (overlay) overlay.onclick = () => {
-    const marks = dialog.querySelector('.homework-view-marks');
-    marks.hidden = !marks.hidden;
-    overlay.setAttribute('aria-pressed', String(!marks.hidden));
+  stage.onpointermove = event => {
+    if (mouse?.id !== event.pointerId) return;
+    if (!(event.buttons & 1)) { mouse = null; return; }
+    const next = point(event);
+    if (next.x === mouse.x && next.y === mouse.y) return;
+    if (!stage.hasPointerCapture(event.pointerId)) stage.setPointerCapture(event.pointerId);
+    shift(homeworkView.scale, mouse, next);
+    mouse = { id: event.pointerId, ...next };
+    suppressClickUntil = performance.now() + 400;
   };
-  shrink.onclick = () => zoom(scale / 1.5);
-  enlarge.onclick = () => zoom(scale * 1.5);
-  reset.onclick = () => zoom(1);
-  dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  document.body.append(dialog);
-  dialog.showModal();
-  zoom(1);
+  stage.onpointerup = stage.onpointercancel = stage.onlostpointercapture = () => { mouse = null; };
+  stage.addEventListener('click', event => {
+    if (event.detail && performance.now() < suppressClickUntil && !reset.contains(event.target)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, true);
+  stage.ondblclick = event => {
+    if (event.target.closest('button')) return;
+    const anchor = point(event);
+    shift(homeworkView.scale > 1 ? 1 : 2, anchor, anchor);
+  };
+  reset.onclick = () => shift(1, { x: 0, y: 0 }, { x: 0, y: 0 });
+  draw();
 }
 
 function ocrLocalFileWarning() {

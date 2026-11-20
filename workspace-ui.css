@@ -943,7 +943,7 @@ dialog#detail .detail-head {
 .homework-grading h2 { margin:12px 0 8px; font-size:17px; }
 .homework-models { margin:14px 0 0; padding:10px 12px; border:1px solid var(--line); border-radius:12px; min-width:0; }
 .homework-models legend { padding:0 6px; font-size:14px; font-weight:650; }
-.homework-models .field { margin-top:0; }
+.homework-models .ocr-switch { margin:0 0 4px; }
 .homework-checks { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
 .homework-checks label { display:inline-flex; align-items:center; gap:4px; min-height:36px; }
 .homework-checks input { width:16px; height:16px; }
@@ -963,18 +963,10 @@ dialog#detail .detail-head {
 .homework-review-link { width:100%; margin-bottom:12px; }
 .homework-photo { position:relative; overflow:hidden; border-radius:14px; outline:1px solid var(--line); isolation:isolate; }
 .homework-photo img { display:block; width:100%; height:auto; }
-.homework-photo-open { display:block; position:relative; width:100%; margin:0; padding:0; border:0; background:none; border-radius:inherit; cursor:zoom-in; }
-.homework-photo-open span { position:absolute; right:8px; bottom:8px; padding:5px 9px; border-radius:20px; color:white; background:#121a27dc; font-size:12px; }
-.homework-photo-open:focus-visible { outline:3px solid #2176ff; outline-offset:-4px; }
-.homework-viewer { width:min(960px,100%); max-width:100%; height:92dvh; max-height:96dvh; padding:0; overflow:hidden; }
-.homework-viewer[open] { display:flex; flex-direction:column; }
-.homework-viewer header { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:5px; padding:8px; border-bottom:1px solid var(--line); }
-.homework-viewer header button { padding:6px 8px; min-width:36px; min-height:38px; }
-.homework-viewer header button:disabled { opacity:.5; }
-.homework-viewer [data-overlay][aria-pressed="false"] { opacity:.62; }
-.homework-view-scroll { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; touch-action:pan-x pan-y; }
-.homework-view-scroll .homework-photo { border-radius:0; outline:0; max-width:none; }
-.homework-view-marks { position:absolute; inset:0; pointer-events:none; }
+.homework-photo-layer { position:relative; transform-origin:top left; user-select:none; }
+.homework-photo[data-zoom]:not([data-zoom="1"]) { cursor:grab; touch-action:none; }
+.homework-photo[data-zoom]:not([data-zoom="1"]):active { cursor:grabbing; }
+.homework-reset-zoom { position:absolute; z-index:3; right:8px; top:8px; border:0; padding:7px 10px; border-radius:20px; color:white; background:#121a27dc; font-size:12px; }
 .homework-review-row .homework-conflict { color:#a65a12; font-weight:650; }
 .homework-grading [data-verdict] { --grade-ink:#475569; --grade-tint:#eff3f8; }
 .homework-grading [data-verdict="1"] { --grade-ink:#087354; --grade-tint:#e6f7ef; }
