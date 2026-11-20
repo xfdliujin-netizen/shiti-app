@@ -154,16 +154,16 @@ function renderHomeworkReview(result) {
   </section>`;
 }
 
-async function prepareHomeworkImage(source) {
+async function prepareHomeworkImage(source, { forTutor = false } = {}) {
   const photo = new Image();
   photo.src = source;
   await photo.decode();
   const shortest = Math.min(photo.naturalWidth, photo.naturalHeight);
   const longest = Math.max(photo.naturalWidth, photo.naturalHeight);
-  if (shortest < 512 || Math.round(8192 * shortest / longest) < 512) {
+  if (!forTutor && (shortest < 512 || Math.round(8192 * shortest / longest) < 512)) {
     throw Error('百度作业批改要求处理后的图片短边至少 512 像素，请换一张清晰的作业图');
   }
-  const scale = Math.min(1, 8192 / longest, Math.max(2560 / longest, 512 / shortest));
+  const scale = Math.min(1, 8192 / longest, forTutor ? 2560 / longest : Math.max(2560 / longest, 512 / shortest));
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(photo.naturalWidth * scale);
   canvas.height = Math.round(photo.naturalHeight * scale);
@@ -171,8 +171,12 @@ async function prepareHomeworkImage(source) {
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(photo, 0, 0, canvas.width, canvas.height);
-  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .84));
-  if (!blob) throw Error('作业图片处理失败，请重新选图');
+  let blob;
+  for (const quality of forTutor ? [.84, .68, .45, .3] : [.84]) {
+    blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+    if (blob && (!forTutor || blob.size <= 1900000)) break;
+  }
+  if (!blob || (forTutor && blob.size > 1900000)) throw Error('作业图片处理失败，请重新选图');
   const src = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
@@ -359,7 +363,8 @@ function bindHomeworkReview(result) {
       const index = button.dataset.edututorAnswer;
       const question = result.questions[index];
       await run(button, async () => {
-        const image = await studyImageCopy(result.photo.src, 'original', question.region);
+        const crop = await studyImageCopy(result.photo.src, 'original', question.region);
+        const image = crop.length > 2533300 ? (await prepareHomeworkImage(crop, { forTutor: true })).src : crop;
         const response = await requestEduTutor('edututor-answer', image);
         if (typeof response.explanation !== 'string' || !response.explanation.trim()) throw Error('未收到有效的参考解析');
         question.explanation = response.explanation;
@@ -522,7 +527,7 @@ function bindHomeworkGrading() {
     status.textContent = '正在用通义识别题目范围…';
     status.classList.add('is-grading');
     await run(cut, async () => {
-      const photo = await prepareHomeworkImage(original);
+      const photo = await prepareHomeworkImage(original, { forTutor: true });
       const result = await requestEduTutor('edututor-cut', photo.src);
       if (!Array.isArray(result.questions) || !result.questions.length) throw Error('通义未找到可切出的题目');
       const questions = homeworkReviewedQuestions(result.questions.map(question => ({ ...question, verdict: 0 })), photo);

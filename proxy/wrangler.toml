@@ -14,6 +14,16 @@ enabled = true
 ALLOWED_ORIGIN = "https://shiti.86518925.xyz,https://xfdliujin-netizen.github.io"
 # BAIDU_API_KEY / BAIDU_SECRET_KEY / OCR_PROXY_TOKEN 请通过 Secrets 配置。
 # 千问代理可选：QWEN_API_KEY 使用 Secret；QWEN_BASE_URL 可在变量中设置。
+# 通义拍照解题：EDUTUTOR_ACCESS_KEY_ID 和 EDUTUTOR_ACCESS_KEY_SECRET 使用 Secret。
+# 将 EDUTUTOR_WORKSPACE_ID 配置为 Worker 变量，部署时保留现有的控制台变量。
+
+[[d1_databases]]
+binding = "EDUTUTOR_PHOTOS"
+database_name = "shiti-images"
+database_id = "22c95d09-47e7-49f8-93ee-328233e13974"
+
+[triggers]
+crons = ["7 * * * *"]
 
 [[routes]]
 pattern = "ocr.86518925.xyz"

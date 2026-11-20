@@ -1,6 +1,7 @@
 const encoder = new TextEncoder();
 const mediaPrefix = '/api/edututor-photo/';
 const photoTTL = 180000;
+const maxPhotoBytes = 1900000;
 const actions = {
   'edututor-cut': ['CutQuestions', '/service/cutApi'],
   'edututor-answer': ['AnswerSSE', '/service/answerSSE']
@@ -93,11 +94,17 @@ export async function serveEduTutorPhoto(request, env, pathname) {
   const missing = () => new Response(null, { status: 404, headers: { 'Cache-Control': 'no-store' } });
   const id = pathname.slice(mediaPrefix.length);
   if (!['GET', 'HEAD'].includes(request.method) || !/^[a-f0-9]{32}$/.test(id) || !env.EDUTUTOR_PHOTOS) return missing();
-  const object = await (request.method === 'HEAD' ? env.EDUTUTOR_PHOTOS.head(id) : env.EDUTUTOR_PHOTOS.get(id));
-  if (!object || !(Number(object.customMetadata?.expires) > Date.now())) return missing();
-  return new Response(request.method === 'HEAD' ? null : object.body, {
-    headers: { 'Content-Type': 'image/jpeg', 'Content-Length': String(object.size), 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
+  const head = request.method === 'HEAD';
+  const fields = head ? 'length(bytes) AS size' : 'bytes';
+  const object = await env.EDUTUTOR_PHOTOS.prepare(`SELECT ${fields} FROM edututor_photos WHERE id = ? AND expires > ?`).bind(id, Date.now()).first();
+  if (!object) return missing();
+  return new Response(head ? null : new Uint8Array(object.bytes), {
+    headers: { 'Content-Type': 'image/jpeg', 'Content-Length': String(head ? object.size : object.bytes.length), 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
   });
+}
+
+export async function cleanEduTutorPhotos(env) {
+  if (env.EDUTUTOR_PHOTOS) await env.EDUTUTOR_PHOTOS.prepare('DELETE FROM edututor_photos WHERE expires <= ?').bind(Date.now()).run();
 }
 
 export async function handleEduTutor(body, env, fetcher, reply) {
@@ -107,13 +114,13 @@ export async function handleEduTutor(body, env, fetcher, reply) {
   }
   if (body.action === 'edututor-status') return reply(200, { ready: true });
   const image = typeof body.image === 'string' && /^data:image\/jpeg;base64,([A-Za-z0-9+/]+={0,2})$/.exec(body.image);
-  if (!image || image[1].length > 6 * 1024 * 1024 || image[1].length % 4) return reply(400, { error: '需要有效的 JPEG 照片' });
+  if (!image || image[1].length > Math.ceil(maxPhotoBytes / 3) * 4 || image[1].length % 4) return reply(400, { error: '需要 1.9 MB 以内的有效 JPEG 照片' });
   const id = crypto.randomUUID().replace(/-/g, '');
   const url = 'https://ocr.86518925.xyz' + mediaPrefix + id;
   try {
     const bytes = Uint8Array.from(atob(image[1]), byte => byte.charCodeAt(0));
-    if (bytes[0] !== 255 || bytes[1] !== 216 || bytes[2] !== 255) return reply(400, { error: '照片格式无效' });
-    await env.EDUTUTOR_PHOTOS.put(id, bytes, { customMetadata: { expires: String(Date.now() + photoTTL) } });
+    if (bytes.length > maxPhotoBytes || bytes[0] !== 255 || bytes[1] !== 216 || bytes[2] !== 255) return reply(400, { error: '照片格式或大小无效' });
+    await env.EDUTUTOR_PHOTOS.prepare('INSERT INTO edututor_photos (id, expires, bytes) VALUES (?, ?, ?)').bind(id, Date.now() + photoTTL, bytes.buffer).run();
     const cut = body.action === 'edututor-cut';
     const payload = cut ? { image: url, parameters: { struct: true, extract_images: false } }
       : { messages: [{ role: 'user', content: [{ image: url }, { text: '请给出这道题的参考答案和解题步骤。' }] }] };
@@ -134,6 +141,6 @@ export async function handleEduTutor(body, env, fetcher, reply) {
   } catch {
     return reply(502, { error: '通义拍照解题服务暂不可用，请稍后重试' });
   } finally {
-    await env.EDUTUTOR_PHOTOS.delete(id).catch(() => {});
+    await env.EDUTUTOR_PHOTOS.prepare('DELETE FROM edututor_photos WHERE id = ?').bind(id).run().catch(() => {});
   }
 }

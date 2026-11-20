@@ -1,4 +1,4 @@
-import { handleEduTutor, serveEduTutorPhoto } from './edututor.mjs';
+import { cleanEduTutorPhotos, handleEduTutor, serveEduTutorPhoto } from './edututor.mjs';
 
 // Cloudflare Worker / Node 共用，凭据只取服务端环境变量，不接受客户端指定上游。
 const MAX_IMAGE = 10 * 1024 * 1024, MAX_BODY = MAX_IMAGE + 2048;
@@ -270,4 +270,4 @@ export function createOCRService(fetcher = globalThis.fetch) {
 }
 
 const handle = createOCRService();
-export default { fetch: (request, env) => handle(request, env) };
+export default { fetch: (request, env) => handle(request, env), scheduled: (_event, env, ctx) => ctx.waitUntil(cleanEduTutorPhotos(env)) };

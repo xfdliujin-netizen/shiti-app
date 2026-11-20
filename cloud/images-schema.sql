@@ -17,3 +17,10 @@ END;
 CREATE TRIGGER IF NOT EXISTS image_size_after_delete AFTER DELETE ON images BEGIN
  UPDATE storage SET bytes=bytes-length(OLD.bytes) WHERE id=1;
 END;
+CREATE TABLE IF NOT EXISTS edututor_photos (
+  id TEXT PRIMARY KEY,
+  expires INTEGER NOT NULL,
+  bytes BLOB NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS edututor_photos_expires ON edututor_photos(expires);

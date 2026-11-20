@@ -6,7 +6,7 @@
 
 在百炼应用实践开通「通义拍照解题辅导」，复制该业务空间 ID。使用专用 RAM 用户，授予 `edututor:CutQuestions` 和 `edututor:AnswerSSE` 两项权限，资源填 `*`。在 OCR Worker 中保存 `EDUTUTOR_ACCESS_KEY_ID`、`EDUTUTOR_ACCESS_KEY_SECRET` 两枚 Secret，以及 `EDUTUTOR_WORKSPACE_ID` 变量。通义拍照解题的 OpenAPI 使用 RAM AccessKey。
 
-在 OCR Worker 配置中绑定专用私有 R2 桶 `EDUTUTOR_PHOTOS`，关闭桶的公开访问，建议添加 1 天的生命周期规则处理异常中断产生的残留对象。阿里云通过 OCR Worker 读取 3 分钟有效的随机图片链接，代理正常完成后立即删除临时图片。部署 Worker 后，可在拾题设置的「通义拍照解题」检查代理配置。
+在现有的私有 D1 图片库 `shiti-images` 执行 `cloud/images-schema.sql`，OCR Worker 的 `EDUTUTOR_PHOTOS` 已指向该库。阿里云通过 OCR Worker 读取 3 分钟有效的随机图片链接，代理正常完成后立即删除临时图片，定时任务清理异常中断的残留。部署 Worker 后，可在拾题设置的「通义拍照解题」检查代理配置。
 
 在「批改」上传照片，点击「通义切题」。展开切出的单题后点「获取参考解析」。切题结果供人工校对和勾选收录。
 
