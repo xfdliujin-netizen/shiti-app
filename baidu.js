@@ -1,9 +1,11 @@
 const baiduUsage = { calls: 0 };
 const homeworkVerdicts = { 0: ['未批改', '?'], 1: ['正确', '✓'], 2: ['错误', '×'], 3: ['未作答', '—'], 5: ['批改失败', '?'] };
-const homeworkProviders = { baidu: '百度', qwen: '千问', deepseek: 'DeepSeek' };
+const homeworkProviders = { deepseek: 'DeepSeek', baidu: '百度智能批改', qwen: '千问视觉' };
 let homeworkPrimary = 'baidu';
+let homeworkCrossCheckEnabled = false;
 const homeworkChecks = new Set();
 let homeworkSource = '', homeworkTask = null, homeworkResult = null;
+let homeworkOperation = null;
 let homeworkView = { scale: 1, x: 0, y: 0 };
 
 function baiduGradingSettings() {
@@ -13,7 +15,8 @@ function baiduGradingSettings() {
 }
 
 function eduTutorSettings() {
-  return `<p class="notice">在百炼开通「通义拍照解题辅导」后，由代理配置业务空间和具有切题、解题权限的 RAM 密钥。连接成功后，在「批改」上传照片，点击「通义切题」，再展开单题获取参考解析。</p>
+  return `<label class="verify"><input type="checkbox" id="show-edututor-cut" ${cfg.showEduTutorCut === true ? 'checked' : ''}> 在作业批改页显示「通义切题」</label>
+    <p class="notice">在百炼开通「通义拍照解题辅导」后，由代理配置业务空间和具有切题、解题权限的 RAM 密钥。连接成功后，在「批改」上传照片，点击「通义切题」，再展开单题获取参考解析。</p>
     <button type="button" class="secondary" id="test-edututor">检查通义连接配置</button>
     <p class="hint" id="edututor-status" role="status"></p>
     <p><a href="https://bailian-legacy.console.aliyun.com/cn-beijing/?tab=app#/app/app-market/edututor" target="_blank" rel="noopener">前往百炼开通 EduTutor</a></p>
@@ -21,6 +24,11 @@ function eduTutorSettings() {
 }
 
 function bindEduTutorSettings() {
+  const visibility = $('#show-edututor-cut');
+  if (visibility) visibility.onchange = () => {
+    cfg.showEduTutorCut = visibility.checked;
+    saveLocalConfig(false);
+  };
   const button = $('#test-edututor');
   if (!button) return;
   button.onclick = async () => {
@@ -43,24 +51,35 @@ function homeworkGradingPage() {
   const tutor = homeworkResult?.edututor;
   const preview = homeworkTask?.original || homeworkSource;
   const locked = busy || Boolean(homeworkTask);
-  const additional = homeworkResult && !tutor && Object.keys(homeworkProviders).filter(key => key !== homeworkResult.primary && !homeworkResult.checks.includes(key));
-  const checks = additional || Object.keys(homeworkProviders).filter(key => key !== homeworkPrimary);
+  const primary = homeworkResult?.primary || homeworkPrimary;
+  const checked = homeworkResult?.checks || [];
+  const selected = homeworkResult?.selectedChecks || homeworkChecks;
+  const canAddChecks = !homeworkResult || checked.length < Object.keys(homeworkProviders).length - 1;
   return `<section class="card homework-grading">
-    <header class="homework-heading"><h1>作业批改</h1></header>
-    ${tutor || (homeworkResult && !checks.length) ? '' : `<fieldset class="homework-models" ${locked ? 'disabled' : ''}>
-      <legend>${homeworkResult ? '追加交叉验证' : '批改模型'}</legend>
-      ${homeworkResult ? '' : `<div class="ocr-switch" role="group" aria-label="主批改模型">${Object.entries(homeworkProviders).map(([key, label]) => `<button type="button" data-homework-model="${key}" aria-pressed="${key === homeworkPrimary}" class="${key === homeworkPrimary ? 'active' : ''}">${label}</button>`).join('')}</div>`}
-      <div class="homework-checks">${homeworkResult ? '' : '<span>交叉验证</span>'}${checks.map(key => `<label><input type="checkbox" data-homework-check="${key}" ${(homeworkTask?.providers || [...(homeworkResult?.selectedChecks || homeworkChecks)]).includes(key) ? 'checked' : ''}> ${homeworkProviders[key]}</label>`).join('')}</div>
-      <p class="hint">勾选的服务会收到同一张照片，并独立计入用量。</p>
-    </fieldset>`}
+    <header class="homework-heading">
+      <h1>作业批改</h1>
+      ${tutor ? '' : `<fieldset class="homework-models" ${locked ? 'disabled' : ''}>
+        <legend class="visually-hidden">批改模型</legend>
+        <div class="homework-model-controls">
+          ${canAddChecks ? `<label class="homework-cross-check"><input type="checkbox" id="homework-cross-check" aria-describedby="homework-cross-check-help" ${homeworkCrossCheckEnabled ? 'checked' : ''}> 交叉验证</label>` : ''}
+          <div class="ocr-switch" role="group" aria-label="批改模型">${Object.entries(homeworkProviders).map(([key, label]) => {
+            const active = key === primary || checked.includes(key) || (homeworkCrossCheckEnabled && selected.has(key));
+            const unavailable = homeworkResult ? key === primary || checked.includes(key) || !homeworkCrossCheckEnabled : key === primary && homeworkCrossCheckEnabled;
+            return `<button type="button" data-homework-model="${key}" aria-pressed="${active}" class="${active ? 'active' : ''}" ${unavailable ? 'disabled' : ''}>${label}</button>`;
+          }).join('')}</div>
+          ${canAddChecks ? `<p class="hint" id="homework-cross-check-help">${homeworkCrossCheckEnabled ? `主模型：${homeworkProviders[primary]}。各模型独立计入用量。` : '开启后可多选模型，同一张照片会发送给所选模型。'}</p>` : ''}
+        </div>
+      </fieldset>`}
+    </header>
     <div class="actions homework-actions">
       <input type="file" id="homework-upload" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
       <button type="button" class="secondary" id="choose-homework" ${busy ? 'disabled' : ''}>${preview || homeworkResult ? '重新选图' : '上传作业图'}</button>
-      ${homeworkResult ? '' : `<button type="button" class="primary" id="grade-homework" ${!homeworkSource && !homeworkTask ? 'disabled' : ''}>${homeworkTask ? '继续查询批改' : '开始批改'}</button>`}
-      ${!homeworkResult && !homeworkTask ? `<button type="button" class="secondary" id="cut-edututor" ${!homeworkSource || busy ? 'disabled' : ''}>通义切题</button>` : ''}
-      ${additional?.length ? `<button type="button" class="primary" id="check-homework" ${!homeworkTask && !homeworkResult.selectedChecks.size ? 'disabled' : ''}>${homeworkTask ? '继续查询复核' : '开始复核'}</button>` : ''}
+      ${homeworkResult ? '' : `<button type="button" class="primary" id="grade-homework" ${busy || (!homeworkSource && !homeworkTask) ? 'disabled' : ''}>${homeworkTask ? '继续查询批改' : '开始批改'}</button>`}
+      ${cfg.showEduTutorCut === true && !homeworkResult && !homeworkTask ? `<button type="button" class="secondary" id="cut-edututor" ${!homeworkSource || busy ? 'disabled' : ''}>通义切题</button>` : ''}
+      ${homeworkResult && !tutor && canAddChecks && homeworkCrossCheckEnabled ? `<button type="button" class="primary" id="check-homework" ${busy || (!homeworkTask && !selected.size) ? 'disabled' : ''}>${homeworkTask ? '继续查询复核' : '开始复核'}</button>` : ''}
+      <button type="button" class="secondary" id="cancel-homework" ${homeworkOperation || homeworkTask ? '' : 'hidden'} ${homeworkOperation?.signal.aborted ? 'disabled' : ''}>取消</button>
     </div>
-    <p class="hint homework-status" id="homework-status" role="status">${homeworkTask ? '已提交，等待结果。' : homeworkResult ? '双指缩放照片，点标记可定位题目。' : preview ? '双指缩放照片，放大后可拖动。' : '上传一张包含题目和学生作答的整页照片。'}</p>
+    <p class="hint homework-status${homeworkOperation ? ' is-grading' : ''}" id="homework-status" role="status">${homeworkOperation ? '正在处理作业…' : homeworkTask ? '已提交，等待结果。' : homeworkResult ? '双指缩放照片，点标记可定位题目。' : preview ? '双指缩放照片，放大后可拖动。' : '上传一张包含题目和学生作答的整页照片。'}</p>
     ${!homeworkResult && preview ? renderHomeworkPhoto(preview, '待批改的作业图') : ''}
     ${homeworkResult ? `<section aria-label="${tutor ? '通义切题结果' : '作业批改结果'}">
       <div class="homework-result-head"><h2>${tutor ? '通义切题结果' : '批改结果'} · ${questions.length} 题</h2><span>用时 ${Math.round(homeworkResult.elapsed / 1000)} 秒</span></div>
@@ -83,6 +102,47 @@ function renderHomeworkPhoto(src, label, marks = '', dimensions = '') {
     <div class="homework-photo-layer"><img alt="${label}" src="${esc(src)}" ${dimensions} draggable="false">${marks}</div>
     <button type="button" class="homework-reset-zoom" aria-label="恢复照片原大小" hidden>恢复大小</button>
   </div>`;
+}
+
+function renderHomeworkExplanation(explanation) {
+  const renderInline = text => text.split(/(\*\*[^*\n]+\*\*)/g).map((part, index) =>
+    index % 2 ? `<strong>${renderStudyText(part.slice(2, -2))}</strong>` : renderStudyText(part)
+  ).join('');
+  const blocks = explanation.replace(/\r\n?/g, '\n')
+    .split(/(^```[^\n]*\n[\s\S]*?^```[^\S\n]*$|\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\])/gm);
+  const output = [];
+  for (const [index, block] of blocks.entries()) {
+    if (index % 2) {
+      output.push(block.startsWith('```')
+        ? `<pre><code>${esc(block.slice(block.indexOf('\n') + 1, block.lastIndexOf('\n```')))}</code></pre>`
+        : renderStudyText(block));
+      continue;
+    }
+    let pending = [];
+    let kind = '';
+    const flush = () => {
+      if (!pending.length) return;
+      output.push(kind === 'p' ? `<p>${pending.join('<br>')}</p>` :
+        `<${kind}>${pending.map(item => `<li>${item}</li>`).join('')}</${kind}>`);
+      pending = [];
+    };
+    for (const line of block.split('\n')) {
+      const text = line.trim();
+      const heading = /^#{1,6}\s+(.+)$/.exec(text);
+      if (!text || heading) {
+        flush();
+        if (heading) output.push(`<h4>${renderInline(heading[1])}</h4>`);
+        continue;
+      }
+      const item = /^(\d+[.)]|[-+*])\s+(.+)$/.exec(text);
+      const nextKind = item ? (/^\d/.test(item[1]) ? 'ol' : 'ul') : 'p';
+      if (nextKind !== kind) flush();
+      kind = nextKind;
+      pending.push(renderInline(item ? item[2] : text));
+    }
+    flush();
+  }
+  return output.join('');
 }
 
 function renderHomeworkMarks(photo, questions) {
@@ -137,7 +197,7 @@ function renderHomeworkReview(result) {
           <div class="homework-review-body">
             ${question.reasons.length ? `<p class="hint">${homeworkProviders[result.primary]}判定 · ${homeworkVerdicts[question.originalVerdict]?.[0] || '待核对'}</p><p class="prose">${esc(question.reasons.join('\n'))}</p>` : ''}
             ${question.checks?.map(check => `<p class="hint">${homeworkProviders[check.provider]}复核 · ${check.label}${check.reason ? ' · ' + esc(check.reason) : ''}</p>`).join('') || ''}
-            ${question.explanation ? `<h3>通义参考解析</h3><p class="prose">${esc(question.explanation)}</p>` : ''}
+            ${question.explanation ? `<h3>通义参考解析</h3><div class="homework-explanation">${renderHomeworkExplanation(question.explanation)}</div>` : ''}
             ${question.saved ? '' : `<label class="field"><span>校对判定</span><select data-homework-verdict="${index}">
               ${Object.entries(homeworkVerdicts).map(([value, [name]]) => `<option value="${value}" ${Number(value) === question.verdict ? 'selected' : ''}>${name}</option>`).join('')}
             </select></label>
@@ -187,16 +247,17 @@ async function prepareHomeworkImage(source, { forTutor = false } = {}) {
   return { src, width: canvas.width, height: canvas.height };
 }
 
-async function requestHomeworkGrading(connection, body) {
+async function requestHomeworkGrading(connection, body, signal) {
   let response;
   try {
     response = await fetch(connection.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-OCR-Token': connection.token },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(45000)
+      signal: AbortSignal.any([signal, AbortSignal.timeout(45000)])
     });
   } catch {
+    signal.throwIfAborted();
     throw Object.assign(Error('百度批改网络连接中断，请继续查询'), { retryable: true });
   }
   const result = await response.json();
@@ -208,16 +269,17 @@ async function requestHomeworkGrading(connection, body) {
   return result;
 }
 
-async function requestEduTutor(action, image) {
+async function requestEduTutor(action, image, signal) {
   const warning = ocrLocalFileWarning();
   if (warning) throw Error(warning);
   const token = getOcrToken();
   if (token.length < 24) throw Error('请先在设置的「图片文字识别」中填写代理访问口令');
+  const timeout = AbortSignal.timeout(75000);
   const response = await fetch((cfg.ocrProxy || defaultOCRProxy()).trim(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-OCR-Token': token },
     body: JSON.stringify({ action, image }),
-    signal: AbortSignal.timeout(75000)
+    signal: signal ? AbortSignal.any([signal, timeout]) : timeout
   });
   const result = await response.json().catch(() => ({}));
   if (response.status === 400 && result.error === '不支持的操作') throw Error('当前 OCR 代理尚未部署通义拍照解题');
@@ -265,7 +327,7 @@ async function saveHomeworkQuestions(result) {
       term: profile.term,
       text: question.text.trim() || `识别第 ${question.number} 题 · 见题图`,
       image: cropped[index],
-      source: result.edututor ? '通义拍照解题' : homeworkProviders[result.primary] + '作业批改',
+      source: result.edututor ? '通义拍照解题' : result.primary === 'baidu' ? '百度作业批改' : homeworkProviders[result.primary] + '作业批改',
       originalNumber: String(question.number),
       analysis: question.explanation || (question.verdict === 2 && question.originalVerdict === 2 ? question.reasons.join('\n') : ''),
       answerStatus: question.verdict === 3 && question.originalVerdict !== 3 ? 'unanswered' : 'unknown',
@@ -385,11 +447,16 @@ function bindHomeworkReview(result) {
   };
 }
 
-async function pollHomeworkResult(task, resuming) {
+async function pollHomeworkResult(task, resuming, signal) {
   const delays = [resuming ? 0 : 5000, 2000, 2000, 2000, 2000, 2000, 4000, 4000, 4000, 4000, 4000, 4000];
   for (const delay of delays) {
-    if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-    const result = await requestHomeworkGrading(task, { action: 'homework-result', task_id: task.id });
+    signal.throwIfAborted();
+    if (delay) await new Promise((resolve, reject) => {
+      const abort = () => { clearTimeout(timer); reject(signal.reason); };
+      const timer = setTimeout(() => { signal.removeEventListener('abort', abort); resolve(); }, delay);
+      signal.addEventListener('abort', abort, { once: true });
+    });
+    const result = await requestHomeworkGrading(task, { action: 'homework-result', task_id: task.id }, signal);
     if (result.status === 'pending') continue;
     if (result.status !== 'complete' || !Array.isArray(result.questions)) throw Error('批改结果格式不正确，请继续查询');
     return result.questions;
@@ -397,25 +464,25 @@ async function pollHomeworkResult(task, resuming) {
   return null;
 }
 
-async function gradeHomeworkWithBaidu(task) {
+async function gradeHomeworkWithBaidu(task, signal) {
   const resuming = Boolean(task.baidu);
   if (!task.baidu) {
     const warning = ocrLocalFileWarning();
     if (warning) throw Error(warning);
     const connection = { endpoint: (cfg.ocrProxy || defaultOCRProxy()).trim(), token: getOcrToken() };
     if (connection.token.length < 24) throw Error('请先在设置的「图片文字识别」中填写代理访问口令');
-    const result = await requestHomeworkGrading(connection, { action: 'homework-create', image: task.photo.src });
+    const result = await requestHomeworkGrading(connection, { action: 'homework-create', image: task.photo.src }, signal);
     if (typeof result.task_id !== 'string' || !result.task_id) throw Error('代理未返回批改任务编号，请确认代理已更新');
     task.baidu = { ...connection, id: result.task_id };
     cfg.baiduHomeworkCalls = (Number(cfg.baiduHomeworkCalls) || 0) + 1;
     saveLocalConfig();
   }
-  return pollHomeworkResult(task.baidu, resuming);
+  return pollHomeworkResult(task.baidu, resuming, signal);
 }
 
-async function gradeHomeworkWithVision(provider, photo) {
+async function gradeHomeworkWithVision(provider, photo, signal) {
   const response = await ai(`逐题批改同一张完整作业照片，按阅读顺序返回。仅判断纸面上的学生原作答，忽略教师勾叉和批注。无法辨认、没有把握或缺题干用 0；明确空白用 3；正确用 1；错误用 2。多小问合并为题目外框；有明确错误时标 2。number 是可见题号，不能辨认则填阅读顺序。bbox_2d 是整道题（含题干、配图和作答）的矩形 [左,上,右,下]，相对实际整张照片归一化到 0~999；坐标不可靠填 null。reason 简要给依据。只返回 {"questions":[{"number":"1","verdict":2,"bbox_2d":[10,30,980,250],"reason":"中文说明"}]}。`, photo.src,
-    { ocr: true, grading: true, provider });
+    { ocr: true, grading: true, provider, signal });
   if (!Array.isArray(response?.questions)) throw Error('模型未返回有效的逐题结果');
   return response.questions.slice(0, 150).flatMap((question, index) => {
     if (!question || ![0, 1, 2, 3].includes(question.verdict)) return [];
@@ -452,19 +519,21 @@ function crossCheckHomework(questions, provider, others) {
   });
 }
 
-async function completeHomeworkBatch(task) {
+async function completeHomeworkBatch(task, signal) {
   await Promise.all(task.providers.map(async provider => {
     if (task.results.has(provider) || task.failures.has(provider)) return;
     try {
-      const questions = await (provider === 'baidu' ? gradeHomeworkWithBaidu(task) : gradeHomeworkWithVision(provider, task.photo));
+      const questions = await (provider === 'baidu' ? gradeHomeworkWithBaidu(task, signal) : gradeHomeworkWithVision(provider, task.photo, signal));
       if (!questions) return;
       if (!questions.length) throw Error('未识别到可批改的题目');
       task.results.set(provider, homeworkReviewedQuestions(questions, task.photo));
     } catch (error) {
+      if (signal.aborted) return;
       if (provider === 'baidu' && task.baidu && error.retryable) return;
       task.failures.set(provider, error.name === 'TimeoutError' ? '请求超时' : error.message || '批改失败');
     }
   }));
+  signal.throwIfAborted();
   if (task.providers.some(provider => !task.results.has(provider) && !task.failures.has(provider))) return null;
   if (task.review) {
     for (const [provider, reason] of task.failures) task.review.failures.set(provider, reason);
@@ -485,8 +554,53 @@ async function completeHomeworkBatch(task) {
   return { photo: task.photo, original: task.original, questions, primary, checks, failures: task.failures, selectedChecks: new Set(), elapsed: performance.now() - task.started };
 }
 
+function finishHomeworkOperation() {
+  if (current() !== 'grading') return;
+  const open = [...document.querySelectorAll('.homework-questions details[open]')].map(detail => detail.id);
+  render();
+  open.forEach(id => { const detail = document.getElementById(id); if (detail) detail.open = true; });
+}
+
+async function runHomeworkOperation(button, message, work) {
+  const operation = new AbortController();
+  homeworkOperation = operation;
+  $('#cancel-homework').hidden = false;
+  $('#choose-homework').disabled = true;
+  $('#grade-homework')?.setAttribute('disabled', '');
+  $('#cut-edututor')?.setAttribute('disabled', '');
+  $('.homework-models')?.setAttribute('disabled', '');
+  const status = $('#homework-status');
+  status.textContent = message;
+  status.classList.add('is-grading');
+  try {
+    await run(button, async () => {
+      try {
+        await work(operation.signal, status);
+      } catch (error) {
+        homeworkTask = null;
+        if (!operation.signal.aborted) throw error;
+        toast('已取消');
+      }
+    });
+  } finally {
+    homeworkOperation = null;
+    finishHomeworkOperation();
+  }
+}
+
 function bindHomeworkGrading() {
   const upload = $('#homework-upload');
+  const cancel = $('#cancel-homework');
+  cancel.onclick = () => {
+    if (homeworkOperation) {
+      cancel.disabled = true;
+      homeworkOperation.abort();
+    } else if (homeworkTask && !busy) {
+      homeworkTask = null;
+      finishHomeworkOperation();
+      toast('已取消');
+    }
+  };
   $('#choose-homework').onclick = () => {
     if (!busy) upload.click();
   };
@@ -501,21 +615,26 @@ function bindHomeworkGrading() {
       if (current() === 'grading') render();
     });
   };
+  const selected = homeworkResult?.selectedChecks || homeworkChecks;
+  const crossCheck = $('#homework-cross-check');
+  if (crossCheck) crossCheck.onchange = () => {
+    homeworkCrossCheckEnabled = crossCheck.checked;
+    if (!homeworkCrossCheckEnabled) {
+      selected.clear();
+      homeworkChecks.clear();
+    }
+    finishHomeworkOperation();
+    $('#homework-cross-check')?.focus();
+  };
   document.querySelectorAll('[data-homework-model]').forEach(model => {
     model.onclick = () => {
       if (busy) return;
-      homeworkPrimary = model.dataset.homeworkModel;
-      homeworkChecks.delete(homeworkPrimary);
-      render();
-      $(`[data-homework-model="${homeworkPrimary}"]`)?.focus();
-    };
-  });
-  const selected = homeworkResult?.selectedChecks || homeworkChecks;
-  document.querySelectorAll('[data-homework-check]').forEach(input => {
-    input.onchange = () => {
-      if (input.checked) selected.add(input.dataset.homeworkCheck);
-      else selected.delete(input.dataset.homeworkCheck);
-      if ($('#check-homework')) $('#check-homework').disabled = !selected.size;
+      const provider = model.dataset.homeworkModel;
+      if (!homeworkCrossCheckEnabled) homeworkPrimary = provider;
+      else if (selected.has(provider)) selected.delete(provider);
+      else selected.add(provider);
+      finishHomeworkOperation();
+      $(`[data-homework-model="${provider}"]`)?.focus();
     };
   });
   bindHomeworkPhoto($('.homework-photo'));
@@ -524,60 +643,44 @@ function bindHomeworkGrading() {
   if (cut) cut.onclick = async () => {
     if (busy || !homeworkSource || homeworkTask) return;
     const started = performance.now(), original = homeworkSource;
-    const status = $('#homework-status');
-    status.textContent = '正在用通义识别题目范围…';
-    status.classList.add('is-grading');
-    await run(cut, async () => {
+    await runHomeworkOperation(cut, '正在用通义识别题目范围…', async signal => {
       const photo = await prepareHomeworkImage(original, { forTutor: true });
-      const result = await requestEduTutor('edututor-cut', photo.src);
+      signal.throwIfAborted();
+      const result = await requestEduTutor('edututor-cut', photo.src, signal);
+      signal.throwIfAborted();
       if (!Array.isArray(result.questions) || !result.questions.length) throw Error('通义未找到可切出的题目');
       const questions = homeworkReviewedQuestions(result.questions.map(question => ({ ...question, verdict: 0 })), photo);
       questions.forEach((question, index) => { question.text = result.questions[index].text || ''; });
       homeworkResult = { edututor: true, photo, original, questions, elapsed: performance.now() - started };
       homeworkSource = '';
     });
-    if (current() === 'grading') render();
   };
   const button = $('#grade-homework') || $('#check-homework');
   if (!button) return;
   button.onclick = async () => {
     if (busy) return;
-    const status = $('#homework-status');
-    const choose = $('#choose-homework');
-    choose.disabled = true;
-    $('.homework-models').disabled = true;
-    status.classList.add('is-grading');
-    await run(button, async () => {
+    const message = homeworkResult ? '正在对已有结果逐题复核…' : '正在处理照片…';
+    await runHomeworkOperation(button, message, async (signal, status) => {
       if (!homeworkTask) {
         const started = performance.now();
         if (homeworkResult) {
           homeworkTask = { photo: homeworkResult.photo, original: homeworkResult.original, review: homeworkResult, providers: [...selected] };
         } else {
           if (!homeworkSource) throw Error('请先上传作业图片');
-          status.textContent = '正在处理照片…';
           const photo = await prepareHomeworkImage(homeworkSource);
-          homeworkTask = { photo, original: homeworkSource, started, providers: [homeworkPrimary, ...homeworkChecks] };
+          signal.throwIfAborted();
+          homeworkTask = { photo, original: homeworkSource, started, providers: homeworkCrossCheckEnabled ? [homeworkPrimary, ...homeworkChecks] : [homeworkPrimary] };
         }
         homeworkTask.results = new Map();
         homeworkTask.failures = new Map();
       }
       status.textContent = homeworkTask.review ? '正在对已有结果逐题复核…' : '正在逐题批改…';
-      try {
-        const result = await completeHomeworkBatch(homeworkTask);
-        if (!result) return toast('批改还未结束，可以稍后继续查询');
-        homeworkResult = result;
-        homeworkSource = '';
-        homeworkTask = null;
-      } catch (error) {
-        homeworkTask = null;
-        throw error;
-      }
+      const result = await completeHomeworkBatch(homeworkTask, signal);
+      if (!result) return toast('批改还未结束，可以稍后继续查询');
+      homeworkResult = result;
+      homeworkSource = '';
+      homeworkTask = null;
     });
-    if (current() === 'grading') {
-      const open = [...document.querySelectorAll('.homework-questions details[open]')].map(detail => detail.id);
-      render();
-      open.forEach(id => { const detail = document.getElementById(id); if (detail) detail.open = true; });
-    }
   };
 }
 

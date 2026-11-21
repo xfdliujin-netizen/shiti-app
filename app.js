@@ -344,7 +344,7 @@ function capture() {
     <section class="card capture-card">
       <div class="card-head capture-head">
         <h2>录入新错题</h2>
-        <div class="ocr-switch" role="group" aria-label="图片识别服务">${[['baidu', '百度 OCR'], ['deepseek', 'DeepSeek'], ['qwen', '千问']].map(([provider, label]) => `<button type="button" data-ocr-provider="${provider}" aria-pressed="${ocrProvider === provider}" class="${ocrProvider === provider ? 'active' : ''}">${label}</button>`).join('')}</div>
+        <div class="ocr-switch" role="group" aria-label="图片识别服务">${[['baidu', '百度 OCR'], ['deepseek', 'DeepSeek'], ['qwen', '千问视觉']].map(([provider, label]) => `<button type="button" data-ocr-provider="${provider}" aria-pressed="${ocrProvider === provider}" class="${ocrProvider === provider ? 'active' : ''}">${label}</button>`).join('')}</div>
       </div>
       
       <select id="subject" hidden>${opts(currentSubject)}</select>
@@ -892,7 +892,7 @@ function settings() {
         ${settingsRow('ocr', '◐', 'purple', '图片文字识别', '框选题目后用什么识别文字', ocrLabel)}
         ${settingsRow('deepseek', '✦', 'orange', '文字分析与练习', '校对后的文字分析、变式、组卷与判题', cfg.textProvider === 'qwen' ? cfg.qwenModel || 'qwen-plus' : cfg.model || 'deepseek-chat')}
         ${typeof baiduGradingSettings === 'function' ? settingsRow('homework-grading', '✓', 'teal', '百度智能作业批改', '图片批改与免费额度查询入口', '') : ''}
-        ${typeof eduTutorSettings === 'function' ? settingsRow('edututor', '▤', 'teal', '通义拍照解题', '试卷切题与参考解析', '') : ''}
+        ${typeof eduTutorSettings === 'function' ? settingsRow('edututor', '▤', 'teal', '通义拍照解题', '设置批改页是否显示通义切题', '') : ''}
       </div>
       <p class="settings-footnote">识别默认使用百度高精度 OCR，可在录题页切换 DeepSeek 或千问。</p>
     </div>
@@ -1030,11 +1030,12 @@ async function ai(prompt, img, options = {}) {
   const proxyToken = viaProxy ? getOcrToken() : '';
   if (viaProxy && proxyToken.length < 24) throw Error('请先在「图片文字识别」中配置代理访问口令');
   const url = viaProxy ? cfg.ocrProxy || defaultOCRProxy() : endpoint.replace(/\/+$/, '').replace(/\/chat\/completions$/, '') + '/chat/completions';
+  const timeout = AbortSignal.timeout(180000);
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(viaProxy ? { 'X-OCR-Token': proxyToken } : { Authorization: 'Bearer ' + key }) },
     body: JSON.stringify(viaProxy ? { action: 'qwen-completion', payload } : payload),
-    signal: AbortSignal.timeout(180000)
+    signal: options.signal ? AbortSignal.any([options.signal, timeout]) : timeout
   });
   const json = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -1731,9 +1732,9 @@ function merge(a, b) {
 }
 
 function bindSettings() {
-  if (typeof bindEduTutorSettings === 'function') bindEduTutorSettings();
   if(typeof bindUnifiedProfile==='function')bindUnifiedProfile();
   if (typeof bindCloudSettings === 'function') bindCloudSettings();
+  if (typeof bindEduTutorSettings === 'function') bindEduTutorSettings();
   document.querySelectorAll('[data-open-sheet]').forEach(btn => {
     btn.onclick = () => {
       openSheet = btn.dataset.openSheet;

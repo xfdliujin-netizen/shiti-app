@@ -941,16 +941,18 @@ dialog#detail .detail-head {
 .exam-history p { margin:12px 0 0; }
 .homework-grading h1 { margin:0; font-size:22px; }
 .homework-grading h2 { margin:12px 0 8px; font-size:17px; }
-.homework-models { margin:14px 0 0; padding:10px 12px; border:1px solid var(--line); border-radius:12px; min-width:0; }
-.homework-models legend { padding:0 6px; font-size:14px; font-weight:650; }
-.homework-models .ocr-switch { margin:0 0 4px; }
-.homework-checks { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
-.homework-checks label { display:inline-flex; align-items:center; gap:4px; min-height:36px; }
-.homework-checks input { width:16px; height:16px; }
-.homework-models .hint { margin:4px 0 0; }
+.homework-models { flex:1 1 306px; margin:0; padding:0; border:0; min-width:0; max-width:100%; }
+.homework-model-controls { display:grid; grid-template-columns:max-content minmax(0,240px); justify-content:end; align-items:center; gap:3px 8px; }
+.homework-models .ocr-switch { grid-column:2; margin:0; max-width:100%; flex-wrap:wrap; }
+.homework-models .ocr-switch button { padding-inline:8px; }
+.homework-cross-check { grid-area:1 / 1; display:inline-flex; align-items:center; gap:4px; min-height:32px; font-size:11px; white-space:nowrap; cursor:pointer; }
+.homework-cross-check input { width:13px; height:13px; }
+.homework-models .hint { grid-column:2; margin:0; font-size:11px; }
 .homework-heading, .homework-result-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px 12px; flex-wrap:wrap; }
-.homework-heading > span, .homework-result-head > span { color:var(--muted); font-size:12px; }
+.homework-heading { justify-content:flex-start; column-gap:8px; }
+.homework-result-head > span { color:var(--muted); font-size:12px; }
 .homework-actions { margin:14px 0 8px; gap:8px; }
+.homework-actions #cancel-homework[hidden] { display:none; }
 .homework-actions button:disabled, .homework-save button:disabled { opacity:.5; }
 .homework-status.is-grading { display:flex; align-items:center; gap:8px; }
 .homework-status.is-grading::before { content:""; flex:0 0 12px; height:12px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:homework-spin .85s linear infinite; }
@@ -990,6 +992,11 @@ dialog#detail .detail-head {
 .homework-badge { padding:3px 8px; border-radius:100px; color:var(--grade-ink); background:var(--grade-tint); font-size:12px; font-weight:650; }
 .homework-review-body { padding:4px 4px 12px; }
 .homework-review-body button { margin-bottom:8px; }
+.homework-explanation { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; line-height:1.65; overflow-wrap:anywhere; margin:8px 0 14px; }
+.homework-explanation :where(h4,p,ol,ul,pre,.katex-display) { margin:0; }
+.homework-explanation h4 { margin-top:6px; font-size:1em; }
+.homework-explanation :where(ol,ul) { padding-inline-start:1.5em; }
+.homework-explanation pre { overflow-x:auto; padding:8px 10px; border:1px solid var(--line); border-radius:8px; }
 .homework-save .hint:empty { display:none; }
 .homework-save > button { width:100%; }
 .detail-head .detail-number { min-width:0; font-variant-numeric:tabular-nums; }
