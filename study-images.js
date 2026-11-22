@@ -33,6 +33,31 @@ async function studyImageCopy(src, mode = 'original', region = null) {
   return mode === 'bw' ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', .9);
 }
 
+async function joinStudyPages(first, second) {
+  const images = await Promise.all([first, second].map(async src => {
+    if (!isStudyImage(src)) throw Error('续页图片格式无效');
+    const image = new Image();
+    image.src = src;
+    await image.decode();
+    return image;
+  }));
+  const ratios = images.map(image => image.naturalHeight / image.naturalWidth);
+  const width = Math.max(1, Math.floor(Math.min(1600, 4096 / (ratios[0] + ratios[1]), Math.max(...images.map(image => image.naturalWidth)))));
+  const heights = ratios.map(ratio => Math.max(1, Math.floor(width * ratio)));
+  if (heights[0] + heights[1] > 4096) throw Error('续页图片比例过长，请先框选本题区域');
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = heights[0] + heights[1];
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(images[0], 0, 0, width, heights[0]);
+  ctx.drawImage(images[1], 0, heights[0], width, heights[1]);
+  const src = canvas.toDataURL('image/jpeg', .88);
+  if (!isStudyImage(src)) throw Error('续页合并失败，请先将照片框小一些');
+  return { src, firstFraction: heights[0] / canvas.height };
+}
+
 function whitenStudyPaper({ width, height, data }, blackWhite) {
   // Estimate paper from the bright part of each neighborhood, excluding isolated glare.
   const step = Math.max(12, Math.round(Math.min(width, height) / 20));

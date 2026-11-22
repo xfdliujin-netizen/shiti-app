@@ -50,16 +50,45 @@ function updateStructuredAnswer(p) {
 function switchQuestionType(p,type,subject) {
   type=normalizeQuestionType(type);
   ensureAnswerStructure(p,subject);
-  p.answerDrafts[p.questionType]={studentAnswer:p.studentAnswer||'',choices:[...p.choices],blankAnswers:[...p.blankAnswers],blankCount:p.blankCount,optionCount:p.optionCount};
-  p.questionType=questionTypesFor(subject).includes(type)?type:'other';
-  const saved=p.answerDrafts[p.questionType];
-  p.studentAnswer=saved?.studentAnswer||'';p.choices=saved?.choices||[];p.blankAnswers=saved?.blankAnswers||[];p.blankCount=saved?.blankCount||2;p.optionCount=saved?.optionCount||5;
+  const target = questionTypesFor(subject).includes(type) ? type : 'other';
+  if (target === p.questionType) return;
+  const previous = {
+    studentAnswer: p.studentAnswer || '', choices: [...p.choices], blankAnswers: [...p.blankAnswers],
+    blankCount: p.blankCount, optionCount: p.optionCount, answerStatus: p.answerStatus, carriedAnswer: p.carriedAnswer
+  };
+  p.answerDrafts[p.questionType] = previous;
+  p.questionType = target;
+  const saved = p.answerDrafts[target];
+  const source = saved?.studentAnswer || saved?.carriedAnswer ? saved : previous;
+  const text = source.studentAnswer || source.carriedAnswer || '';
+  p.studentAnswer = text;
+  p.choices = [];
+  p.blankAnswers = [];
+  p.blankCount = saved?.blankCount || 2;
+  p.optionCount = saved?.optionCount || previous.optionCount;
+  p.carriedAnswer = '';
+  if (source === saved) {
+    p.choices = [...saved.choices];
+    p.blankAnswers = [...saved.blankAnswers];
+    p.carriedAnswer = saved.carriedAnswer || '';
+  } else if (target === 'fill' && text) {
+    const numbered = text.split('\n').map(line => /^第(\d+)空[：:](.*)$/.exec(line));
+    if (numbered.every(match => match && Number(match[1]) >= 1 && Number(match[1]) <= 20)) {
+      for (const [, slot, value] of numbered) p.blankAnswers[Number(slot) - 1] = value === '【未填写】' ? '' : value;
+      p.blankCount = Math.max(p.blankCount, p.blankAnswers.length);
+    } else p.blankAnswers[0] = text;
+  } else if (isChoiceType(target) && text) {
+    if (/^[A-H](?:[、,，\s]*[A-H])*$/.test(text.trim())) p.choices = [...new Set(text.match(/[A-H]/g))];
+    else p.carriedAnswer = text;
+    p.optionCount = Math.max(p.optionCount, ...p.choices.map(letter => letter.charCodeAt(0) - 64));
+  }
   updateStructuredAnswer(p);
-  p.answerStatus='unknown';invalidatePaperEvidence(p);
+  p.answerStatus = p.studentAnswer ? source.answerStatus || 'unknown' : source.answerStatus === 'unanswered' ? 'unanswered' : 'unknown';
+  invalidatePaperEvidence(p);
 }
 function structuredAnswerFields(p,i) {
   if(isChoiceType(p.questionType)){
-    return `<div class="field"><span>孩子实际选择（直接点选）</span><div class="answer-choices" role="group" aria-label="孩子实际选择">${Array.from({length:p.optionCount},(_,j)=>String.fromCharCode(65+j)).map(letter=>`<button type="button" class="answer-choice ${p.choices.includes(letter)?'selected':''}" aria-pressed="${p.choices.includes(letter)}" data-answer-choice="${letter}" data-index="${i}">${letter}</button>`).join('')}<label class="choice-count">选项数 <select data-answer-count="options" data-index="${i}">${Array.from({length:7},(_,j)=>j+2).map(n=>`<option ${n===p.optionCount?'selected':''}>${n}</option>`).join('')}</select></label></div><div class="answer-tools"><span>${esc(p.studentAnswer?'已选：'+p.studentAnswer:'尚未选择')}</span></div></div>`;
+    return `<div class="field"><span>孩子实际选择（直接点选）</span><div class="answer-choices" role="group" aria-label="孩子实际选择">${Array.from({length:p.optionCount},(_,j)=>String.fromCharCode(65+j)).map(letter=>`<button type="button" class="answer-choice ${p.choices.includes(letter)?'selected':''}" aria-pressed="${p.choices.includes(letter)}" data-answer-choice="${letter}" data-index="${i}">${letter}</button>`).join('')}<label class="choice-count">选项数 <select data-answer-count="options" data-index="${i}">${Array.from({length:7},(_,j)=>j+2).map(n=>`<option ${n===p.optionCount?'selected':''}>${n}</option>`).join('')}</select></label></div><div class="answer-tools"><span data-choice-summary>${esc(p.studentAnswer?'已选：'+p.studentAnswer:'尚未选择')}</span></div>${p.carriedAnswer ? `<p class="hint prose">切换题型前的作答已保留：${esc(p.carriedAnswer)}</p>` : ''}</div>`;
   }
   if(p.questionType==='fill')return `<div class="field"><div class="answer-tools"><span>孩子各空作答</span><label>空数 <input type="number" min="1" max="20" value="${p.blankCount}" data-answer-count="blanks" data-index="${i}"></label></div><div class="blank-answer-grid">${Array.from({length:p.blankCount},(_,j)=>`<label class="field"><span>第${j+1}空</span><input type="text" data-blank-answer="${j}" data-index="${i}" value="${esc(p.blankAnswers[j]||'')}" placeholder="填写孩子原始作答"></label>`).join('')}</div></div>`;
   return paperField(p.questionType==='calculation'?'孩子的计算结果与过程':'孩子实际作答','studentAnswer',p.studentAnswer,i,true);
@@ -95,6 +124,7 @@ function answerReviewFields(p,i) {
   if(!p.answerStatus)p.answerStatus='confirmed';
   const options=[['unknown','无法确认孩子作答（只解题，不判断错因）'],['confirmed','已确认孩子的作答'],['unanswered','已确认未作答']];
   return `<div class="answer-review">${typeof editableTypeFields==='function'?editableTypeFields(p,i,subject):`<label class="field"><span>题型</span><select data-paper="questionType" data-index="${i}">${questionTypeOptions(subject,p.questionType)}</select></label>`}
+    ${typeof readingScopeField === 'function' && ['reading', 'material'].includes(p.questionType) ? `<div data-reading-scope-host="${i}">${readingScopeField(p, i)}</div>` : ''}
     ${p.suggestedQuestionType === p.questionType && !p.questionTypeName ? '<p class="hint">题型由 DeepSeek 建议，可在上方修改。</p>' : ''}
     ${p.ocrStudentAnswer ? '<p class="hint prose">作答转录供核对：' + esc(p.ocrStudentAnswer) + '</p>' : ''}
     ${structuredAnswerFields(p,i)}
@@ -111,7 +141,12 @@ function bindStructuredAnswerFields() {
   document.querySelectorAll('[data-answer-choice]').forEach(el=>el.onclick=()=>{
     const i=Number(el.dataset.index),p=paper.items[i],v=el.dataset.answerChoice;
     p.choices=p.choices.includes(v)?p.choices.filter(x=>x!==v):[...p.choices,v];
-    updateStructuredAnswer(p);p.answerStatus=p.studentAnswer?'confirmed':'unknown';reset(p,i);render();
+    updateStructuredAnswer(p);p.answerStatus=p.studentAnswer?'confirmed':'unknown';reset(p,i);
+    const pressed = p.choices.includes(v);
+    el.classList.toggle('selected', pressed);
+    el.setAttribute('aria-pressed', String(pressed));
+    el.closest('.field').querySelector('[data-choice-summary]').textContent = p.studentAnswer ? '已选：' + p.studentAnswer : '尚未选择';
+    el.closest('.card, .paper-item')?.querySelector('[data-paper-analysis-output]')?.remove();
   });
   document.querySelectorAll('[data-blank-answer]').forEach(el=>el.oninput=()=>{
     const i=Number(el.dataset.index),p=paper.items[i];p.blankAnswers[Number(el.dataset.blankAnswer)]=el.value;updateStructuredAnswer(p);p.answerStatus=p.studentAnswer?'confirmed':'unknown';reset(p,i);

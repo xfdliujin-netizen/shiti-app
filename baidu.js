@@ -915,8 +915,7 @@ async function recognizeWithBaidu() {
     warnings,
     complete: true
   };
-  items.forEach(p=>{p.verified=false;p.answerStatus='confirmed';p.annotation='';p.visualFeatures=''});
-  if(/加点|划线|画线|下划线|图中/.test(transcript))paper.warnings.push('请补充加点、划线或图示');
+  if(/加点|划线|画线|下划线|图中/.test(transcript))paper.warnings.push('加点、划线和图示可手动标记，也可在解析时让 AI 参考原图');
   draft = null;
   editingId = null;
   progress(src ? '识别已返回，请核对原题，并单独确认孩子作答。坐标整理不代表内容已识别正确。' : '文字已录入，请核对题干与孩子作答。');

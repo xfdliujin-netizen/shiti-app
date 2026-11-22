@@ -38,13 +38,6 @@ html, body {
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-#main.apple-view-swap > * {
-  animation: appleViewEnter 0.42s var(--ease-spring) both;
-}
-#main.apple-view-swap > *:nth-child(2) { animation-delay: 0.03s; }
-#main.apple-view-swap > *:nth-child(3) { animation-delay: 0.06s; }
-#main.apple-view-swap > *:nth-child(4) { animation-delay: 0.09s; }
-
 body .card:not(#printable-exam) {
   background: var(--surface) !important;
   backdrop-filter: saturate(180%) blur(20px);
@@ -718,6 +711,9 @@ textarea { box-sizing:border-box; min-height:96px; }
 #answer-picker-text { flex:1; min-height:120px; overflow:auto; padding:10px 4px; background:var(--surface-sub); border:1px solid var(--line); border-radius:10px; line-height:36px; }
 .answer-char { display:inline-block; min-width:21px; min-height:36px; padding:0 3px; margin:1px; border:1px solid transparent; border-radius:4px; background:transparent; color:var(--text); font-size:16px; line-height:32px; cursor:pointer; user-select:none; }
 .answer-char.selected { color:var(--primary); background:var(--primary-soft); border-color:var(--primary); }
+:is(.capture-card, .paper-dialog) :is(button, .chip):is(:hover, :active):not(:disabled) { transform:none !important; }
+#paper-continuation-preview { max-height:130px; object-fit:contain; }
+#answer-picker-slot-field[hidden], #answer-picker-underline[hidden], #paper-continuation-preview[hidden] { display:none; }
 .answer-picker-pages { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:10px 0; font-size:12px; color:var(--muted); }
 .answer-picker-pages button { min-height:40px; padding:6px 10px; font-size:12px; }
 .answer-picker-preview { border:1px solid var(--line); border-radius:8px; padding:10px; margin-bottom:10px; font-size:12px; color:var(--muted); }

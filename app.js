@@ -262,11 +262,20 @@ function renderSubjectConfigModal() {
   </div>`;
 }
 
+let renderedTab;
+
 function render() {
   injectCustomStyles();
   const tab = current(), parentTab = tab === 'variants' ? 'notebook' : tab;
   const draftWasOpen = Boolean($('#draft-dialog')?.open);
-  const paperWasOpen = !!document.getElementById('paper-dialog')?.open;
+  const paperDialog = $('#paper-dialog');
+  if (tab === 'capture' && paper && paperDialog?.open && typeof refreshPaperDialog === 'function') {
+    openPaperOnRender = false;
+    refreshPaperDialog(paperDialog);
+    return;
+  }
+  const captureScroll = tab === 'capture' && renderedTab === tab && !paperDialog?.open ? window.scrollY : null;
+  renderedTab = tab;
   const p = getStudentProfile();
   if ($('#nav')) {
     $('#nav').innerHTML = tabs.map((t, i) => `<a href="#${t[0]}" class="${parentTab === t[0] ? 'active' : ''}" ${parentTab === t[0] ? 'aria-current="page"' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${paths[i]}</svg><span>${t[1]}</span></a>`).join('');
@@ -284,16 +293,14 @@ function render() {
   const mobileBar = '';
   const mainEl = $('#main');
   mainEl.innerHTML = mobileBar + ({ capture, grading: () => homeworkGradingPage(), notebook, variants: variantsPage, libraries:librariesPage, exam: examPage, settings })[tab]() + (draft ? draftForm() : '');
-  mainEl.classList.remove('apple-view-swap');
-  if (typeof mainEl.offsetWidth === 'number') void mainEl.offsetWidth;
-  mainEl.classList.add('apple-view-swap');
   bind(tab);
+  if (captureScroll !== null && window.scrollY !== captureScroll) window.scrollTo(0, captureScroll);
   if (draft && (openDraftOnRender || draftWasOpen)) {
     openDraftOnRender = false;
     const dlg = document.getElementById('draft-dialog');
     if (dlg && !dlg.open) { try { dlg.showModal(); } catch {} }
   }
-  if (tab === 'capture' && paper && (paperWasOpen || openPaperOnRender)) {
+  if (tab === 'capture' && paper && openPaperOnRender) {
     openPaperOnRender = false;
     const dlg = document.getElementById('paper-dialog');
     if (dlg && !dlg.open) { try { dlg.showModal(); } catch {} }
@@ -361,7 +368,7 @@ function capture() {
 
     </section>
 
-    <div id="paper-area">${paper ? `<dialog id="paper-dialog" class="paper-dialog"><div class="paper-dialog-close-wrap"><button type="button" class="detail-close" id="paper-dialog-close" aria-label="关闭">×</button></div>${pView}</dialog><button type="button" class="secondary" id="open-paper">📄 查看识别结果 · ${paper.items.length} 题</button>` : ''}</div>
+    <div id="paper-area">${paper ? `<dialog id="paper-dialog" class="paper-dialog"><div class="paper-dialog-close-wrap"><button type="button" class="detail-close" id="paper-dialog-close" aria-label="关闭">×</button></div><div id="paper-dialog-body">${pView}</div></dialog><button type="button" class="secondary" id="open-paper">📄 查看识别结果 · ${paper.items.length} 题</button>` : ''}</div>
 
     <details id="recent-entries" class="recent-entries" ${$('#recent-entries')?.open ? 'open' : ''}>
       <summary><span>最近收录</span><span class="recent-entries-indicator" aria-hidden="true"></span></summary>
@@ -997,14 +1004,15 @@ function qwenUsageText() {
 }
 
 async function ai(prompt, img, options = {}) {
+  const visual = Boolean(img) && (options.ocr || options.vision);
   const textRequest = !options.ocr && !img;
-  const provider = options.ocr ? options.provider || 'deepseek' : textRequest ? options.provider || defaultTextProvider() : 'deepseek';
+  const provider = options.ocr ? options.provider || 'deepseek' : textRequest || options.vision ? options.provider || defaultTextProvider() : 'deepseek';
   const qwen = provider === 'qwen';
   const viaProxy = qwen && cfg.qwenViaProxy;
   const key = getStoredKey(qwen ? 'shiti-qwen-key' : 'shiti-key');
   if (!viaProxy && !key) throw Error(`请先在设置填写 ${qwen ? '百炼' : 'DeepSeek'} API Key`);
   const endpoint = qwen ? cfg.qwenEndpoint || 'https://dashscope.aliyuncs.com/compatible-mode/v1' : cfg.endpoint || 'https://api.deepseek.com';
-  const model = options.ocr && img
+  const model = visual
     ? qwen ? cfg.qwenVisionModel || 'qwen3-vl-plus' : cfg.ocrVisionModel || (new URL(endpoint).hostname === 'api.deepseek.com' ? 'deepseek-flash' : textModelName(provider))
     : textModelName(provider);
   if (!viaProxy && !/^https:\/\//.test(endpoint) && !/^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(endpoint)) throw Error('API 地址需要使用 HTTPS');
@@ -1020,7 +1028,7 @@ async function ai(prompt, img, options = {}) {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: img ? [{ type: 'text', text: userPrompt }, ...(Array.isArray(img) ? img : [img]).map(url => ({ type: 'image_url', image_url: qwen ? { url } : { url, detail: 'original' } }))] : userPrompt }
     ],
-    ...(options.ocr && !qwen && new URL(endpoint).hostname === 'api.deepseek.com' ? { thinking: { type: 'disabled' } } : {}),
+    ...((options.ocr || visual) && !qwen && new URL(endpoint).hostname === 'api.deepseek.com' ? { thinking: { type: 'disabled' } } : {}),
     ...(qwen ? { enable_thinking: false } : {}),
     response_format: { type: 'json_object' },
     max_tokens: options.maxTokens || 8000,
@@ -1260,7 +1268,7 @@ function bind(tab) {
       editingId = null;
       draft=null;
       const questionType=selectedCaptureQuestionType(currentSubject);
-      paper={subject:currentSubject,questionType,notebookId:typeof captureNotebookId==='function'?captureNotebookId():'default',source:$('#source')?.value||'',mistake:$('#mistake')?.value||'',image:mode==='image'?image:'',scope:'crop',ocrProvider:'manual',inventory:[],warnings:[],complete:true,items:[{section:'文字录入',number:'1',text:$('#question-text')?.value||'',studentAnswer:'',questionType,answerStatus:'confirmed',selected:true,verified:false,analyzed:false,answer:'',analysis:'',reminder:'',tags:[]}]};
+      paper={subject:currentSubject,questionType,notebookId:typeof captureNotebookId==='function'?captureNotebookId():'default',source:$('#source')?.value||'',mistake:$('#mistake')?.value||'',image:mode==='image'?image:'',scope:'crop',ocrProvider:'manual',inventory:[],warnings:[],complete:true,items:[{section:'文字录入',number:'1',text:$('#question-text')?.value||'',studentAnswer:'',questionType,answerStatus:'unknown',selected:true,verified:false,analyzed:false,answer:'',analysis:'',reminder:'',tags:[]}]};
       openPaperOnRender = true;
       render();
     };

@@ -26,6 +26,7 @@ function deepSeekOCRSchema(subject, detectSubject = false) {
   const schema = detectSubject ? OCR_SCHEMA.replace('{"items":', '{"suggestedSubject":"","items":') : OCR_SCHEMA;
   return schema.replace('"uncertainty":', '"suggestedQuestionType":"","uncertainty":')
     + (detectSubject ? ' ' + ocrSubjectInstruction() : '')
+    + ' 对原题印刷的加点、下划线或图示，逐题附上 visualFeatures 字段，写明确实可见的文字和标记范围。把印刷的答题空线与学生写在上面的字分开；无法确定归属就注明，不当成作答。'
     + ' 每题按纸面要求建议一个题型，仅填代码：' + allowed
     + '。混合题、看不清或无法确定时填空字符串。填空题另返回 blankAnswers 数组，按空位顺序逐字记录孩子写的内容，位置明确但空白或看不清用 null，无法匹配空位则省略数组。选择题的 studentAnswer 只写实际选项字母，判断题照录实际标记。不要解题或推测作答。';
 }
@@ -36,6 +37,142 @@ function getVerdictTagOptions(selected) {
     : ['概念混淆', '审题偏差', '计算粗心', '知识盲区', '书写规范', '思路受阻', '薄弱待练', '巩固良好'];
   const cur = selected && list.includes(selected) ? selected : '薄弱待练';
   return list.map(v => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(v)}</option>`).join('');
+}
+
+function refreshPaperDialog(dialog) {
+  const body = $('#paper-dialog-body');
+  const scroll = dialog.scrollTop;
+  const active = document.activeElement;
+  const selector = active && body.contains(active) && (active.id ? '#' + CSS.escape(active.id) :
+    active.getAttributeNames().filter(name => name.startsWith('data-'))
+      .map(name => `[${name}="${CSS.escape(active.getAttribute(name))}"]`).join(''));
+  const openDetails = [...body.querySelectorAll('details')].map(element => element.open);
+  body.innerHTML = paperView();
+  [...body.querySelectorAll('details')].forEach((element, index) => {
+    if (openDetails[index] && !element.matches('[data-answer-extra]')) element.open = true;
+  });
+  bindPaper();
+  if (selector) body.querySelector(selector)?.focus({ preventScroll: true });
+  dialog.scrollTop = scroll;
+  const open = $('#open-paper');
+  if (open) open.textContent = `📄 查看识别结果 · ${paper.items.length} 题`;
+}
+
+function readingQuestionParts(text) {
+  const bracketed = [...text.matchAll(/^[ \t]*([（(][0-9０-９]{1,2}[）)])/gm)];
+  const markers = bracketed.length >= 2 ? bracketed : [...text.matchAll(/^[ \t]*([0-9０-９]{1,2}[.．、])(?![0-9０-９])/gm)];
+  if (markers.length < 2) return [];
+  const passage = text.slice(0, markers[0].index).trimEnd();
+  return markers.map((marker, i) => ({
+    label: marker[1], text: [passage, text.slice(marker.index, markers[i + 1]?.index).trim()].filter(Boolean).join('\n\n')
+  }));
+}
+
+function readingScopeField(item, index) {
+  if (!['reading', 'material'].includes(item.questionType)) return '';
+  const parts = readingQuestionParts(item.readingScope && item.readingScope !== 'all' ? item.readingDrafts.all : item.text);
+  if (!parts.length) return '';
+  const selected = item.readingScope || 'all';
+  return `<label class="field"><span>收录范围（保留阅读材料）</span><select data-reading-scope="${index}"><option value="all">整篇与全部小题</option>${parts.map(({label}, i) => `<option value="${i}" ${selected === String(i) ? 'selected' : ''}>只收录小题 ${esc(label)}</option>`).join('')}</select></label>`;
+}
+
+function bindReadingScope(select) {
+  select.onchange = () => {
+    const item = paper.items[Number(select.dataset.readingScope)];
+    const drafts = item.readingDrafts ||= {};
+    drafts[item.readingScope || 'all'] = item.text;
+    const scope = select.value;
+    const replacement = drafts[scope] ?? readingQuestionParts(drafts.all)[Number(scope)]?.text;
+    if (typeof replacement !== 'string') return;
+    item.readingScope = scope;
+    item.text = replacement;
+    invalidatePaperEvidence(item);
+    render();
+    if (scope !== 'all' && item.studentAnswer) toast('已保留材料和所选小题，请核对孩子作答是否只对应此题');
+  };
+}
+
+function paperContinuationTools() {
+  return `<div class="paper-answer-tools"><button type="button" class="secondary" id="paper-add-continuation">补录续页</button></div>
+    <dialog id="paper-continuation" class="compact-dialog">
+      <div class="card-head"><h2>补录续页</h2><button type="button" class="dialog-x" id="paper-continuation-close" aria-label="关闭">×</button></div>
+      <p class="hint">可选续页照片并框出本题范围，也可以直接补写续页的题干或小问。</p>
+      <label class="field"><span>续页照片（选填）</span><input type="file" id="paper-continuation-photo" accept="image/jpeg,image/png,image/webp,image/gif"></label>
+      <img class="paper-original" id="paper-continuation-preview" alt="续页照片" hidden>
+      <div class="actions"><button type="button" class="secondary" id="paper-continuation-crop" disabled>框选续页</button><button type="button" class="secondary" id="paper-continuation-ocr" disabled>识别续页文字</button></div>
+      <label class="field"><span>续页题干或小问</span><textarea rows="4" id="paper-continuation-text"></textarea></label>
+      <button type="button" class="primary" id="paper-continuation-add">合并到当前题</button>
+    </dialog>`;
+}
+
+function bindPaperContinuation() {
+  const dialog = $('#paper-continuation');
+  if (!dialog) return;
+  const preview = $('#paper-continuation-preview');
+  const crop = $('#paper-continuation-crop'), recognize = $('#paper-continuation-ocr');
+  const input = $('#paper-continuation-photo'), textField = $('#paper-continuation-text');
+  let photo = '', region, generation = 0;
+  $('#paper-add-continuation').onclick = () => {
+    if (busy) return;
+    generation++;
+    photo = '';
+    region = undefined;
+    input.value = textField.value = '';
+    preview.removeAttribute('src');
+    preview.hidden = crop.disabled = recognize.disabled = true;
+    dialog.showModal();
+  };
+  $('#paper-continuation-close').onclick = () => { if (!busy) dialog.close(); };
+  dialog.oncancel = event => { if (busy) event.preventDefault(); };
+  input.onchange = () => {
+    const version = ++generation;
+    loadImage(input.files[0], source => {
+      if (version !== generation || !dialog.open) return;
+      photo = source;
+      region = undefined;
+      preview.src = source;
+      preview.hidden = crop.disabled = recognize.disabled = false;
+    });
+  };
+  crop.onclick = () => run(crop, async () => {
+    const chosen = await openFigurePicker(photo, region, { forHomework: true });
+    if (chosen) region = chosen;
+  });
+  recognize.onclick = () => run(recognize, async () => {
+    const source = await studyImageCopy(photo, 'original', region || { x:0, y:0, w:1, h:1 });
+    const provider = paper.ocrProvider === 'manual' ? (cfg.ocrProvider || 'baidu') : paper.ocrProvider;
+    if (provider === 'baidu') {
+      const response = await callBaiduOCR(source);
+      textField.value = arrangeOCRLines(response.words_result).text;
+    } else {
+      const response = await ai('转录这张续页图上属于原题的题干、小问、选项和图中文字。保留原字与编号，排除学生手写。只返回 JSON {"text":"续页原文"}。', source, { ocr:true, provider });
+      if (typeof response.text !== 'string' || !response.text.trim()) throw Error('没识别到续页原文，请手动填写');
+      textField.value = response.text;
+    }
+  });
+  const add = $('#paper-continuation-add');
+  add.onclick = () => run(add, async () => {
+    const text = textField.value.trim();
+    if (!text && !photo) throw Error('请添加续页照片或文字');
+    const item = paper.items[0];
+    if (item.readingScope && item.readingScope !== 'all') throw Error('请先将收录范围切回整篇，再合并续页');
+    if (photo) {
+      const next = await studyImageCopy(photo, 'original', region || { x:0, y:0, w:1, h:1 });
+      if (isStudyImage(paper.image)) {
+        const combined = await joinStudyPages(paper.image, next);
+        paper.image = combined.src;
+        if (validFigureRegion(item.figureRegion)) {
+          item.figureRegion = { ...item.figureRegion, y:item.figureRegion.y * combined.firstFraction, h:item.figureRegion.h * combined.firstFraction };
+        }
+      } else paper.image = next;
+      item.hasContinuation = true;
+    }
+    if (text) item.text = [item.text, text].filter(Boolean).join('\n\n');
+    invalidatePaperEvidence(item);
+    dialog.close();
+    render();
+    toast('续页已合并到当前题，请重新核对');
+  });
 }
 
 function paperView() {
@@ -56,10 +193,11 @@ function paperView() {
       ${paper.ocrProvider === 'baidu' && paper.warnings.length ? `<div class="ocr-notices">${paper.warnings.map(w => `<span class="${w.startsWith('已保留') ? 'ocr-info' : 'ocr-warning'}">${esc(w)}</span>`).join('')}</div>` : paper.warnings.map(w => `<p class="result-note">${esc(w)}</p>`).join('')}
       <label class="field"><span>原题（仅题干、印刷选项和空位；请移出手写答案与订正，不修正原卷错字）</span><textarea class="paper-textarea" data-paper="text" data-index="0">${esc(p.text)}</textarea></label>
       ${typeof answerTransferTools==='function'?answerTransferTools():''}
+      ${paperContinuationTools()}
       ${typeof rawOCRView === 'function' ? rawOCRView() : ''}
       ${answerReviewFields(p,0)}
       ${p.analyzed ? `
-        <div style="margin-top:12px;padding-top:12px;border-top:1px dashed #cbd5e1">
+        <div data-paper-analysis-output style="margin-top:12px;padding-top:12px;border-top:1px dashed #cbd5e1">
           <div class="form-row">
             <label class="field">
               <span>🤖 AI 判定错因标签</span>
@@ -108,13 +246,13 @@ function paperView() {
       ${answerReviewFields(p,i)}
       ${p.uncertainty ? `<p class="result-note">需核对：${esc(p.uncertainty)}</p>` : ''}
       ${p.analyzed ? `
-        <div class="form-row">
+        <div data-paper-analysis-output><div class="form-row">
           <label class="field"><span>🤖 AI 判定错因标签</span><select data-paper="aiVerdict" data-index="${i}">${getVerdictTagOptions(p.aiVerdict)}</select></label>
           ${paperField('标签（逗号分隔）', 'tagsText', (p.tags || []).join('，'), i)}
         </div>
         ${paperField('答案', 'answer', p.answer, i, true)}
         ${paperField('步骤', 'analysis', p.analysis, i, true)}
-        ${paperField('提醒', 'reminder', p.reminder, i, true)}
+        ${paperField('提醒', 'reminder', p.reminder, i, true)}</div>
       ` : ''}
       ${p.error ? `<p class="result-note">${esc(p.error)}</p>` : ''}
       <div class="actions"><button class="text-button" data-paper-delete="${i}">移除此条目</button></div>
@@ -186,6 +324,7 @@ function normalizeOCR(r, suggestionSubject) {
       ? p.suggestedQuestionType : null;
     const transcribedAnswer = typeof p.studentAnswer === 'string' ? p.studentAnswer : '';
     const needsStructuredAnswer = suggestedType === 'choice' || suggestedType === 'fill';
+    const hasAnswer = transcribedAnswer.trim() || (Array.isArray(p.blankAnswers) && p.blankAnswers.some(answer => typeof answer === 'string' && answer.trim()));
     const item = {
       section: p.section.trim(),
       number: p.number.trim(),
@@ -196,9 +335,9 @@ function normalizeOCR(r, suggestionSubject) {
       uncertainty: typeof p.uncertainty === 'string' ? p.uncertainty : '',
       selected: autoCheck,
       verified: false,
-      answerStatus: 'confirmed',
+      answerStatus: hasAnswer ? 'confirmed' : 'unknown',
       annotation: '',
-      visualFeatures: '',
+      visualFeatures: typeof p.visualFeatures === 'string' ? p.visualFeatures.trim().slice(0, 1200) : '',
       analyzed: false,
       aiVerdict: '薄弱待练',
       answer: '',
@@ -299,6 +438,7 @@ function selectedPaper() {
 }
 
 async function analyzeSelectedItems() {
+  const sourcePaper = paper;
   const items = selectedPaper();
   const verdictList = typeof aiVerdictTags !== 'undefined' && Array.isArray(aiVerdictTags)
     ? aiVerdictTags
@@ -310,11 +450,25 @@ async function analyzeSelectedItems() {
     progress(`AI 正在拆解分析第 ${i + 1} / ${items.length} 题…`);
     try {
       const evidence=answerEvidence(p);
+      const originalText = p.text;
       if(evidence.status==='confirmed'&&!evidence.answer)throw Error('已选择确认作答，请填写孩子实际作答；未作答或不确定请切换证据状态');
       if(evidence.status==='confirmed'&&p.questionType==='fill'&&Array.from({length:p.blankCount},(_,i)=>p.blankAnswers?.[i]).some(v=>!String(v||'').trim()))throw Error('请记录每个空的实际作答；孩子确实没写的空请填【未作答】，不确定则切换为无法确认');
-      if(/加点|划线|画线|下划线|图中/.test(p.text) && !evidence.visualFeatures.trim()){p.showAnswerExtra=true;throw Error('此题依赖视觉信息，请展开补充加点字、划线范围或图示内容；无法确认时请暂不分析')}
+      const needsVisual = /加点|划线|画线|下划线|图中/.test(p.text);
+      const original = typeof isStudyImage === 'function' && isStudyImage(paper.image) ? paper.image : '';
+      const useImage = original && ((needsVisual && !evidence.visualFeatures.trim()) || p.hasContinuation);
+      if (needsVisual && !evidence.visualFeatures.trim() && !useImage) {
+        p.showAnswerExtra = true;
+        throw Error('原题需要加点、划线或图示等视觉信息。可以选中文字并标记，或在「补充原题视觉信息」中填写。');
+      }
+      const image = useImage && !p.hasContinuation && validFigureRegion(p.figureRegion)
+        ? await studyImageCopy(original, 'original', p.figureRegion)
+        : useImage ? original : undefined;
       const canDiagnose=evidence.status==='confirmed'&&Boolean(evidence.answer);
-      const r = await ai(`你只得到人工核对后的文字，没有看到原始试卷图片。学科：${paper.subject}。原题：${JSON.stringify(p.text)}。视觉信息：${JSON.stringify(evidence.visualFeatures)}。作答证据：${JSON.stringify(evidence)}。用户补充（不是孩子作答的替代证据）：${JSON.stringify(paper.mistake)}。原题错字、错误拼音、错误选项照录，不得按正确知识改写题干。括号和横线只是空位，不能推测其中的答案。圈画、订正和老师批改与孩子原始作答不同，不可混用；红勾不能证明标准答案。${canDiagnose?'仅根据已确认作答与标准解法比较，判断 correct/incorrect/unknown；即使答错，也不能断言思考过程，只能给有依据的可能原因。':'孩子作答未确认或已确认未作答：仅讲解题目，不能说孩子答错、选了某项或存在某个错因；status 必须是 unknown，aiVerdict 必须是未判定。'}条件不足或视觉信息无法辨认时明确说明无法确定，不猜测。返回 JSON {"answer":"标准答案或无法确定原因","analysis":"解题步骤；仅有已确认作答时才可比较","status":"correct/incorrect/unknown","comparisonEvidence":"对比依据，无证据则空字符串","reminder":"复习建议，不把可能错因说成事实","aiVerdict":"${canDiagnose?'选择最贴切错因标签，无法判断则未判定':'未判定'}","tags":["知识点"]}。可用错因标签：${JSON.stringify(verdictList)}。`, undefined, {learning:{subject:paper.subject,text:p.text,tags:p.tags||[]}});
+      const imageContext = image ? `看图核对原题第 ${p.number} 题的印刷加点、划线、图示和续页，按核对文字定位。区分印刷标记、学生手写与订正；看不清就说明。图像不能替代已确认的学生作答。` : '你只得到人工核对后的文字，没有看到原始试卷图片。';
+      const r = await ai(`${imageContext}学科：${paper.subject}。原题：${JSON.stringify(p.text)}。视觉信息：${JSON.stringify(evidence.visualFeatures)}。作答证据：${JSON.stringify(evidence)}。用户补充（不是孩子作答的替代证据）：${JSON.stringify(paper.mistake)}。原题错字、错误拼音、错误选项照录，不得按正确知识改写题干。括号和横线只是空位，不能推测其中的答案。圈画、订正和老师批改与孩子原始作答不同，不可混用；红勾不能证明标准答案。${canDiagnose?'仅根据已确认作答与标准解法比较，判断 correct/incorrect/unknown；即使答错，也不能断言思考过程，只能给有依据的可能原因。':'孩子作答未确认或已确认未作答：仅讲解题目，不能说孩子答错、选了某项或存在某个错因；status 必须是 unknown，aiVerdict 必须是未判定。'}条件不足或视觉信息无法辨认时明确说明无法确定，不猜测。返回 JSON {"answer":"标准答案或无法确定原因","analysis":"解题步骤；仅有已确认作答时才可比较","status":"correct/incorrect/unknown","comparisonEvidence":"对比依据，无证据则空字符串","reminder":"复习建议，不把可能错因说成事实","aiVerdict":"${canDiagnose?'选择最贴切错因标签，无法判断则未判定':'未判定'}","tags":["知识点"]}。可用错因标签：${JSON.stringify(verdictList)}。`, image, {vision: Boolean(image), learning:{subject:paper.subject,text:p.text,tags:p.tags||[]}});
+      if (paper !== sourcePaper || !sourcePaper.items.includes(p) || originalText !== p.text || JSON.stringify(evidence) !== JSON.stringify(answerEvidence(p))) {
+        throw Error('题目或作答已修改，请重新核对并分析');
+      }
       if (typeof r.answer !== 'string' || typeof r.analysis !== 'string') throw Error('分析结果不完整');
       const status=canDiagnose&&['correct','incorrect'].includes(r.status)?r.status:'unknown';
       const matchedVerdict = status==='incorrect'&&verdictList.includes(r.aiVerdict) ? r.aiVerdict : '未判定';
@@ -407,6 +561,14 @@ function bindPaper() {
       if (k === 'aiVerdict') { p.aiVerdict = el.value; return; }
       if(k==='questionType'){if(p.questionType!==el.value){switchQuestionType(p,el.value,paper.subject);render()}return}
       p[k] = el.value;
+      if (k === 'text' && ['reading', 'material'].includes(p.questionType)) {
+        const host = document.querySelector(`[data-reading-scope-host="${el.dataset.index}"]`);
+        if (host) {
+          host.innerHTML = readingScopeField(p, Number(el.dataset.index));
+          const scope = host.querySelector('select');
+          if (scope) bindReadingScope(scope);
+        }
+      }
       if (['text', 'section', 'number', 'studentAnswer','answerStatus','annotation','visualFeatures'].includes(k)) {
         invalidatePaperEvidence(p);
         const cb=document.querySelector(`[data-paper="verified"][data-index="${el.dataset.index}"]`);if(cb)cb.checked=false;
@@ -437,6 +599,8 @@ function bindPaper() {
     });
   });
   bindStructuredAnswerFields();
+  document.querySelectorAll('[data-reading-scope]').forEach(bindReadingScope);
+  bindPaperContinuation();
   if(typeof bindCaptureOptions==='function')bindCaptureOptions();
 
   if ($('#paper-select-all')) $('#paper-select-all').onclick = () => { const checked = !paper.items.every(p => p.selected); paper.items.forEach(p => p.selected = checked); render(); };
@@ -445,7 +609,7 @@ function bindPaper() {
   if ($('#paper-analyze')) $('#paper-analyze').onclick = e => runPaperAction(e, async () => {
     const failures = await analyzeSelectedItems();
     render();
-    toast(failures ? `${failures} 题分析失败，请检查文字模型设置后重试` : '✓ AI 分析与错因判定完成，核对无误后点击收录');
+    toast(failures ? paper?.items.find(item => item.selected && item.error)?.error || '请查看题目下方的错误提示' : '✓ AI 解析已完成，可继续核对');
   });
 
   if ($('#paper-save')) $('#paper-save').onclick = e => runPaperAction(e, async () => {
