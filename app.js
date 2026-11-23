@@ -1352,6 +1352,14 @@ function bindDraftEditor() {
   });
 }
 
+function renderSolutionSection(kind, title, value, extra = '', format = renderStudyText, empty = '暂无记录') {
+  return `<section class="solution-section" data-solution-section="${kind}">
+    <h3>${title}</h3>
+    ${value ? `<div class="prose">${format(value)}</div>` : extra ? '' : `<p class="hint">${empty}</p>`}
+    ${extra}
+  </section>`;
+}
+
 function openQuestion(id) {
   const q = data.questions.find(q => q.id === id);
   if (!q) return;
@@ -1373,15 +1381,23 @@ function openQuestion(id) {
     </div>
     ${q.source ? `<p class="detail-question-source">来源 · ${esc(q.source)}</p>` : ''}
 
-    <p class="prose">${esc(q.text)}</p>
-    <p class="result-note">作答证据：${q.evidenceVerified&&q.answerStatus==='confirmed'?'已人工核对孩子作答':q.answerStatus==='unanswered'?'已确认未作答':'未确认；不能据此诊断孩子错因'}</p>
-    ${q.annotation?`<div class="analysis-block"><h3>批注／订正（非原始作答）</h3><p class="prose">${esc(q.annotation)}</p></div>`:''}
-    ${q.visualFeatures?`<div class="analysis-block"><h3>加点／划线等视觉信息</h3><p class="prose">${esc(q.visualFeatures)}</p></div>`:''}
-    ${isStudyImage(q.image) ? `<div id="detail-figure"></div>
-      <button type="button" id="detail-pick-figure" class="secondary">${validFigureRegion(q.figureRegion) ? '调整题图' : '从原图框选题图'}</button>
-      <details ${validFigureRegion(q.figureRegion) ? '' : 'open'}><summary>原题图片</summary><img src="${esc(q.image)}" alt="原题图片" class="saved-figure"></details>` : ''}
-    ${rawOcr ? `<details style="margin-top:10px;padding:8px 12px;background:var(--surface-sub, #f8fafc);border-radius:10px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--muted)">查看百度 OCR 原始转录（默认收起）</summary><div class="prose" style="margin-top:8px;font-size:13px;color:var(--muted)">${esc(rawOcr)}</div></details>` : ''}
-    ${[['孩子的错误作答 / 困惑', q.mistake], ['正确答案', q.answer], ['解题步骤', q.analysis], ['易错提醒', q.reminder], ['知识点', (q.tags || []).join(' · ')]].filter(x => x[1]).map(x => `<div class="analysis-block"><h3>${x[0]}</h3><div class="prose">${esc(x[1])}</div></div>`).join('')}
+    ${renderSolutionSection('stem', '题干', q.text, `
+      ${q.visualFeatures ? `<p class="hint prose">加点／划线等视觉信息：${esc(q.visualFeatures)}</p>` : ''}
+      ${isStudyImage(q.image) ? `<div id="detail-figure"></div>
+        <button type="button" id="detail-pick-figure" class="secondary">${validFigureRegion(q.figureRegion) ? '调整题图' : '从原图框选题图'}</button>
+        <details ${validFigureRegion(q.figureRegion) ? '' : 'open'}><summary>原题图片</summary><img src="${esc(q.image)}" alt="原题图片" class="saved-figure"></details>` : ''}
+      ${rawOcr ? `<details><summary>查看百度 OCR 原始转录</summary><div class="prose">${esc(rawOcr)}</div></details>` : ''}`)}
+    ${renderSolutionSection('response', '孩子的错误作答／困惑',
+      [q.mistake, q.studentAnswer && !q.mistake?.includes(q.studentAnswer) ? q.studentAnswer : ''].filter(Boolean).join('\n'),
+      `<p class="hint">${q.evidenceVerified && q.answerStatus === 'confirmed' ? '作答已人工核对' : q.answerStatus === 'unanswered' ? '已确认未作答' : '作答未确认'}</p>
+       ${q.annotation ? `<p class="hint prose">批注／订正：${esc(q.annotation)}</p>` : ''}`, esc)}
+    ${renderSolutionSection('answer', '正确答案', q.answer)}
+    ${renderSolutionSection('steps', '解题步骤', q.analysis)}
+    ${renderSolutionSection('pitfall', '易错题型', [
+      q.questionType || q.questionTypeName ? '题型：' + notebookTypeLabel(q) : '',
+      (q.tags || []).length ? '知识点：' + q.tags.join(' · ') : '',
+      q.reminder
+    ].filter(Boolean).join('\n'))}
     <div class="actions detail-question-actions">
       <button class="primary" id="master">${q.mastered ? '重新巩固' : '标记已掌握'}</button>
       <button class="secondary" id="edit-q">编辑</button>

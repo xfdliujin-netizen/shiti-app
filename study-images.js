@@ -106,13 +106,13 @@ function whitenStudyPaper({ width, height, data }, blackWhite) {
   }
 }
 
-async function openFigurePicker(src, previous, { forHomework = false } = {}) {
+async function openFigurePicker(src, previous, { forHomework = false, forSubmission = false } = {}) {
   if (!isStudyImage(src)) throw Error('没有可框选的原题图片');
   const dialog = document.createElement('dialog');
   dialog.className = 'figure-picker';
   dialog.setAttribute('aria-labelledby', 'figure-picker-title');
   dialog.innerHTML = `<header class="figure-picker-header">
-      <h2 id="figure-picker-title">${forHomework ? '调整切题范围' : '保留题目配图'}</h2>
+      <h2 id="figure-picker-title">${forSubmission ? '框选处理范围' : forHomework ? '调整切题范围' : '保留题目配图'}</h2>
       <button type="button" class="dialog-x" data-close aria-label="关闭题图窗口" autofocus>×</button>
     </header>
     <div class="figure-picker-body">
@@ -123,9 +123,9 @@ async function openFigurePicker(src, previous, { forHomework = false } = {}) {
     </div>
     <footer class="figure-picker-footer">
       <button type="button" class="text-button" data-redraw disabled>重画</button>
-      ${!forHomework && validFigureRegion(previous) ? '<button type="button" class="text-button" data-clear>移除题图</button>' : ''}
+      ${!forHomework && !forSubmission && validFigureRegion(previous) ? '<button type="button" class="text-button" data-clear>移除题图</button>' : ''}
       <button type="button" class="secondary" data-cancel>取消</button>
-      <button type="button" class="primary" data-confirm disabled>${forHomework ? '确认切题范围' : '保存题图'}</button>
+      <button type="button" class="primary" data-confirm disabled>${forSubmission ? '确认框选' : forHomework ? '确认切题范围' : '保存题图'}</button>
     </footer>`;
   const stage = dialog.querySelector('.figure-stage');
   const image = stage.querySelector('img');

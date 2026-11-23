@@ -457,17 +457,25 @@ function selectedPaper() {
 function showPaperAnalysis(items) {
   const dialog = $('#paper-analysis-dialog');
   if (!items.length || typeof dialog?.showModal !== 'function') return null;
-  const format = text => typeof renderStudyText === 'function' ? renderStudyText(text) : esc(text);
   const original = typeof isStudyImage === 'function' && isStudyImage(paper?.image) ? paper.image : '';
   dialog.innerHTML = `<div class="card-head"><h2 id="paper-analysis-title">AI 解析</h2><button type="button" class="dialog-x" aria-label="关闭解析" autofocus>×</button></div>
     <p class="hint" data-analysis-save-status role="status" hidden></p>
-    ${original ? `<figure class="paper-analysis-image"><img src="${original}" alt="${paper.scope === 'crop' ? '录题原图' : '整卷原图'}"></figure>` : ''}
+    ${original && items.length > 1 ? `<figure class="paper-analysis-image"><img src="${original}" alt="整卷原图"></figure>` : ''}
     ${items.map((item, index) => `<article class="paper-item">${items.length > 1 ? `<h3>原卷第 ${esc(item.number)} 题</h3>` : ''}
       ${item.detectedSubject ? `<p class="hint">科目：${esc(item.detectedSubject)}</p>` : ''}
-      <h3>原题</h3><div class="prose">${format(item.text)}</div>
-      ${original && validFigureRegion(item.figureRegion) ? `<div data-analysis-figure="${index}"></div>` : ''}
-      <h3>参考答案</h3><div class="prose">${format(item.answer)}</div><h3>解题解析</h3><div class="prose">${format(item.analysis)}</div>
-      ${item.reminder ? `<h3>易错提醒</h3><div class="prose">${format(item.reminder)}</div>` : ''}</article>`).join('')}`;
+      ${renderSolutionSection('stem','题干',item.text,`
+        ${original && items.length === 1 ? `<figure class="paper-analysis-image"><img src="${original}" alt="录题原图"></figure>` : ''}
+        ${original && validFigureRegion(item.figureRegion) ? `<div data-analysis-figure="${index}"></div>` : ''}`)}
+      ${renderSolutionSection('response','孩子的错误作答／困惑',
+        [answerEvidence(item).answer, paper.mistake].filter(Boolean).join('\n'), '', esc,
+        item.answerStatus === 'unanswered' ? '已确认未作答' : '暂无已确认的作答或困惑')}
+      ${renderSolutionSection('answer','正确答案',item.answer)}
+      ${renderSolutionSection('steps','解题步骤',item.analysis)}
+      ${renderSolutionSection('pitfall','易错题型',[
+        item.captureType?.questionTypeName || item.questionTypeName,
+        item.tags?.length ? '知识点：' + item.tags.join(' · ') : '',
+        item.reminder
+      ].filter(Boolean).join('\n'))}</article>`).join('')}`;
   dialog.querySelector('.dialog-x').onclick = () => dialog.close();
   dialog.onclose = () => {
     if (dialog.open) return;

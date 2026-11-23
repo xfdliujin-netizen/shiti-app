@@ -983,6 +983,7 @@ dialog#detail .detail-head {
 .homework-totals strong { font-size:21px; line-height:1.2; font-variant-numeric:tabular-nums; }
 .homework-photo { position:relative; overflow:hidden; border-radius:14px; outline:1px solid var(--line); isolation:isolate; }
 .homework-photo img { display:block; width:100%; height:auto; }
+.homework-scope { position:absolute; pointer-events:none; border:2px solid #248fff; border-radius:5px; box-shadow:0 0 0 200vmax #15243f58; }
 .homework-photo-layer { position:relative; transform-origin:top left; user-select:none; }
 .homework-photo[data-zoom]:not([data-zoom="1"]) { cursor:grab; touch-action:none; }
 .homework-photo[data-zoom]:not([data-zoom="1"]):active { cursor:grabbing; }
@@ -1063,3 +1064,15 @@ dialog.homework-analysis-sheet[open] { position:fixed; inset:auto 0 0; margin:0 
 .homework-sheet-extra { margin-bottom:4px; color:var(--muted); font-size:13px; }
 .homework-sheet-extra button { display:block; margin-top:8px; }
 #homework-review-dialog .homework-review { margin-top:0; }
+
+.solution-section { margin:0 0 11px; padding:11px 13px; border:1px solid var(--line); border-radius:12px; background:var(--surface-sub); }
+.solution-section > h3 { margin:0 0 7px; font-size:15px; line-height:1.35; }
+.solution-section > :last-child { margin-bottom:0; }
+.solution-section > .prose { margin:0; overflow-wrap:anywhere; }
+.solution-section > .hint { margin:5px 0 0; }
+.solution-section details, .solution-section > .secondary, .solution-section .paper-analysis-image { margin-top:9px; }
+.solution-section[data-solution-section="stem"] { border-inline-start:3px solid var(--primary); background:var(--surface-solid); }
+.solution-section[data-solution-section="stem"] > h3 { color:var(--primary); }
+.solution-section[data-solution-section="stem"] > .prose { font-size:16px; line-height:1.65; }
+.solution-section .homework-sheet-crop:empty { display:none; }
+.solution-section .homework-sheet-crop img { margin:8px auto 0; }
