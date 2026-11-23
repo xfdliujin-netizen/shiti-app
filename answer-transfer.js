@@ -1,6 +1,6 @@
 let releaseAnswerTransfer=null,answerMoveUndo=null;
 function canUndoAnswerMove(){return answerMoveUndo?.paper===paper&&answerMoveUndo.after===paper.items[0]&&answerMoveUndo.subject===paper.subject&&answerMoveUndo.signature===JSON.stringify(paper.items[0])}
-function answerTransferTools(){return `<div class="paper-answer-tools"><button type="button" class="secondary" id="paper-move-answer"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h10M4 9h8M4 13h5M12 17h8m-3-3 3 3-3 3"/></svg><span id="paper-move-answer-label">选文字作为孩子作答</span></button><button type="button" class="secondary" id="paper-mark-visual">标记加点／划线</button>${canUndoAnswerMove()?'<button type="button" class="secondary" id="paper-undo-answer">撤销移动</button>':''}<small id="paper-selection-note">长按选字，或点按钮选取</small></div>
+function answerTransferTools(){return `<div class="paper-answer-tools"><button type="button" class="secondary" id="paper-move-answer"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h10M4 9h8M4 13h5M12 17h8m-3-3 3 3-3 3"/></svg>点选作答</button><button type="button" class="secondary" id="paper-mark-visual">标记加点／划线</button>${canUndoAnswerMove()?'<button type="button" class="secondary" id="paper-undo-answer">撤销移动</button>':''}</div>
   <dialog id="answer-text-picker" class="compact-dialog">
     <div class="card-head"><h2 id="answer-picker-title">选择孩子实际写的答案</h2><button type="button" class="dialog-x" id="answer-picker-close" aria-label="关闭">×</button></div>
     <p class="hint">点选起点和终点。只选一个字时，点一次即可。</p>
@@ -35,21 +35,15 @@ function bindAnswerTransfer(ta) {
   let saved = null, pressing = false, picker = null;
   const item = () => paper.items[0];
 
-  function hint() {
-    const valid = saved?.text === ta.value;
-    $('#paper-move-answer-label').textContent = valid ? '移入孩子作答' : '选文字作为孩子作答';
-    $('#paper-selection-note').textContent = valid ? `已选 ${saved.end-saved.start} 个字` : '长按选字，或点按钮选取';
-  }
   function remember() {
     if (!ta.isConnected) return;
     const start = ta.selectionStart, end = ta.selectionEnd;
     if (end > start) saved = {text:ta.value,start,end};
     else if (document.activeElement === ta && !pressing) saved = null;
-    hint();
   }
   const selectionChange = () => { if (document.activeElement === ta) remember(); };
   const events = ['select','keyup','pointerup','touchend'];
-  const input = () => { saved = null; hint(); };
+  const input = () => { saved = null; };
   document.addEventListener('selectionchange', selectionChange);
   events.forEach(event => ta.addEventListener(event, remember));
   ta.addEventListener('input', input);

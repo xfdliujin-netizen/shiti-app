@@ -189,14 +189,13 @@ function paperView() {
         <h2>校对识别结果</h2>
         <span class="pill">${p.analyzed ? '✓ 已生成 AI 解析与错因判定' : '待校对 / 分析'}</span>
       </div>
-      ${typeof paperMetadataFields==='function'?paperMetadataFields():''}
-      ${paper.image ? `<div id="paper-crop-image-box" style="margin-bottom:10px;background:#f8fafc;padding:8px;border-radius:10px;text-align:center"><img id="paper-crop-img" class="paper-original" src="${paper.image}" alt="框选原图，点击全屏查看" title="点击全屏查看" style="max-height:180px;width:auto;margin:0 auto;display:block;cursor:zoom-in"></div><dialog id="paper-lightbox" class="image-lightbox"><button type="button" class="lightbox-close" id="paper-lightbox-close" aria-label="关闭">×</button><img id="paper-lightbox-img" alt="框选图全屏预览"></dialog>` : ''}
-      ${paperFigureTools(p, 0)}
-      ${paper.ocrProvider === 'baidu' && paper.warnings.length ? `<div class="ocr-notices">${paper.warnings.map(w => `<span class="${w.startsWith('已保留') ? 'ocr-info' : 'ocr-warning'}">${esc(w)}</span>`).join('')}</div>` : paper.warnings.map(w => `<p class="result-note">${esc(w)}</p>`).join('')}
+      ${typeof paperMetadataFields==='function'?paperMetadataFields(p):''}
+      ${paper.image ? `<div id="paper-crop-image-box"><img id="paper-crop-img" class="paper-original" src="${paper.image}" alt="框选原图，点击全屏查看" title="点击全屏查看">${rawPaperTranscriptLink()}</div><dialog id="paper-lightbox" class="image-lightbox"><button type="button" class="lightbox-close" id="paper-lightbox-close" aria-label="关闭">×</button><img id="paper-lightbox-img" alt="框选图全屏预览"></dialog>` : rawPaperTranscriptLink()}
+      ${rawPaperTranscriptDialog()}
+      ${paperFigureTools(p, 0, true)}
       <label class="field"><span>原题（仅题干、印刷选项和空位；请移出手写答案与订正，不修正原卷错字）</span><textarea class="paper-textarea" data-paper="text" data-index="0">${esc(p.text)}</textarea></label>
       ${typeof answerTransferTools==='function'?answerTransferTools():''}
       ${paperContinuationTools()}
-      ${typeof rawOCRView === 'function' ? rawOCRView() : ''}
       ${answerReviewFields(p,0)}
       ${p.analyzed ? `
         <div data-paper-analysis-output style="margin-top:12px;padding-top:12px;border-top:1px dashed #cbd5e1">
@@ -223,7 +222,6 @@ function paperView() {
 
   const keys = new Set([...paper.items.map(p => paperKey(p)), ...(paper.savedKeys || [])]);
   const missing = paper.inventory.filter(p => !keys.has(paperKey(p)));
-  const rawViewHtml = typeof rawOCRView === 'function' ? rawOCRView() : '';
   return `<section class="card">
     <div class="card-head">
       <h2>${paper.scope === 'crop' ? '框内原文核对' : '整卷逐题核对'} · ${paper.items.length} 题</h2>
@@ -231,9 +229,8 @@ function paperView() {
     </div>
     ${typeof paperMetadataFields==='function'?paperMetadataFields():''}
     <p class="result-note">${paper.ocrProvider === 'baidu' ? '请对照裁剪图核对原文。' : `目录发现 ${paper.inventory.length} 个题号；当前转录 ${paper.items.length} 个条目。`}${missing.length ? ' 待核对：' + esc(missing.map(p => p.section + ' / ' + p.number).join('、')) : ''}</p>
-    ${paper.warnings.map(w => `<p class="result-note">${esc(w)}</p>`).join('')}
-    ${paper.image ? `<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">展开原图对照（默认收起）</summary><a href="${paper.image}" target="_blank" rel="noopener"><img class="paper-original" src="${paper.image}" alt="原始试卷，点击放大"></a></details>` : ''}
-    ${rawViewHtml ? (rawViewHtml.trim().startsWith('<details') ? rawViewHtml : `<details style="margin-bottom:10px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">查看 OCR 原始转录（默认收起）</summary>${rawViewHtml}</details>`) : ''}
+    ${paper.image ? `<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:13px;color:var(--muted)">展开原图对照（默认收起）</summary><div class="paper-original-frame"><a href="${paper.image}" target="_blank" rel="noopener"><img class="paper-original" src="${paper.image}" alt="原始试卷，点击放大"></a>${rawPaperTranscriptLink()}</div></details>` : rawPaperTranscriptLink()}
+    ${rawPaperTranscriptDialog()}
     <div class="actions">
       <button class="secondary" id="paper-select-all">全选 / 取消全选</button>
       <button class="secondary" id="paper-add">补录漏题</button>
@@ -242,10 +239,11 @@ function paperView() {
       <div class="card-head">
         <label><input type="checkbox" data-paper="selected" data-index="${i}" ${p.selected ? 'checked' : ''}> 选择第 ${i + 1} 个条目</label>
         <span class="pill">${p.analyzed ? '已分析 · ' + esc(p.aiVerdict || '薄弱待练') : '待核对'}</span>
+        ${p.orderedAnswers && typeof captureTypeField === 'function' ? captureTypeField(p, i) : ''}
       </div>
       ${paperField('原题全文（保留材料、选项和空格）', 'text', p.text, i, true)}
       ${p.orderedAnswers ? `<button type="button" class="secondary" data-move-paper-answer="${i}">选中文字，移入下一空</button>` : ''}
-      ${paperFigureTools(p, i)}
+      ${paperFigureTools(p, i, i === 0)}
       ${answerReviewFields(p,i)}
       ${p.uncertainty ? `<p class="result-note">需核对：${esc(p.uncertainty)}</p>` : ''}
       ${p.analyzed ? `
@@ -267,10 +265,20 @@ function paperView() {
   </section>`;
 }
 
-function paperFigureTools(item, index) {
-  if (!paper.image || typeof isStudyImage !== 'function' || !isStudyImage(paper.image)) return '';
-  return `<div class="paper-figure-tools"><div data-paper-figure="${index}"></div>
-    <button type="button" class="secondary" data-pick-paper-figure="${index}">${validFigureRegion(item.figureRegion) ? '调整题图' : '从原图框选题图'}</button></div>`;
+function rawPaperTranscriptLink() {
+  return paper.ocrProvider === 'baidu' && paper.ocrOriginalText ? '<button type="button" class="text-button paper-raw-link" id="paper-open-raw">查看百度原始转录</button>' : '';
+}
+
+function rawPaperTranscriptDialog() {
+  return paper.ocrProvider === 'baidu' && paper.ocrOriginalText ? `<dialog id="paper-raw-dialog" class="compact-dialog" aria-labelledby="paper-raw-title"><div class="card-head"><h2 id="paper-raw-title">百度原始转录</h2><button type="button" id="paper-raw-close" class="dialog-x" aria-label="关闭原始转录">×</button></div><pre class="prose paper-raw-text">${esc(paper.ocrOriginalText)}</pre></dialog>` : '';
+}
+
+function paperFigureTools(item, index, showNotices = false) {
+  const hasImage = paper.image && typeof isStudyImage === 'function' && isStudyImage(paper.image);
+  const notices = showNotices && paper.warnings.length ? `<div class="ocr-notices">${paper.warnings.map(w => `<span class="${w.startsWith('已保留') ? 'ocr-info' : 'ocr-warning'}">${esc(w)}</span>`).join('')}</div>` : '';
+  if (!hasImage && !notices) return '';
+  return `<div class="paper-figure-tools">${hasImage ? `<div data-paper-figure="${index}"></div>` : ''}<div class="paper-figure-actions">
+    ${hasImage ? `<button type="button" class="secondary" data-pick-paper-figure="${index}">${validFigureRegion(item.figureRegion) ? '调整题图' : '从原图框选题图'}</button>` : ''}${notices}</div></div>`;
 }
 
 function paperField(label, key, value, i, area = false) {
@@ -446,18 +454,21 @@ function selectedPaper() {
   return items;
 }
 
-function showPaperAnalysis(items, savedCount = 0) {
+function showPaperAnalysis(items) {
   const dialog = $('#paper-analysis-dialog');
-  if (!items.length || typeof dialog?.showModal !== 'function') return;
+  if (!items.length || typeof dialog?.showModal !== 'function') return null;
   const format = text => typeof renderStudyText === 'function' ? renderStudyText(text) : esc(text);
   dialog.innerHTML = `<div class="card-head"><h2 id="paper-analysis-title">AI 解析</h2><button type="button" class="dialog-x" aria-label="关闭解析" autofocus>×</button></div>
-    ${savedCount ? `<p class="hint">已收录 ${savedCount} 道错题</p>` : ''}
+    <p class="hint" data-analysis-save-status role="status" hidden></p>
     ${items.map(item => `<article class="paper-item">${items.length > 1 ? `<h3>原卷第 ${esc(item.number)} 题</h3>` : ''}
       ${item.detectedSubject ? `<p class="hint">科目：${esc(item.detectedSubject)}</p>` : ''}
       <h3>参考答案</h3><div class="prose">${format(item.answer)}</div><h3>解题解析</h3><div class="prose">${format(item.analysis)}</div>
       ${item.reminder ? `<h3>易错提醒</h3><div class="prose">${format(item.reminder)}</div>` : ''}</article>`).join('')}`;
   dialog.querySelector('.dialog-x').onclick = () => dialog.close();
+  dialog.onclose = () => { if (current() === 'capture') render(); };
   if (!dialog.open) dialog.showModal();
+  dialog.scrollTop = 0;
+  return dialog;
 }
 
 async function analyzeSelectedItems() {
@@ -535,7 +546,7 @@ async function saveSelectedItems() {
       subject,
       notebookId:$('#paper-notebook')?.value||paper.notebookId||(typeof captureNotebookId==='function'?captureNotebookId():'default'),
       grade:getStudentProfile().grade,term:getStudentProfile().term,
-      ...(p.orderedAnswers ? {} : { questionType:p.questionType||paper.questionType||'other', questionTypeName:p.questionTypeName||QUESTION_TYPE_NAMES[p.questionType]||'其他题型' }),
+      ...(p.orderedAnswers ? (p.captureType || {}) : { questionType:p.questionType||paper.questionType||'other', questionTypeName:p.questionTypeName||QUESTION_TYPE_NAMES[p.questionType]||'其他题型' }),
       answerDetails:{choices:p.choices||[],blankAnswers:p.blankAnswers||[],blankCount:p.blankCount||0,optionCount:p.optionCount||0},
       source: [paper.source, p.section !== '框选题目' ? p.section : '', p.number !== '1' ? p.number : ''].filter(Boolean).join(' · '),
       text: p.text,
@@ -651,9 +662,17 @@ function bindPaper() {
   if ($('#paper-analyze')) $('#paper-analyze').onclick = e => runPaperAction(e, async () => {
     const items = selectedPaper();
     const failures = await analyzeSelectedItems();
+    const dialog = showPaperAnalysis(items.filter(item => item.analyzed));
+    if (dialog) {
+      if (failures) {
+        const status = dialog.querySelector('[data-analysis-save-status]');
+        status.hidden = false;
+        status.textContent = `有 ${failures} 道题未完成，请关闭弹窗查看具体提示`;
+      }
+      return;
+    }
     render();
-    if (!failures && current() === 'capture') showPaperAnalysis(items);
-    toast(failures ? paper?.items.find(item => item.selected && item.error)?.error || '请查看题目下方的错误提示' : '✓ AI 解析已完成，可继续核对');
+    if (failures) toast(paper?.items.find(item => item.selected && item.error)?.error || '请查看题目下方的错误提示');
   });
 
   if ($('#paper-save')) $('#paper-save').onclick = e => runPaperAction(e, async () => {
@@ -688,6 +707,8 @@ function bindPaper() {
     lb.resetImageView?.();
   };
   if ($('#paper-lightbox-close')) $('#paper-lightbox-close').onclick = () => $('#paper-lightbox').close();
+  if ($('#paper-open-raw')) $('#paper-open-raw').onclick = () => $('#paper-raw-dialog').showModal();
+  if ($('#paper-raw-close')) $('#paper-raw-close').onclick = () => $('#paper-raw-dialog').close();
   if ($('#paper-lightbox')) $('#paper-lightbox').onclick = e => { if (e.target === $('#paper-lightbox')) $('#paper-lightbox').close(); };
   if(typeof bindZoomImage==='function')bindZoomImage($('#paper-lightbox'),$('#paper-lightbox-img'));
 if ($('#paper-analyze-and-save')) $('#paper-analyze-and-save').onclick = e => runPaperAction(e, async () => {
@@ -698,9 +719,28 @@ if ($('#paper-analyze-and-save')) $('#paper-analyze-and-save').onclick = e => ru
       toast('AI 分析未完成，请查看错误提示或直接收录原题');
       return;
     }
-    const count = await saveSelectedItems();
-    render();
-    if (current() === 'capture') showPaperAnalysis(items, count);
-    toast(`✓ AI 分析完成并已收录 ${count} 道错题！`);
+    const dialog = showPaperAnalysis(items);
+    const status = dialog?.querySelector('[data-analysis-save-status]');
+    const close = dialog?.querySelector('.dialog-x');
+    if (status) {
+      status.hidden = false;
+      status.textContent = '正在收录…';
+      close.disabled = true;
+      dialog.oncancel = event => event.preventDefault();
+    }
+    try {
+      const count = await saveSelectedItems();
+      if (status) status.textContent = `已收录 ${count} 道错题`;
+      else render();
+    } catch (error) {
+      if (!status) throw error;
+      status.textContent = error.message || '收录失败，可以关闭解析后重试';
+    } finally {
+      if (dialog) {
+        close.disabled = false;
+        dialog.oncancel = null;
+        close.focus({ preventScroll:true });
+      }
+    }
   });
 }

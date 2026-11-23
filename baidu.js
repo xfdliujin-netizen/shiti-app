@@ -922,10 +922,3 @@ async function recognizeWithBaidu() {
   render();
 
 }
-
-function rawOCRView() {
-  return paper?.ocrProvider === 'baidu'
-    ? `<details class="raw-ocr"><summary>查看百度原始转录（只读对照）</summary><pre class="prose">${esc(paper.ocrOriginalText)}</pre></details>`
-    : '';
-}
-

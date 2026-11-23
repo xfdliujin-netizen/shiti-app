@@ -1,4 +1,4 @@
-function paperSubjectField(){return `<label class="field"><span>题目科目</span><select id="paper-subject">${subjects.map(v=>`<option value="${v}" ${paper.subject===v?'selected':''}>${v}</option>`).join('')}</select></label>`}
+function paperSubjectField(){return `<label class="field paper-subject-field"><span>题目科目</span><select id="paper-subject">${subjects.map(v=>`<option value="${v}" ${paper.subject===v?'selected':''}>${v}</option>`).join('')}</select></label>`}
 // User-editable labels stay separate from the stable answer layout IDs.
 const DEFAULT_SOURCES=['日常作业','课堂练习','单元测验','阶段测评','练习册','自选资料'];
 function sourceChoices(){return (Array.isArray(cfg.sourceChoices)?cfg.sourceChoices:DEFAULT_SOURCES).filter(s=>typeof s==='string'&&s.trim()&&s.length<=40).slice(0,30)}
@@ -7,7 +7,14 @@ function answerLayout(kind){return isChoiceType(kind)?'choice':kind==='fill'?'fi
 function layoutOptions(value){return [['text','文字作答'],['choice','点选选项'],['fill','按空填写']].map(([k,t])=>`<option value="${k}" ${value===k?'selected':''}>${t}</option>`).join('')}
 function paperSourceFields(){return `<label class="field"><span class="editable-label"><span>错题来源</span><button type="button" class="text-button small-button" data-edit-capture-options="source">编辑选项</button></span><input id="paper-source" list="paper-source-options" maxlength="40" value="${esc(paper.source||'')}" placeholder="例如：单元测验、练习册名称"><datalist id="paper-source-options">${sourceChoices().map(v=>`<option value="${esc(v)}"></option>`).join('')}</datalist></label>`}
 function captureOptionsDialog(){return `<dialog id="capture-options-editor" class="compact-dialog"><div class="card-head"><h2 id="capture-options-title"></h2><button type="button" class="dialog-x" id="capture-options-close" aria-label="关闭">×</button></div><div id="capture-options-rows"></div><div class="actions"><button type="button" class="secondary" id="capture-option-add">＋ 添加选项</button><button type="button" class="primary" id="capture-options-save">保存选项</button></div></dialog>`}
-function paperMetadataFields(){return '<div class="review-meta-row">'+paperSubjectField()+paperSourceFields()+'</div>'+captureOptionsDialog()}
+function paperMetadataFields(item){return '<div class="review-meta-row paper-top-meta">'+paperSubjectField()+(item?.orderedAnswers ? captureTypeField(item, 0) : '')+paperSourceFields()+'</div>'+captureOptionsDialog()}
+
+function captureTypeField(item, index) {
+  const selected = item.captureType?.questionTypeName;
+  const choices = new Set(reviewTypeOptions(paper.subject).keys());
+  if (selected) choices.add(selected);
+  return `<label class="field paper-type-field"><span>题型</span><select data-capture-type="${index}"><option value="">未选择</option>${[...choices].map(label => `<option value="${esc(label)}" ${label === selected ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select></label>`;
+}
 
 function reviewTypeOptions(subject) {
   const options = new Map(questionTypesFor(subject).map(kind => [QUESTION_TYPE_NAMES[kind], kind]));
@@ -32,6 +39,14 @@ function editableTypeFields(p, i, subject) {
 
 function rememberType(label,kind){const subject=paper.subject,choices=typeChoices(subject),index=choices.findIndex(r=>r.label===label);if(index>=0)choices[index]={label,kind};else if(choices.length<20)choices.push({label,kind});cfg.typeChoices={...cfg.typeChoices,[subject]:choices};saveLocalConfig()}
 function bindCaptureOptions(){
+  document.querySelectorAll('[data-capture-type]').forEach(select => {
+    select.onchange = () => {
+      const item = paper.items[Number(select.dataset.captureType)];
+      const label = select.value;
+      if (!label) delete item.captureType;
+      else item.captureType = {questionType:reviewTypeOptions(paper.subject).get(label) || 'other', questionTypeName:label};
+    };
+  });
   if($('#paper-subject'))$('#paper-subject').onchange=e=>{const subject=e.target.value;if(!subjects.includes(subject))return;paper.subject=subject;paper.subjectManual=true;currentSubject=subject;cfg.lastSubject=subject;for(const p of paper.items){const previous=p.questionType;ensureAnswerStructure(p,subject);if(previous!==p.questionType)p.questionTypeName=QUESTION_TYPE_NAMES[p.questionType];invalidatePaperEvidence(p)}saveLocalConfig();render()};
   if($('#paper-source')){const el=$('#paper-source');el.oninput=()=>{paper.source=el.value.trim()};el.onchange=()=>{const value=el.value.trim();if(value&&!sourceChoices().includes(value)){cfg.sourceChoices=[...sourceChoices(),value].slice(-30);saveLocalConfig()}}}
   const selectType = (index, name, kind) => {
