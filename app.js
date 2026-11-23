@@ -57,7 +57,7 @@ const paths = [
   '<path d="M4 4h16v16H4z"/><path d="M8 4v16M4 9h16M12 13h4M12 16h4"/>',
   '<circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/>'
 ];
-const tabs = [['capture', '录题'], ['grading', '批改'], ['notebook', '错题本'], ['exam', '练习'], ['libraries', '题库'], ['settings', '设置']];
+const tabs = [['capture', '录题'], ['grading', '批改解题'], ['notebook', '错题本'], ['exam', '练习'], ['libraries', '题库'], ['settings', '设置']];
 
 let data = { version: 1, questions: [], practices: [], deleted: {} },
     cfg = readConfig(),
