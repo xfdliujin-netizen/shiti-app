@@ -1241,7 +1241,6 @@ function bind(tab) {
   if (tab === 'capture') {
     recognitionScope='crop';
     document.querySelectorAll('[data-ocr-provider]').forEach(b=>b.onclick=()=>{if(busy)return;cfg.ocrProvider=b.dataset.ocrProvider;recognitionScope='crop';saveLocalConfig();render()});
-    if($('#capture-question-type'))$('#capture-question-type').onchange=e=>{cfg.questionTypes={...cfg.questionTypes,[currentSubject]:e.target.value};saveLocalConfig()};
     document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { mode = b.dataset.mode; render(); });
     document.querySelectorAll('[data-subj]').forEach(b => b.onclick = () => {
       currentSubject = b.dataset.subj;
@@ -1267,8 +1266,7 @@ function bind(tab) {
     if ($('#manual')) $('#manual').onclick = () => {
       editingId = null;
       draft=null;
-      const questionType=selectedCaptureQuestionType(currentSubject);
-      paper={subject:currentSubject,questionType,notebookId:typeof captureNotebookId==='function'?captureNotebookId():'default',source:$('#source')?.value||'',mistake:$('#mistake')?.value||'',image:mode==='image'?image:'',scope:'crop',ocrProvider:'manual',inventory:[],warnings:[],complete:true,items:[{section:'文字录入',number:'1',text:$('#question-text')?.value||'',studentAnswer:'',questionType,answerStatus:'unknown',selected:true,verified:false,analyzed:false,answer:'',analysis:'',reminder:'',tags:[]}]};
+      paper={subject:currentSubject,notebookId:typeof captureNotebookId==='function'?captureNotebookId():'default',source:$('#source')?.value||'',mistake:$('#mistake')?.value||'',image:mode==='image'?image:'',scope:'crop',ocrProvider:'manual',inventory:[],warnings:[],complete:true,items:[{section:'文字录入',number:'1',text:$('#question-text')?.value||'',studentAnswer:'',orderedAnswers:true,blankCount:1,answerStatus:'unknown',selected:true,verified:false,analyzed:false,answer:'',analysis:'',reminder:'',tags:[]}]};
       openPaperOnRender = true;
       render();
     };

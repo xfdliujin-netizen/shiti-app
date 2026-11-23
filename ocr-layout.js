@@ -45,6 +45,7 @@ function ensureAnswerStructure(p,subject) {
 }
 function updateStructuredAnswer(p) {
   if(isChoiceType(p.questionType))p.studentAnswer=p.choices.slice().sort().join('、');
+  else if(p.orderedAnswers) p.studentAnswer = p.blankAnswers.slice(0,p.blankCount).flatMap((value,i)=>String(value||'').trim()?[`第${i+1}空：${value}`]:[]).join('\n');
   else if(p.questionType==='fill')p.studentAnswer=p.blankAnswers.slice(0,p.blankCount).some(v=>String(v||'').trim())?Array.from({length:p.blankCount},(_,i)=>`第${i+1}空：${p.blankAnswers[i]||'【未填写】'}`).join('\n'):'';
 }
 function switchQuestionType(p,type,subject) {
@@ -90,7 +91,7 @@ function structuredAnswerFields(p,i) {
   if(isChoiceType(p.questionType)){
     return `<div class="field"><span>孩子实际选择（直接点选）</span><div class="answer-choices" role="group" aria-label="孩子实际选择">${Array.from({length:p.optionCount},(_,j)=>String.fromCharCode(65+j)).map(letter=>`<button type="button" class="answer-choice ${p.choices.includes(letter)?'selected':''}" aria-pressed="${p.choices.includes(letter)}" data-answer-choice="${letter}" data-index="${i}">${letter}</button>`).join('')}<label class="choice-count">选项数 <select data-answer-count="options" data-index="${i}">${Array.from({length:7},(_,j)=>j+2).map(n=>`<option ${n===p.optionCount?'selected':''}>${n}</option>`).join('')}</select></label></div><div class="answer-tools"><span data-choice-summary>${esc(p.studentAnswer?'已选：'+p.studentAnswer:'尚未选择')}</span></div>${p.carriedAnswer ? `<p class="hint prose">切换题型前的作答已保留：${esc(p.carriedAnswer)}</p>` : ''}</div>`;
   }
-  if(p.questionType==='fill')return `<div class="field"><div class="answer-tools"><span>孩子各空作答</span><label>空数 <input type="number" min="1" max="20" value="${p.blankCount}" data-answer-count="blanks" data-index="${i}"></label></div><div class="blank-answer-grid">${Array.from({length:p.blankCount},(_,j)=>`<label class="field"><span>第${j+1}空</span><input type="text" data-blank-answer="${j}" data-index="${i}" value="${esc(p.blankAnswers[j]||'')}" placeholder="填写孩子原始作答"></label>`).join('')}</div></div>`;
+  if(p.orderedAnswers || p.questionType==='fill')return `<div class="field"><div class="answer-tools"><span>孩子作答（按原卷顺序）</span><label>空数 <input type="number" min="1" max="20" value="${p.blankCount}" data-answer-count="blanks" data-index="${i}"></label></div><div class="blank-answer-grid">${Array.from({length:p.blankCount},(_,j)=>`<label class="field"><span>第${j+1}空</span>${p.orderedAnswers ? `<textarea rows="2" data-blank-answer="${j}" data-index="${i}" placeholder="填写孩子原始作答">${esc(p.blankAnswers[j]||'')}</textarea>` : `<input type="text" data-blank-answer="${j}" data-index="${i}" value="${esc(p.blankAnswers[j]||'')}" placeholder="填写孩子原始作答">`}</label>`).join('')}</div></div>`;
   return paperField(p.questionType==='calculation'?'孩子的计算结果与过程':'孩子实际作答','studentAnswer',p.studentAnswer,i,true);
 }
 function questionNumberPrefix(subject, grade, term, day) {
@@ -123,7 +124,7 @@ function answerReviewFields(p,i) {
   ensureAnswerStructure(p,subject);
   if(!p.answerStatus)p.answerStatus='confirmed';
   const options=[['unknown','无法确认孩子作答（只解题，不判断错因）'],['confirmed','已确认孩子的作答'],['unanswered','已确认未作答']];
-  return `<div class="answer-review">${typeof editableTypeFields==='function'?editableTypeFields(p,i,subject):`<label class="field"><span>题型</span><select data-paper="questionType" data-index="${i}">${questionTypeOptions(subject,p.questionType)}</select></label>`}
+  return `<div class="answer-review">${p.orderedAnswers ? '' : typeof editableTypeFields==='function'?editableTypeFields(p,i,subject):`<label class="field"><span>题型</span><select data-paper="questionType" data-index="${i}">${questionTypeOptions(subject,p.questionType)}</select></label>`}
     ${typeof readingScopeField === 'function' && ['reading', 'material'].includes(p.questionType) ? `<div data-reading-scope-host="${i}">${readingScopeField(p, i)}</div>` : ''}
     ${p.suggestedQuestionType === p.questionType && !p.questionTypeName ? '<p class="hint">题型由 DeepSeek 建议，可在上方修改。</p>' : ''}
     ${p.ocrStudentAnswer ? '<p class="hint prose">作答转录供核对：' + esc(p.ocrStudentAnswer) + '</p>' : ''}
@@ -153,7 +154,10 @@ function bindStructuredAnswerFields() {
   });
   document.querySelectorAll('[data-answer-count]').forEach(el=>el.onchange=()=>{
     const i=Number(el.dataset.index),p=paper.items[i];
-    if(el.dataset.answerCount==='blanks')p.blankCount=Math.min(20,Math.max(1,Number(el.value)||1));
+    if(el.dataset.answerCount==='blanks'){
+      const lastFilled = p.blankAnswers.findLastIndex(value => String(value || '').trim()) + 1;
+      p.blankCount=Math.min(20,Math.max(1,p.orderedAnswers ? lastFilled : 1,Number(el.value)||1));
+    }
     else {p.optionCount=Math.min(8,Math.max(2,Number(el.value)||5));p.choices=p.choices.filter(v=>v.charCodeAt(0)-64<=p.optionCount)}
     updateStructuredAnswer(p);p.answerStatus='unknown';reset(p,i);render();
   });

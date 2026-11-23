@@ -17,7 +17,9 @@ function recognizedSubject(result, fallback) {
   return ocrSubjectOptions().includes(suggestion) ? suggestion : fallback;
 }
 
-function deepSeekOCRSchema(subject, detectSubject = false) {
+function deepSeekOCRSchema(subject, detectSubject = false, ordered = false) {
+  if (ordered) return (detectSubject ? OCR_SCHEMA.replace('{"items":', '{"suggestedSubject":"","items":') + ' ' + ocrSubjectInstruction() : OCR_SCHEMA)
+    + ' 不分类题型。每题额外返回 answerParts 数组，按原卷顺序单独照录每个作答区（选项字母、文字、计算等均可），空白或无法辨认用 null。另用 visualFeatures 写明确实看见的印刷加点、划线或图示。不得推测答案。';
   const kinds = detectSubject
     ? [...new Set([...ocrSubjectOptions(), subject].flatMap(questionTypesFor))]
     : questionTypesFor(subject);
@@ -242,6 +244,7 @@ function paperView() {
         <span class="pill">${p.analyzed ? '已分析 · ' + esc(p.aiVerdict || '薄弱待练') : '待核对'}</span>
       </div>
       ${paperField('原题全文（保留材料、选项和空格）', 'text', p.text, i, true)}
+      ${p.orderedAnswers ? `<button type="button" class="secondary" data-move-paper-answer="${i}">选中文字，移入下一空</button>` : ''}
       ${paperFigureTools(p, i)}
       ${answerReviewFields(p,i)}
       ${p.uncertainty ? `<p class="result-note">需核对：${esc(p.uncertainty)}</p>` : ''}
@@ -312,7 +315,7 @@ function prefillOCRAnswer(item, response, subject) {
   updateStructuredAnswer(item);
 }
 
-function normalizeOCR(r, suggestionSubject) {
+function normalizeOCR(r, suggestionSubject, ordered = false) {
   if (!Array.isArray(r.items)) throw Error('模型没有返回逐题列表，未采用此结果，请重试');
   return r.items.map(p => {
     if (typeof p.text !== 'string' || !p.text.trim() || typeof p.section !== 'string' || typeof p.number !== 'string' || !p.section.trim() || !p.number.trim()) {
@@ -320,7 +323,7 @@ function normalizeOCR(r, suggestionSubject) {
     }
     const autoCheck = !isTestEnv() && r.items.length === 1;
     const allowedTypes = suggestionSubject ? questionTypesFor(suggestionSubject) : [];
-    const suggestedType = allowedTypes.includes(p.suggestedQuestionType) && p.suggestedQuestionType !== 'other'
+    const suggestedType = !ordered && allowedTypes.includes(p.suggestedQuestionType) && p.suggestedQuestionType !== 'other'
       ? p.suggestedQuestionType : null;
     const transcribedAnswer = typeof p.studentAnswer === 'string' ? p.studentAnswer : '';
     const needsStructuredAnswer = suggestedType === 'choice' || suggestedType === 'fill';
@@ -346,6 +349,14 @@ function normalizeOCR(r, suggestionSubject) {
       tags: []
     };
     if (needsStructuredAnswer) prefillOCRAnswer(item, p, suggestionSubject);
+    if (ordered) {
+      item.orderedAnswers = true;
+      const parts = Array.isArray(p.answerParts) ? p.answerParts : [transcribedAnswer];
+      item.blankAnswers = parts.slice(0,20).map(value => typeof value === 'string' ? value : '');
+      item.blankCount = Math.min(20, Math.max(1, item.blankAnswers.length + Number(item.blankAnswers.every(value => value.trim()))));
+      updateStructuredAnswer(item);
+      item.answerStatus = item.studentAnswer ? 'confirmed' : 'unknown';
+    }
     return item;
   });
 }
@@ -388,7 +399,6 @@ async function recognizePaper() {
   const sourceImage = mode === 'image' ? image : '', text = $('#question-text')?.value || '';
   if (!sourceImage && !text.trim()) throw Error('请先上传试卷或输入题目');
   const meta = { notebookId:typeof captureNotebookId==='function'?captureNotebookId():'default', subject: $('#subject')?.value || currentSubject || '语文', source: $('#source')?.value || '', mistake: $('#mistake')?.value || '' };
-  meta.questionType=selectedCaptureQuestionType(meta.subject);
   const columns = Number($('#paper-layout')?.value || 2);
   paperLayout = String(columns);
   draft = null;
@@ -401,7 +411,6 @@ async function recognizePaper() {
     paper.inventory = inv.inventory;
     meta.subject = recognizedSubject(inv, meta.subject);
     paper.subject = meta.subject;
-    paper.questionType = selectedCaptureQuestionType(meta.subject);
     paper.warnings = Array.isArray(inv.warnings) ? inv.warnings.map(String) : [];
     const groups = sourceImage ? Array.from({ length: columns }, () => []) : [[]];
     if (sourceImage) {
@@ -410,8 +419,8 @@ async function recognizePaper() {
     }
     for (let col = 0; col < groups.length; col++) {
       progress(`2 / 3 · 转录第 ${col + 1} / ${groups.length} 栏…`);
-      const r = await ai(`你现在只做逐字转录，不解题、不筛错题、不改正印刷错字或学生答案。${sourceImage ? '接下来的三张图片是同一栏从上至下的重叠切片，按顺序合并跨片内容；重复题目只返回一次。' : '逐题处理下列文字。'}保留全部大题和小题，包括书写、拼音、选择、填空、阅读材料、实践。选择题必须包含全部选项，不能编造同类型题。手写答案与印刷题干分开，不能把教师勾叉直接当作正确性结论；无法识别写【无法辨认】，注明截断，不能猜测。不转录学生姓名等身份信息。目录供题号命名参考，不代表本栏一定出现全部题目：${JSON.stringify(paper.inventory)}。${text ? JSON.stringify({ text }) : ''}${deepSeekOCRSchema(meta.subject)}`, groups[col].length ? groups[col] : null, { ocr: true, maxTokens: 12000 });
-      const items = normalizeOCR(r, meta.subject);
+      const r = await ai(`你现在只做逐字转录，不解题、不筛错题、不改正印刷错字或学生答案。${sourceImage ? '接下来的三张图片是同一栏从上至下的重叠切片，按顺序合并跨片内容；重复题目只返回一次。' : '逐题处理下列文字。'}保留全部大题和小题，包括书写、拼音、选择、填空、阅读材料、实践。选择题必须包含全部选项，不能编造同类型题。手写答案与印刷题干分开，不能把教师勾叉直接当作正确性结论；无法识别写【无法辨认】，注明截断，不能猜测。不转录学生姓名等身份信息。目录供题号命名参考，不代表本栏一定出现全部题目：${JSON.stringify(paper.inventory)}。${text ? JSON.stringify({ text }) : ''}${deepSeekOCRSchema(meta.subject, false, true)}`, groups[col].length ? groups[col] : null, { ocr: true, maxTokens: 12000 });
+      const items = normalizeOCR(r, meta.subject, true);
       paper.items.push(...items);
       if (Array.isArray(r.warnings)) paper.warnings.push(...r.warnings.map(String));
     }
@@ -437,6 +446,20 @@ function selectedPaper() {
   return items;
 }
 
+function showPaperAnalysis(items, savedCount = 0) {
+  const dialog = $('#paper-analysis-dialog');
+  if (!items.length || typeof dialog?.showModal !== 'function') return;
+  const format = text => typeof renderStudyText === 'function' ? renderStudyText(text) : esc(text);
+  dialog.innerHTML = `<div class="card-head"><h2 id="paper-analysis-title">AI 解析</h2><button type="button" class="dialog-x" aria-label="关闭解析" autofocus>×</button></div>
+    ${savedCount ? `<p class="hint">已收录 ${savedCount} 道错题</p>` : ''}
+    ${items.map(item => `<article class="paper-item">${items.length > 1 ? `<h3>原卷第 ${esc(item.number)} 题</h3>` : ''}
+      ${item.detectedSubject ? `<p class="hint">科目：${esc(item.detectedSubject)}</p>` : ''}
+      <h3>参考答案</h3><div class="prose">${format(item.answer)}</div><h3>解题解析</h3><div class="prose">${format(item.analysis)}</div>
+      ${item.reminder ? `<h3>易错提醒</h3><div class="prose">${format(item.reminder)}</div>` : ''}</article>`).join('')}`;
+  dialog.querySelector('.dialog-x').onclick = () => dialog.close();
+  if (!dialog.open) dialog.showModal();
+}
+
 async function analyzeSelectedItems() {
   const sourcePaper = paper;
   const items = selectedPaper();
@@ -452,7 +475,7 @@ async function analyzeSelectedItems() {
       const evidence=answerEvidence(p);
       const originalText = p.text;
       if(evidence.status==='confirmed'&&!evidence.answer)throw Error('已选择确认作答，请填写孩子实际作答；未作答或不确定请切换证据状态');
-      if(evidence.status==='confirmed'&&p.questionType==='fill'&&Array.from({length:p.blankCount},(_,i)=>p.blankAnswers?.[i]).some(v=>!String(v||'').trim()))throw Error('请记录每个空的实际作答；孩子确实没写的空请填【未作答】，不确定则切换为无法确认');
+      if(evidence.status==='confirmed'&&!p.orderedAnswers&&p.questionType==='fill'&&Array.from({length:p.blankCount},(_,i)=>p.blankAnswers?.[i]).some(v=>!String(v||'').trim()))throw Error('请记录每个空的实际作答；孩子确实没写的空请填【未作答】，不确定则切换为无法确认');
       const needsVisual = /加点|划线|画线|下划线|图中/.test(p.text);
       const original = typeof isStudyImage === 'function' && isStudyImage(paper.image) ? paper.image : '';
       const useImage = original && ((needsVisual && !evidence.visualFeatures.trim()) || p.hasContinuation);
@@ -465,7 +488,7 @@ async function analyzeSelectedItems() {
         : useImage ? original : undefined;
       const canDiagnose=evidence.status==='confirmed'&&Boolean(evidence.answer);
       const imageContext = image ? `看图核对原题第 ${p.number} 题的印刷加点、划线、图示和续页，按核对文字定位。区分印刷标记、学生手写与订正；看不清就说明。图像不能替代已确认的学生作答。` : '你只得到人工核对后的文字，没有看到原始试卷图片。';
-      const r = await ai(`${imageContext}学科：${paper.subject}。原题：${JSON.stringify(p.text)}。视觉信息：${JSON.stringify(evidence.visualFeatures)}。作答证据：${JSON.stringify(evidence)}。用户补充（不是孩子作答的替代证据）：${JSON.stringify(paper.mistake)}。原题错字、错误拼音、错误选项照录，不得按正确知识改写题干。括号和横线只是空位，不能推测其中的答案。圈画、订正和老师批改与孩子原始作答不同，不可混用；红勾不能证明标准答案。${canDiagnose?'仅根据已确认作答与标准解法比较，判断 correct/incorrect/unknown；即使答错，也不能断言思考过程，只能给有依据的可能原因。':'孩子作答未确认或已确认未作答：仅讲解题目，不能说孩子答错、选了某项或存在某个错因；status 必须是 unknown，aiVerdict 必须是未判定。'}条件不足或视觉信息无法辨认时明确说明无法确定，不猜测。返回 JSON {"answer":"标准答案或无法确定原因","analysis":"解题步骤；仅有已确认作答时才可比较","status":"correct/incorrect/unknown","comparisonEvidence":"对比依据，无证据则空字符串","reminder":"复习建议，不把可能错因说成事实","aiVerdict":"${canDiagnose?'选择最贴切错因标签，无法判断则未判定':'未判定'}","tags":["知识点"]}。可用错因标签：${JSON.stringify(verdictList)}。`, image, {vision: Boolean(image), learning:{subject:paper.subject,text:p.text,tags:p.tags||[]}});
+      const r = await ai(`${imageContext}当前科目候选：${paper.subject}。请独立判断实际科目。${ocrSubjectInstruction()} 未记录的空位或作答区视为未知，不判断其对错。原题：${JSON.stringify(p.text)}。视觉信息：${JSON.stringify(evidence.visualFeatures)}。作答证据：${JSON.stringify(evidence)}。用户补充（不是孩子作答的替代证据）：${JSON.stringify(paper.mistake)}。原题错字、错误拼音、错误选项照录，不得按正确知识改写题干。括号和横线只是空位，不能推测其中的答案。圈画、订正和老师批改与孩子原始作答不同，不可混用；红勾不能证明标准答案。${canDiagnose?'仅根据已确认作答与标准解法比较，判断 correct/incorrect/unknown；即使答错，也不能断言思考过程，只能给有依据的可能原因。':'孩子作答未确认或已确认未作答：仅讲解题目，不能说孩子答错、选了某项或存在某个错因；status 必须是 unknown，aiVerdict 必须是未判定。'}条件不足或视觉信息无法辨认时明确说明无法确定，不猜测。返回 JSON {"suggestedSubject":"","answer":"标准答案或无法确定原因","analysis":"解题步骤；仅有已确认作答时才可比较","status":"correct/incorrect/unknown","comparisonEvidence":"对比依据，无证据则空字符串","reminder":"复习建议，不把可能错因说成事实","aiVerdict":"${canDiagnose?'选择最贴切错因标签，无法判断则未判定':'未判定'}","tags":["知识点"]}。可用错因标签：${JSON.stringify(verdictList)}。`, image, {vision: Boolean(image), learning:{subject:paper.subject,text:p.text,tags:p.tags||[]}});
       if (paper !== sourcePaper || !sourcePaper.items.includes(p) || originalText !== p.text || JSON.stringify(evidence) !== JSON.stringify(answerEvidence(p))) {
         throw Error('题目或作答已修改，请重新核对并分析');
       }
@@ -473,6 +496,7 @@ async function analyzeSelectedItems() {
       const status=canDiagnose&&['correct','incorrect'].includes(r.status)?r.status:'unknown';
       const matchedVerdict = status==='incorrect'&&verdictList.includes(r.aiVerdict) ? r.aiVerdict : '未判定';
       Object.assign(p, {
+        detectedSubject: sourcePaper.subjectManual ? sourcePaper.subject : recognizedSubject(r, ''),
         answer: r.answer,
         analysis: r.analysis,
         reminder: String(r.reminder || ''),
@@ -488,23 +512,30 @@ async function analyzeSelectedItems() {
       failures++;
     }
   }
+  const detected = new Set(items.map(item => item.detectedSubject));
+  if (paper === sourcePaper && !paper.subjectManual && detected.size === 1 && !detected.has('') && items.every(item => item.detectedSubject)) {
+    paper.subject = items[0].detectedSubject;
+  }
   return failures;
 }
 
 async function saveSelectedItems() {
   const items = selectedPaper(), created = stamp();
-  const records = items.map((p,index) => {
+  const offsets = new Map();
+  const records = items.map(p => {
     const id = uid();
+    const subject = (!paper.subjectManual && p.detectedSubject) || paper.subject;
+    const index = offsets.get(subject) || 0;
+    offsets.set(subject, index + 1);
     const record = {
       id,
-      number: questionNumber(paper.subject,new Date(created),data.questions,index),
+      number: questionNumber(subject,new Date(created),data.questions,index),
       created,
       updated: created,
-      subject: paper.subject,
+      subject,
       notebookId:$('#paper-notebook')?.value||paper.notebookId||(typeof captureNotebookId==='function'?captureNotebookId():'default'),
       grade:getStudentProfile().grade,term:getStudentProfile().term,
-      questionType:p.questionType||paper.questionType||'other',
-      questionTypeName:p.questionTypeName||QUESTION_TYPE_NAMES[p.questionType]||'其他题型',
+      ...(p.orderedAnswers ? {} : { questionType:p.questionType||paper.questionType||'other', questionTypeName:p.questionTypeName||QUESTION_TYPE_NAMES[p.questionType]||'其他题型' }),
       answerDetails:{choices:p.choices||[],blankAnswers:p.blankAnswers||[],blankCount:p.blankCount||0,optionCount:p.optionCount||0},
       source: [paper.source, p.section !== '框选题目' ? p.section : '', p.number !== '1' ? p.number : ''].filter(Boolean).join(' · '),
       text: p.text,
@@ -599,16 +630,29 @@ function bindPaper() {
     });
   });
   bindStructuredAnswerFields();
+  document.querySelectorAll('[data-move-paper-answer]').forEach(button => {
+    button.onclick = () => {
+      if (busy) return;
+      const index = Number(button.dataset.movePaperAnswer);
+      const text = document.querySelector(`[data-paper="text"][data-index="${index}"]`);
+      try {
+        paper.items[index] = moveAnswerRange(paper.items[index], text.value, text.selectionStart, text.selectionEnd, paper.subject);
+        render();
+      } catch (error) { toast(error.message); }
+    };
+  });
   document.querySelectorAll('[data-reading-scope]').forEach(bindReadingScope);
   bindPaperContinuation();
   if(typeof bindCaptureOptions==='function')bindCaptureOptions();
 
   if ($('#paper-select-all')) $('#paper-select-all').onclick = () => { const checked = !paper.items.every(p => p.selected); paper.items.forEach(p => p.selected = checked); render(); };
-  if ($('#paper-add')) $('#paper-add').onclick = () => { paper.items.push({ section: '手工补录', number: String(paper.items.length + 1), text: '', studentAnswer: '', answerStatus:'confirmed', uncertainty: '手工补录，请填写原文', selected: true, verified: false, analyzed: false, aiVerdict: '薄弱待练', answer: '', analysis: '', reminder: '', tags: [] }); render(); };
+  if ($('#paper-add')) $('#paper-add').onclick = () => { paper.items.push({ section: '手工补录', number: String(paper.items.length + 1), text: '', studentAnswer: '', orderedAnswers:true, blankCount:1, answerStatus:'unknown', uncertainty: '手工补录，请填写原文', selected: true, verified: false, analyzed: false, aiVerdict: '薄弱待练', answer: '', analysis: '', reminder: '', tags: [] }); render(); };
 
   if ($('#paper-analyze')) $('#paper-analyze').onclick = e => runPaperAction(e, async () => {
+    const items = selectedPaper();
     const failures = await analyzeSelectedItems();
     render();
+    if (!failures && current() === 'capture') showPaperAnalysis(items);
     toast(failures ? paper?.items.find(item => item.selected && item.error)?.error || '请查看题目下方的错误提示' : '✓ AI 解析已完成，可继续核对');
   });
 
@@ -647,6 +691,7 @@ function bindPaper() {
   if ($('#paper-lightbox')) $('#paper-lightbox').onclick = e => { if (e.target === $('#paper-lightbox')) $('#paper-lightbox').close(); };
   if(typeof bindZoomImage==='function')bindZoomImage($('#paper-lightbox'),$('#paper-lightbox-img'));
 if ($('#paper-analyze-and-save')) $('#paper-analyze-and-save').onclick = e => runPaperAction(e, async () => {
+    const items = selectedPaper();
     const failures = await analyzeSelectedItems();
     if (failures) {
       render();
@@ -655,6 +700,7 @@ if ($('#paper-analyze-and-save')) $('#paper-analyze-and-save').onclick = e => ru
     }
     const count = await saveSelectedItems();
     render();
+    if (current() === 'capture') showPaperAnalysis(items, count);
     toast(`✓ AI 分析完成并已收录 ${count} 道错题！`);
   });
 }

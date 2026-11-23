@@ -880,7 +880,6 @@ async function recognizeWithBaidu() {
   const src = mode === 'image' ? exportCrop() : '', text = $('#question-text')?.value || '';
   if (!src && !text.trim()) throw Error('请上传并框选题目，或输入文字');
   const meta = { notebookId:typeof captureNotebookId==='function'?captureNotebookId():'default', subject: $('#subject').value, source: '', mistake: '' };
-  meta.questionType=selectedCaptureQuestionType(meta.subject);
   let raw = null, transcript = text, mergedTranscript = text, mergedCount = 0, warnings = [];
   if (src) {
     if (src.split(',')[1].length > 10 * 1024 * 1024) throw Error('选框图片编码超过百度 10 MB 上限，请缩小选框');
@@ -898,7 +897,7 @@ async function recognizeWithBaidu() {
     }
     warnings.push('已保留原文，请核对');
   }
-  const items = normalizeOCR({ items: [{ section: src ? '框选题目' : '文字录入', number: '1', text: mergedTranscript, studentAnswer: '', uncertainty: '' }] });
+  const items = normalizeOCR({ items: [{ section: src ? '框选题目' : '文字录入', number: '1', text: mergedTranscript, studentAnswer: '', uncertainty: '' }] }, meta.subject, true);
   if (typeof window !== 'undefined' && window.document && items[0] && !globalThis.assert) {
     items[0].selected = true;
     items[0].verified = false;

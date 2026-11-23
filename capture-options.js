@@ -32,7 +32,7 @@ function editableTypeFields(p, i, subject) {
 
 function rememberType(label,kind){const subject=paper.subject,choices=typeChoices(subject),index=choices.findIndex(r=>r.label===label);if(index>=0)choices[index]={label,kind};else if(choices.length<20)choices.push({label,kind});cfg.typeChoices={...cfg.typeChoices,[subject]:choices};saveLocalConfig()}
 function bindCaptureOptions(){
-  if($('#paper-subject'))$('#paper-subject').onchange=e=>{const subject=e.target.value;if(!subjects.includes(subject))return;paper.subject=subject;currentSubject=subject;cfg.lastSubject=subject;for(const p of paper.items){const previous=p.questionType;ensureAnswerStructure(p,subject);if(previous!==p.questionType)p.questionTypeName=QUESTION_TYPE_NAMES[p.questionType];invalidatePaperEvidence(p)}saveLocalConfig();render()};
+  if($('#paper-subject'))$('#paper-subject').onchange=e=>{const subject=e.target.value;if(!subjects.includes(subject))return;paper.subject=subject;paper.subjectManual=true;currentSubject=subject;cfg.lastSubject=subject;for(const p of paper.items){const previous=p.questionType;ensureAnswerStructure(p,subject);if(previous!==p.questionType)p.questionTypeName=QUESTION_TYPE_NAMES[p.questionType];invalidatePaperEvidence(p)}saveLocalConfig();render()};
   if($('#paper-source')){const el=$('#paper-source');el.oninput=()=>{paper.source=el.value.trim()};el.onchange=()=>{const value=el.value.trim();if(value&&!sourceChoices().includes(value)){cfg.sourceChoices=[...sourceChoices(),value].slice(-30);saveLocalConfig()}}}
   const selectType = (index, name, kind) => {
     const item = paper.items[index];

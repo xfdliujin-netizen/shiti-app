@@ -18,7 +18,7 @@ function moveAnswerRange(item,text,start,end,subject,targetSlot){
     const value=answer.trim().replace(/^[（(]|[）)]$/g,'').trim().toUpperCase();
     if(!/^[A-H](?:[\s、,，/;；]*[A-H])*$/.test(value))throw Error('选择题请只选择 A～H 选项字母，或使用下方点选作答');
     next.choices=[...new Set(value.match(/[A-H]/g))];next.optionCount=Math.max(next.optionCount,...next.choices.map(v=>v.charCodeAt(0)-64));
-  }else if(next.questionType==='fill'){
+  }else if(next.orderedAnswers || next.questionType==='fill'){
     let slot = targetSlot ?? Array.from({length:next.blankCount}, (_, i) => i).find(i => !String(next.blankAnswers[i] || '').trim()) ?? next.blankCount;
     if(!Number.isInteger(slot)||slot<0||slot>=20)throw Error('已有20空作答，请先整理现有空位');
     if (String(next.blankAnswers[slot] || '').trim()) throw Error(`第${slot+1}空已有作答，请先核对`);
@@ -112,7 +112,7 @@ function bindAnswerTransfer(ta) {
     picker = {mode,text:ta.value,tokens,page:Math.floor(Math.max(0, offset) / 240),start:range?.start || 0,end:range?.end || 0,anchor:null};
     $('#answer-picker-title').textContent = mode === 'visual' ? '选择原题中的加点或划线文字' : '选择孩子实际写的答案';
     underline.hidden = mode !== 'visual';
-    slotField.hidden = mode !== 'answer' || item().questionType !== 'fill';
+    slotField.hidden = mode !== 'answer' || (item().questionType !== 'fill' && !item().orderedAnswers);
     if (!slotField.hidden) {
       const count = item().blankCount;
       const empty = Array.from({length:count}, (_, i) => i).filter(i => !String(item().blankAnswers[i] || '').trim());
@@ -127,7 +127,7 @@ function bindAnswerTransfer(ta) {
   function fromSelection(mode) {
     pressing = false;
     const range = saved?.text === ta.value ? saved : null;
-    if (mode === 'answer' && item().questionType !== 'fill' && range) apply(range);
+    if (mode === 'answer' && range && (item().orderedAnswers || item().questionType !== 'fill')) apply(range);
     else openPicker(mode, range);
   }
   for (const [button, mode] of [[main, 'answer'], [$('#paper-mark-visual'), 'visual']]) {
@@ -156,6 +156,7 @@ function bindAnswerTransfer(ta) {
       picker.start = Math.min(picker.anchor.start, start);
       picker.end = Math.max(picker.anchor.end, end);
       picker.anchor = null;
+      if (picker.mode === 'answer' && item().orderedAnswers && !confirm.disabled && picker.text.slice(picker.start,picker.end).trim()) return apply(picker);
     }
     paintSelection();
   };
