@@ -91,7 +91,20 @@ function structuredAnswerFields(p,i) {
   if(isChoiceType(p.questionType)){
     return `<div class="field"><span>孩子实际选择（直接点选）</span><div class="answer-choices" role="group" aria-label="孩子实际选择">${Array.from({length:p.optionCount},(_,j)=>String.fromCharCode(65+j)).map(letter=>`<button type="button" class="answer-choice ${p.choices.includes(letter)?'selected':''}" aria-pressed="${p.choices.includes(letter)}" data-answer-choice="${letter}" data-index="${i}">${letter}</button>`).join('')}<label class="choice-count">选项数 <select data-answer-count="options" data-index="${i}">${Array.from({length:7},(_,j)=>j+2).map(n=>`<option ${n===p.optionCount?'selected':''}>${n}</option>`).join('')}</select></label></div><div class="answer-tools"><span data-choice-summary>${esc(p.studentAnswer?'已选：'+p.studentAnswer:'尚未选择')}</span></div>${p.carriedAnswer ? `<p class="hint prose">切换题型前的作答已保留：${esc(p.carriedAnswer)}</p>` : ''}</div>`;
   }
-  if(p.orderedAnswers || p.questionType==='fill')return `<div class="field"><div class="answer-tools"><span>孩子作答（按原卷顺序）</span><label>空数 <input type="number" min="1" max="20" value="${p.blankCount}" data-answer-count="blanks" data-index="${i}"></label></div><div class="blank-answer-grid">${Array.from({length:p.blankCount},(_,j)=>`<label class="field"><span>第${j+1}空</span>${p.orderedAnswers ? `<textarea rows="2" data-blank-answer="${j}" data-index="${i}" placeholder="填写孩子原始作答">${esc(p.blankAnswers[j]||'')}</textarea>` : `<input type="text" data-blank-answer="${j}" data-index="${i}" value="${esc(p.blankAnswers[j]||'')}" placeholder="填写孩子原始作答">`}</label>`).join('')}</div></div>`;
+  if (p.orderedAnswers || p.questionType === 'fill') {
+    const numbers = ['一','二','三','四','五','六','七','八','九','十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十'];
+    const rows = Array.from({length:p.blankCount}, (_, j) => {
+      const label = p.blankCount > 1 ? '第' + numbers[j] + '空' : '孩子作答';
+      const attributes = `data-blank-answer="${j}" data-index="${i}" aria-label="${label}"`;
+      const answer = esc(p.blankAnswers[j] || '');
+      const field = p.orderedAnswers
+        ? `<textarea rows="1" ${attributes}>${answer}</textarea>`
+        : `<input type="text" ${attributes} value="${answer}">`;
+      return `<label class="blank-answer-row">${p.blankCount > 1 ? '<span>' + label + '</span>' : ''}${field}</label>`;
+    });
+    const title = p.blankCount > 1 ? '孩子作答（按原卷顺序）' : '孩子作答';
+    return `<div class="field"><div class="answer-tools"><span>${title}</span><label>空数 <input type="number" min="1" max="20" value="${p.blankCount}" data-answer-count="blanks" data-index="${i}"></label></div><div class="blank-answer-list">${rows.join('')}</div></div>`;
+  }
   return paperField(p.questionType==='calculation'?'孩子的计算结果与过程':'孩子实际作答','studentAnswer',p.studentAnswer,i,true);
 }
 function questionNumberPrefix(subject, grade, term, day) {

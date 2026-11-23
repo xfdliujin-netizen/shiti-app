@@ -2162,8 +2162,6 @@ dialog.paper-dialog .card-head {
 .answer-tools { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:10px; font-size:13px; }
 .answer-tools label { display:flex; align-items:center; gap:8px; }
 .answer-tools input, .answer-tools select { width:76px; min-width:0; padding:6px 8px; }
-.blank-answer-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; }
-.blank-answer-grid .field { margin:0; }
 .answer-extra { margin:12px 0; }
 .answer-extra summary { cursor:pointer; font-size:13px; color:var(--muted,#6b7280); margin-bottom:10px; }
 /* Touch image editor and compact mobile layouts. */

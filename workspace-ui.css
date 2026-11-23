@@ -692,6 +692,25 @@ textarea { box-sizing:border-box; min-height:96px; }
 .paper-top-meta > .field > span { min-height:24px; }
 .paper-top-meta > .field:not(.paper-subject-field,.paper-type-field) { grid-column:1 / -1; }
 .paper-top-meta select { padding-inline:8px; font-size:14px; }
+@media (max-width:767px) {
+  .review-meta-row.paper-top-meta { grid-template-columns:minmax(0,70px) minmax(0,86px) minmax(0,1fr); gap:6px; }
+  .paper-top-meta > .field { gap:3px; }
+  .paper-top-meta > .field:not(.paper-subject-field,.paper-type-field) { grid-column:3; }
+  .paper-top-meta:not(:has(.paper-type-field)) > .field:not(.paper-subject-field) { grid-column:2 / -1; }
+  .paper-top-meta > .field > span { min-height:28px; font-size:12px; }
+  .paper-top-meta input,.paper-top-meta select { --form-control-height:40px; }
+  .paper-top-meta select { padding-inline:5px; font-size:13px; }
+  .paper-top-meta input { padding-inline:6px; }
+}
+.blank-answer-list { border:1px solid var(--line); border-radius:10px; background:var(--surface); }
+.blank-answer-list .blank-answer-row { display:flex; align-items:baseline; gap:8px; padding:5px 10px; }
+.blank-answer-row + .blank-answer-row { border-top:1px solid var(--line); }
+.blank-answer-row > span { flex:none; color:var(--muted); font-size:12px; }
+.blank-answer-list [data-blank-answer] { flex:1; width:100%; min-width:0; min-height:36px; margin:0; padding:6px 2px; border:0; border-radius:0; box-shadow:none; background:transparent; font-size:16px; }
+.blank-answer-list textarea[data-blank-answer] { field-sizing:content; }
+.blank-answer-list [data-blank-answer]:focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
+.paper-analysis-image { margin:0 0 12px; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.paper-analysis-image img { display:block; width:100%; max-height:45dvh; object-fit:contain; }
 #paper-crop-image-box, .paper-original-frame { position:relative; margin:8px 0; }
 .paper-raw-link { font-size:11px !important; min-height:32px; padding:4px 8px; }
 #paper-crop-image-box .paper-raw-link, .paper-original-frame .paper-raw-link { position:absolute; right:6px; bottom:6px; background:var(--surface); border-radius:8px; }

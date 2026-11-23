@@ -458,14 +458,25 @@ function showPaperAnalysis(items) {
   const dialog = $('#paper-analysis-dialog');
   if (!items.length || typeof dialog?.showModal !== 'function') return null;
   const format = text => typeof renderStudyText === 'function' ? renderStudyText(text) : esc(text);
+  const original = typeof isStudyImage === 'function' && isStudyImage(paper?.image) ? paper.image : '';
   dialog.innerHTML = `<div class="card-head"><h2 id="paper-analysis-title">AI 解析</h2><button type="button" class="dialog-x" aria-label="关闭解析" autofocus>×</button></div>
     <p class="hint" data-analysis-save-status role="status" hidden></p>
-    ${items.map(item => `<article class="paper-item">${items.length > 1 ? `<h3>原卷第 ${esc(item.number)} 题</h3>` : ''}
+    ${original ? `<figure class="paper-analysis-image"><img src="${original}" alt="${paper.scope === 'crop' ? '录题原图' : '整卷原图'}"></figure>` : ''}
+    ${items.map((item, index) => `<article class="paper-item">${items.length > 1 ? `<h3>原卷第 ${esc(item.number)} 题</h3>` : ''}
       ${item.detectedSubject ? `<p class="hint">科目：${esc(item.detectedSubject)}</p>` : ''}
+      <h3>原题</h3><div class="prose">${format(item.text)}</div>
+      ${original && validFigureRegion(item.figureRegion) ? `<div data-analysis-figure="${index}"></div>` : ''}
       <h3>参考答案</h3><div class="prose">${format(item.answer)}</div><h3>解题解析</h3><div class="prose">${format(item.analysis)}</div>
       ${item.reminder ? `<h3>易错提醒</h3><div class="prose">${format(item.reminder)}</div>` : ''}</article>`).join('')}`;
   dialog.querySelector('.dialog-x').onclick = () => dialog.close();
-  dialog.onclose = () => { if (current() === 'capture') render(); };
+  dialog.onclose = () => {
+    if (dialog.open) return;
+    dialog.replaceChildren();
+    if (current() === 'capture') render();
+  };
+  if (original) dialog.querySelectorAll('[data-analysis-figure]').forEach(container => {
+    showSavedFigure(container, original, items[Number(container.dataset.analysisFigure)].figureRegion);
+  });
   if (!dialog.open) dialog.showModal();
   dialog.scrollTop = 0;
   return dialog;
