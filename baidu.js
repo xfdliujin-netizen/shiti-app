@@ -10,47 +10,8 @@ let homeworkSource = '', homeworkRegion = null, homeworkTask = null, homeworkRes
 let homeworkOperation = null;
 let homeworkView = { scale: 1, x: 0, y: 0 };
 
-function baiduGradingSettings() {
-  return `<p class="notice">在底部「批改解题」上传整张含学生作答的图片，再点击「开始批改」。作业批改使用「图片文字识别」中配置的百度代理和访问口令。百度应用需开通智能作业批改权限。</p>
-    <p class="result-note">本机已提交 ${Number(cfg.baiduHomeworkCalls) || 0} 次批改。账户免费余量请在百度控制台查看。</p>
-    <a href="https://console.bce.baidu.com/ai/#/ai/ocr/overview/index" target="_blank" rel="noopener">打开百度文字识别控制台</a>`;
-}
-
-function eduTutorSettings() {
-  return `<label class="verify"><input type="checkbox" id="show-edututor-cut" ${cfg.showEduTutorCut === true ? 'checked' : ''}> 在作业批改页显示「通义切题」</label>
-    <p class="notice">在百炼开通「通义拍照解题辅导」后，由代理配置业务空间和具有切题、解题权限的 RAM 密钥。连接成功后，在「批改解题」上传照片，点击「通义切题」，再展开单题获取参考解析。</p>
-    <button type="button" class="secondary" id="test-edututor">检查通义连接配置</button>
-    <p class="hint" id="edututor-status" role="status"></p>
-    <p><a href="https://bailian-legacy.console.aliyun.com/cn-beijing/?tab=app#/app/app-market/edututor" target="_blank" rel="noopener">前往百炼开通 EduTutor</a></p>
-    <a href="https://help.aliyun.com/zh/model-studio/brief-introduction-of-edu-tutor" target="_blank" rel="noopener">查看阿里云开通说明</a>`;
-}
-
-function bindEduTutorSettings() {
-  const visibility = $('#show-edututor-cut');
-  if (visibility) visibility.onchange = () => {
-    cfg.showEduTutorCut = visibility.checked;
-    saveLocalConfig(false);
-  };
-  const button = $('#test-edututor');
-  if (!button) return;
-  button.onclick = async () => {
-    const status = $('#edututor-status');
-    button.disabled = true;
-    status.textContent = '正在检查代理配置…';
-    try {
-      await requestEduTutor('edututor-status');
-      status.textContent = '代理配置已就绪。上传作业图进行首次切题可验证阿里云权限。';
-    } catch (error) {
-      status.textContent = error.message;
-    } finally {
-      button.disabled = false;
-    }
-  };
-}
-
 function homeworkGradingPage() {
   const questions = homeworkResult?.questions || [];
-  const tutor = homeworkResult?.edututor;
   const preview = homeworkTask?.original || homeworkSource;
   const locked = busy || Boolean(homeworkTask);
   const solving = homeworkMode === 'solve';
@@ -67,7 +28,7 @@ function homeworkGradingPage() {
       <div class="homework-mode" role="group" aria-label="作业处理方式">
         ${[['grade','批改'],['solve','解题']].map(([mode,label]) => `<button type="button" data-homework-mode="${mode}" aria-pressed="${mode === homeworkMode}" ${locked ? 'disabled' : ''}>${label}</button>`).join('')}
       </div>
-      ${tutor ? '' : `<fieldset class="homework-models" ${locked ? 'disabled' : ''}>
+      <fieldset class="homework-models" ${locked ? 'disabled' : ''}>
         <legend class="visually-hidden">${action}模型</legend>
         <div class="homework-model-controls">
           ${canAddChecks ? `<label class="homework-cross-check"><input type="checkbox" id="homework-cross-check" aria-describedby="homework-cross-check-help" ${homeworkCrossCheckEnabled ? 'checked' : ''}> 交叉验证</label>` : ''}
@@ -78,7 +39,7 @@ function homeworkGradingPage() {
           }).join('')}</div>
           ${canAddChecks ? `<p class="hint" id="homework-cross-check-help">可多模型交叉验证</p>` : ''}
         </div>
-      </fieldset>`}
+      </fieldset>
     </header>
     <div class="actions homework-actions">
       <input type="file" id="homework-upload" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
@@ -86,21 +47,18 @@ function homeworkGradingPage() {
       ${preview && !homeworkResult && !homeworkTask ? `<button type="button" class="secondary" id="crop-homework" ${busy ? 'disabled' : ''}>${region ? '调整框选' : '框选范围'}</button>
       ${region ? '<button type="button" class="secondary" id="whole-homework">全图</button>' : ''}` : ''}
       ${homeworkResult ? '' : `<button type="button" class="primary" id="grade-homework" ${busy || (!homeworkSource && !homeworkTask) ? 'disabled' : ''}>${homeworkTask ? '继续查询' + action : solving ? '解题' : '开始批改'}</button>`}
-      ${!solving && cfg.showEduTutorCut === true && !homeworkResult && !homeworkTask ? `<button type="button" class="secondary" id="cut-edututor" ${!homeworkSource || busy ? 'disabled' : ''}>通义切题</button>` : ''}
-      ${homeworkResult && !tutor && canAddChecks && homeworkCrossCheckEnabled ? `<button type="button" class="primary" id="check-homework" ${busy || (!homeworkTask && !selected.size) ? 'disabled' : ''}>${homeworkTask ? '继续查询复核' : '开始复核'}</button>` : ''}
+      ${homeworkResult && canAddChecks && homeworkCrossCheckEnabled ? `<button type="button" class="primary" id="check-homework" ${busy || (!homeworkTask && !selected.size) ? 'disabled' : ''}>${homeworkTask ? '继续查询复核' : '开始复核'}</button>` : ''}
       <button type="button" class="secondary" id="cancel-homework" ${homeworkOperation || homeworkTask ? '' : 'hidden'} ${homeworkOperation?.signal.aborted ? 'disabled' : ''}>取消</button>
     </div>
     <p class="hint homework-status${homeworkOperation ? ' is-grading' : ''}" id="homework-status" role="status">${homeworkOperation ? '正在处理作业…' : homeworkTask ? '已提交，等待结果。' : homeworkResult ? '双指缩放照片，点题框查看解析。' : region ? '已框选，仅处理框内图片。' : preview ? '可直接处理全图，也可先框选题目。' : solving ? '上传一张包含题目的照片。' : '上传一张包含题目和学生作答的整页照片。'}</p>
     ${!homeworkResult && preview ? renderHomeworkPhoto(preview, '待处理的作业图', region ? `<span class="homework-scope" aria-hidden="true" style="left:${region.x * 100}%;top:${region.y * 100}%;width:${region.w * 100}%;height:${region.h * 100}%"></span>` : '') : ''}
-    ${homeworkResult ? `<section aria-label="${tutor ? '通义切题结果' : action + '结果'}">
-      <div class="homework-result-head"><h2>${tutor ? '通义切题结果' : action + '结果'} · ${questions.length} 题</h2><span>用时 ${Math.round(homeworkResult.elapsed / 1000)} 秒</span></div>
-      ${tutor ? '<p class="hint">点按题框可获取参考答案及解析。请人工核对作答，再勾选要收录的题。</p>' : `
+    ${homeworkResult ? `<section aria-label="${action}结果">
+      <div class="homework-result-head"><h2>${action}结果 · ${questions.length} 题</h2><span>用时 ${Math.round(homeworkResult.elapsed / 1000)} 秒</span></div>
       <p class="hint">主${action}结果 · ${homeworkProviders[homeworkResult.primary]}${homeworkResult.checks.length ? ' ｜ 已复核 · ' + homeworkResult.checks.map(key => homeworkProviders[key]).join('、') : ''}</p>
       ${[...homeworkResult.failures].map(([provider, reason]) => `<p class="hint">${homeworkProviders[provider]}未完成 · ${esc(reason)}</p>`).join('')}
       ${solving ? '' : `<div class="homework-totals">
         ${[[1, '正确'], [2, '错题'], [3, '未作答']].map(([verdict, label]) => `<div data-verdict="${verdict}"><span>${label}</span><strong>${questions.filter(q => q.verdict === verdict).length}</strong></div>`).join('')}
       </div>`}
-      `}
       ${renderHomeworkMarks({ ...homeworkResult.photo, src: homeworkResult.original }, questions, solving)}
       ${questions.length ? `<div class="actions homework-result-actions">
         <button type="button" class="secondary" id="homework-question-index">按题号查看解析</button>
@@ -187,7 +145,7 @@ function bindHomeworkAnalysis(result) {
 
   function showQuestion() {
     const question = result.questions[selected];
-    const models = result.edututor ? [{ provider:'edututor', label:'通义参考解析', ...question }] : [
+    const models = [
       { provider:result.primary, label:homeworkProviders[result.primary], ...question },
       ...(question.checks || []).map(check => ({ ...check, label:homeworkProviders[check.provider], reasons:[check.reason].filter(Boolean) }))
     ];
@@ -207,7 +165,7 @@ function bindHomeworkAnalysis(result) {
       </div>` : ''}
       ${renderSolutionSection('stem','题干',view.text,question.region ? '<div class="homework-sheet-crop"></div>' : '')}
       ${renderSolutionSection('response','孩子的错误作答／困惑',view.studentAnswer,
-        !solving && !result.edututor ? `<p class="hint">${view.label} · ${esc(view.provider === result.primary ? homeworkVerdicts[question.originalVerdict][0] : view.verdictLabel)} · ${view.studentAnswer ? '模型识别，待核对' : '未记录孩子作答'}</p>` : '', esc,
+        !solving ? `<p class="hint">${view.label} · ${esc(view.provider === result.primary ? homeworkVerdicts[question.originalVerdict][0] : view.verdictLabel)} · ${view.studentAnswer ? '模型识别，待核对' : '未记录孩子作答'}</p>` : '', esc,
         solving ? '解题模式未记录作答' : '暂无已确认的作答或困惑')}
       ${renderSolutionSection('answer','正确答案',view.answer,'',renderHomeworkExplanation)}
       ${renderSolutionSection('steps','解题步骤',view.explanation,
@@ -227,13 +185,13 @@ function bindHomeworkAnalysis(result) {
     centerQuestion();
     showSavedFigure(sheet.querySelector('.homework-sheet-crop'), result.photo.src, question.region);
     const extra = sheet.querySelector('.homework-sheet-extra');
-    if (view.provider !== result.primary && !result.edututor) {
+    if (view.provider !== result.primary) {
       if (!view.text && !view.answer && !view.explanation && !view.reasons?.length && solving) extra.textContent = view.verdictLabel;
       return;
     }
     if (view.explanation || solving) return;
-    const provider = result.edututor ? 'edututor' : (cfg.qwenViaProxy || getStoredKey('shiti-qwen-key') ? 'qwen' : 'deepseek');
-    if (!question.region && (result.edututor || !question.text.trim())) {
+    const provider = cfg.qwenViaProxy || getStoredKey('shiti-qwen-key') ? 'qwen' : 'deepseek';
+    if (!question.region && !question.text.trim()) {
       extra.textContent = '没有可用的题图或题干，请先在校对中补齐。';
       return;
     }
@@ -312,12 +270,6 @@ function bindHomeworkAnalysis(result) {
 async function requestHomeworkExplanation(result, question, provider, signal) {
   const crop = question.region ? await studyImageCopy(result.photo.src, 'original', question.region) : undefined;
   signal.throwIfAborted();
-  if (provider === 'edututor') {
-    const photo = crop.length > 2533300 ? (await prepareHomeworkImage(crop, { forTutor:true })).src : crop;
-    const response = await requestEduTutor('edututor-answer', photo, signal);
-    if (typeof response.explanation !== 'string' || !response.explanation.trim()) throw Error('未收到有效的参考解析');
-    return response;
-  }
   const response = await ai('请独立解这道题，忽略学生作答和批注。条件不足或图片不完整时说明缺什么，不猜。只返回 {"text":"按原样转录的题干","answer":"参考答案","explanation":"分步解析","questionType":"题型","pitfall":"常见易错点"}。校对题干：' + JSON.stringify(question.text), crop,
     { vision:Boolean(crop), provider, signal, maxTokens:3000 });
   const solution = homeworkSolutionFields(response);
@@ -345,7 +297,7 @@ function renderHomeworkReview(result) {
   const saved = result.questions.filter(q => q.saved).length;
   return `<section class="homework-review" aria-labelledby="homework-review-title">
     <div class="card-head"><h2 id="homework-review-title">校对并收录错题</h2><button type="button" id="homework-review-close" class="dialog-x" aria-label="关闭校对">×</button></div>
-    <p class="hint">${result.edututor ? '可修改题干和切题范围，勾选需要收录的题。' : '默认勾选判错且无分歧的题。展开题目可改判、重画选框或补充题干，也可手动勾选。'}</p>
+    <p class="hint">默认勾选判错且无分歧的题。展开题目可改判、重画选框或补充题干，也可手动勾选。</p>
     <label class="field homework-subject"><span>收录科目</span><select id="homework-subject">
       <option value="" ${result.subject ? '' : 'selected'} disabled>请选择科目</option>${opts(result.subject)}
     </select></label>
@@ -365,7 +317,6 @@ function renderHomeworkReview(result) {
               ${Object.entries(homeworkVerdicts).map(([value, [name]]) => `<option value="${value}" ${Number(value) === question.verdict ? 'selected' : ''}>${name}</option>`).join('')}
             </select></label>
             <button type="button" class="secondary" data-homework-crop="${index}">${question.region ? '查看或调整切题范围' : '手动框选题目'}</button>
-            ${result.edututor && question.region && !question.explanation ? `<button type="button" class="secondary" data-edututor-answer="${index}">获取参考解析</button>` : ''}
             <label class="field"><span>补充题干（可选）</span><textarea rows="2" data-homework-text="${index}" placeholder="也可只收录题图">${esc(question.text)}</textarea></label>`}
           </div>
         </details>
@@ -378,7 +329,7 @@ function renderHomeworkReview(result) {
   </section>`;
 }
 
-async function prepareHomeworkImage(source, { forTutor = false, needsBaidu = !forTutor, region = null } = {}) {
+async function prepareHomeworkImage(source, { needsBaidu = true, region = null } = {}) {
   const photo = new Image();
   photo.src = source;
   await photo.decode();
@@ -399,12 +350,8 @@ async function prepareHomeworkImage(source, { forTutor = false, needsBaidu = !fo
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(photo, photo.naturalWidth * x, photo.naturalHeight * y, width, height, 0, 0, canvas.width, canvas.height);
-  let blob;
-  for (const quality of forTutor ? [.84, .68, .45, .3] : [.84]) {
-    blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
-    if (blob && (!forTutor || blob.size <= 1900000)) break;
-  }
-  if (!blob || (forTutor && blob.size > 1900000)) throw Error('作业图片处理失败，请重新选图');
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .84));
+  if (!blob) throw Error('作业图片处理失败，请重新选图');
   const src = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
@@ -433,24 +380,6 @@ async function requestHomeworkGrading(connection, body, signal) {
     if (Number(result.error_code) === 6) throw Error('百度应用未开通智能作业批改权限');
     throw Error([17, 18, 19, 110, 111].includes(Number(result.error_code)) ? baiduError(result.error_code) : `百度作业批改失败（${result.error_code}）`);
   }
-  return result;
-}
-
-async function requestEduTutor(action, image, signal) {
-  const warning = ocrLocalFileWarning();
-  if (warning) throw Error(warning);
-  const token = getOcrToken();
-  if (token.length < 24) throw Error('请先在设置的「图片文字识别」中填写代理访问口令');
-  const timeout = AbortSignal.timeout(75000);
-  const response = await fetch((cfg.ocrProxy || defaultOCRProxy()).trim(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-OCR-Token': token },
-    body: JSON.stringify({ action, image }),
-    signal: signal ? AbortSignal.any([signal, timeout]) : timeout
-  });
-  const result = await response.json().catch(() => ({}));
-  if (response.status === 400 && result.error === '不支持的操作') throw Error('当前 OCR 代理尚未部署通义拍照解题');
-  if (!response.ok) throw Error(result.error || `通义拍照解题请求失败（${response.status}）`);
   return result;
 }
 
@@ -499,7 +428,7 @@ async function saveHomeworkQuestions(result) {
       term: profile.term,
       text: question.text.trim() || `识别第 ${question.number} 题 · 见题图`,
       image: cropped[index],
-      source: result.edututor ? '通义拍照解题' : result.primary === 'baidu' ? '百度作业批改' : homeworkProviders[result.primary] + '作业批改',
+      source: result.primary === 'baidu' ? '百度作业批改' : homeworkProviders[result.primary] + '作业批改',
       originalNumber: String(question.number),
       studentAnswer: question.studentAnswer || '',
       answer: question.answer || '',
@@ -619,7 +548,7 @@ async function gradeHomeworkWithBaidu(task, signal) {
     const warning = ocrLocalFileWarning();
     if (warning) throw Error(warning);
     const connection = { endpoint: (cfg.ocrProxy || defaultOCRProxy()).trim(), token: getOcrToken() };
-    if (connection.token.length < 24) throw Error('请先在设置的「图片文字识别」中填写代理访问口令');
+    if (connection.token.length < 24) throw Error('请先在设置的「百度 OCR」中填写代理访问口令');
     const result = await requestHomeworkGrading(connection, { action: 'homework-create', image: task.photo.src }, signal);
     if (typeof result.task_id !== 'string' || !result.task_id) throw Error('代理未返回批改任务编号，请确认代理已更新');
     task.baidu = { ...connection, id: result.task_id };
@@ -731,7 +660,6 @@ async function runHomeworkOperation(button, message, work) {
   $('#whole-homework')?.setAttribute('disabled', '');
   document.querySelectorAll('[data-homework-mode]').forEach(button => { button.disabled = true; });
   $('#grade-homework')?.setAttribute('disabled', '');
-  $('#cut-edututor')?.setAttribute('disabled', '');
   $('.homework-models')?.setAttribute('disabled', '');
   const status = $('#homework-status');
   status.textContent = message;
@@ -845,21 +773,6 @@ function bindHomeworkGrading() {
     bindHomeworkAnalysis(homeworkResult);
     if (!solving) bindHomeworkReview(homeworkResult);
   }
-  const cut = $('#cut-edututor');
-  if (cut) cut.onclick = async () => {
-    if (busy || !homeworkSource || homeworkTask) return;
-    const started = performance.now(), original = homeworkSource;
-    await runHomeworkOperation(cut, '正在用通义识别题目范围…', async signal => {
-      const photo = await prepareHomeworkImage(original, { forTutor:true, region:homeworkRegion });
-      signal.throwIfAborted();
-      const result = await requestEduTutor('edututor-cut', photo.src, signal);
-      signal.throwIfAborted();
-      if (!Array.isArray(result.questions) || !result.questions.length) throw Error('通义未找到可切出的题目');
-      const questions = homeworkReviewedQuestions(result.questions.map(question => ({ ...question, verdict: 0 })), photo);
-      questions.forEach((question, index) => { question.text = result.questions[index].text || ''; });
-      homeworkResult = { edututor: true, photo, original:homeworkRegion ? photo.src : original, questions, elapsed: performance.now() - started };
-    });
-  };
   const button = $('#grade-homework') || $('#check-homework');
   if (!button) return;
   button.onclick = async () => {
@@ -988,25 +901,23 @@ function defaultOCRProxy() {
 }
 
 function baiduSettings() {
-  return `<span class="pill">百度 OCR · 默认</span>
-    ${ocrLocalFileWarning()?`<p class="notice">${esc(ocrLocalFileWarning())} <a href="https://shiti.86518925.xyz" target="_blank" rel="noopener">打开线上拾题</a></p>`:''}
-    <label class="field"><span>识别服务</span>
-      <select id="ocr-provider">
-        <option value="baidu" ${(cfg.ocrProvider || 'baidu') === 'baidu' ? 'selected' : ''}>百度高精度 OCR → 校对 → 文字模型分析</option>
-        <option value="deepseek" ${cfg.ocrProvider === 'deepseek' ? 'selected' : ''}>DeepSeek 视觉转录</option>
-        <option value="qwen" ${cfg.ocrProvider === 'qwen' ? 'selected' : ''}>千问视觉转录</option>
-      </select>
-    </label>
-    <label class="field"><span>百度接口</span><select id="ocr-mode"><option value="accurate" ${(cfg.ocrMode||'accurate')==='accurate'?'selected':''}>高精度含位置版（用于恢复行顺序）</option><option value="basic" ${cfg.ocrMode==='basic'?'selected':''}>高精度纯文字版（兼容旧权限）</option></select></label><p class="notice">含位置版需要百度单独开通相应接口权限，额度与费用以百度控制台为准。失败不会自动重复调用。位置只能恢复排版，不能区分印刷、手写和批注。</p>
-    ${field('DeepSeek 图片转录模型（兼容接口可自定义）','ocr-vision-model',cfg.ocrVisionModel||'','text','官方接口默认 deepseek-flash；其他接口默认使用文字模型配置')}
-    ${field('千问图片转录模型','qwen-vision-model',cfg.qwenVisionModel||'','text','默认 qwen3-vl-plus，使用已配置的百炼密钥或代理')}
-    ${field('OCR 代理完整地址', 'ocr-proxy', cfg.ocrProxy || defaultOCRProxy(), 'url', 'https://ocr.86518925.xyz/api/ocr')}
-    ${field('代理访问口令（已支持设备持久保存）', 'ocr-token', getOcrToken(), 'password', '与 Worker 中的 OCR_PROXY_TOKEN 一致')}
-    <div id="ocr-test-result" class="result-note" style="margin:6px 0"></div>
+  return `<p class="hint">百度 OCR 和百度智能作业批改共用同一个代理口令。百度 API Key 和 Secret Key 配置在代理端。</p>
+    ${ocrLocalFileWarning() ? `<p class="notice">${esc(ocrLocalFileWarning())}</p>` : ''}
+    ${field('代理访问口令', 'ocr-token', getOcrToken(), 'password', '与代理端的 OCR_PROXY_TOKEN 一致')}
+    <details class="ai-settings-advanced"><summary>高级设置</summary>
+      ${field('共用代理地址', 'ocr-proxy', cfg.ocrProxy || defaultOCRProxy(), 'url')}
+      <label class="field"><span>百度 OCR 接口</span><select id="ocr-mode">
+        <option value="accurate" ${(cfg.ocrMode || 'accurate') === 'accurate' ? 'selected' : ''}>高精度含位置版</option>
+        <option value="basic" ${cfg.ocrMode === 'basic' ? 'selected' : ''}>高精度纯文字版</option>
+      </select></label>
+      <p class="hint">含位置版和智能作业批改均需在百度应用中开通对应接口。</p>
+    </details>
+    <div id="ocr-test-result" class="result-note" role="status"></div>
     <div class="actions">
-      <button class="primary" id="save-ocr">保存 OCR 设置</button>
-      <button class="secondary" type="button" id="test-ocr">⚡ 测试手机/当前网络连接</button>
-    </div>`;
+      <button class="secondary" type="button" id="test-ocr">测试代理连接</button>
+    </div>
+    <p class="hint">本机已提交 ${Number(cfg.baiduHomeworkCalls) || 0} 次批改。</p>
+    <a href="https://console.bce.baidu.com/ai/#/ai/ocr/overview/index" target="_blank" rel="noopener">查看百度账户额度</a>`;
 }
 
 function usesBaidu() {
@@ -1030,8 +941,8 @@ async function testOCRConnection() {
   const out = $('#ocr-test-result');
   const localWarning = ocrLocalFileWarning();
   if (localWarning) { out.textContent = '⚠️ ' + localWarning; return; }
-  const endpoint = ($('#ocr-proxy')?.value || cfg.ocrProxy || defaultOCRProxy()).trim();
-  const token = ($('#ocr-token')?.value || getOcrToken()).trim();
+  const endpoint = ($('#ocr-proxy')?.value ?? (cfg.ocrProxy || defaultOCRProxy())).trim();
+  const token = ($('#ocr-token')?.value ?? getOcrToken()).trim();
   if (!endpoint) { out.textContent = '❌ 请先填写 OCR 代理地址'; return; }
   out.textContent = '⏳ 正在测试连接代理服务器…';
   try {

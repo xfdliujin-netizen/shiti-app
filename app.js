@@ -863,12 +863,13 @@ function settingsRow(sheet, icon, cls, title, sub, value) {
 }
 
 function settingsSheet(id, title, lead, inner) {
+  const savesAISettings = ['baidu','deepseek','qwen','ai-defaults'].includes(id);
   return `<dialog class="settings-sheet" id="sheet-${id}">
     <div class="sheet-grabber"></div>
     <div class="sheet-head">
       <button type="button" class="sheet-close" data-close-sheet>\u53d6\u6d88</button>
       <div class="sheet-title">${title}</div>
-      <button type="button" class="sheet-done" data-close-sheet>\u5b8c\u6210</button>
+      <button type="button" class="sheet-done" ${savesAISettings ? 'data-save-ai-settings' : 'data-close-sheet'}>${savesAISettings ? '保存' : '完成'}</button>
     </div>
     <div class="sheet-body">
       ${inner}
@@ -881,7 +882,9 @@ function settings() {
   const st = stageConfig[p.stage];
   const gradeOptions = stageConfig[p.stage].grades;
   const bSettings = typeof baiduSettings === 'function' ? baiduSettings() : '';
-  const ocrLabel = ({deepseek:'DeepSeek 图片转录',qwen:'千问图片转录'})[cfg.ocrProvider] || '百度高精度 OCR';
+  const baiduReady = typeof getOcrToken === 'function' && getOcrToken().length >= 24;
+  const deepseekReady = Boolean(getStoredKey('shiti-key'));
+  const qwenReady = cfg.qwenViaProxy ? baiduReady : Boolean(getStoredKey('shiti-qwen-key'));
   const ghLabel = cfg.owner && cfg.repo ? cfg.owner + '/' + cfg.repo : '未配置';
   const cloudLabel = cfg.cloudEndpoint || 'api.86518925.xyz';
   return `<div class="settings-page">` + heading('YOUR PREFERENCES', '设置', '学情档案、识别、同步与数据，都在这里管理。') + `
@@ -896,12 +899,12 @@ function settings() {
     <div class="settings-group">
       <div class="settings-group-title">识别与 AI</div>
       <div class="settings-list">
-        ${settingsRow('ocr', '◐', 'purple', '图片文字识别', '框选题目后用什么识别文字', ocrLabel)}
-        ${settingsRow('deepseek', '✦', 'orange', '文字分析与练习', '校对后的文字分析、变式、组卷与判题', cfg.textProvider === 'qwen' ? cfg.qwenModel || 'qwen-plus' : cfg.model || 'deepseek-chat')}
-        ${typeof baiduGradingSettings === 'function' ? settingsRow('homework-grading', '✓', 'teal', '百度智能作业批改', '图片批改与免费额度查询入口', '') : ''}
-        ${typeof eduTutorSettings === 'function' ? settingsRow('edututor', '▤', 'teal', '通义拍照解题', '设置批改页是否显示通义切题', '') : ''}
+        ${settingsRow('baidu', '◐', 'blue', '百度 OCR', '图片转文字、智能作业批改 · 代理口令', baiduReady ? '已填写' : '待配置')}
+        ${settingsRow('deepseek', '✦', 'orange', 'DeepSeek', '识图、分析、批改与练习 · 一个 API Key', deepseekReady ? '已填写' : '待配置')}
+        ${settingsRow('qwen', '✦', 'purple', '千问', '视觉与文字模型 · 一个 API Key', qwenReady ? (cfg.qwenViaProxy ? '代理模式' : '已填写') : '待配置')}
+        ${settingsRow('ai-defaults', '◎', 'teal', '默认使用的服务', '选择录题识别和文字分析所用服务', '')}
       </div>
-      <p class="settings-footnote">识别默认使用百度高精度 OCR，可在录题页切换 DeepSeek 或千问。</p>
+      <p class="settings-footnote">凭据按服务填写一次。录题、批改解题和练习可按需切换已接入的模型。</p>
     </div>
 
     <div class="settings-group">
@@ -951,27 +954,38 @@ function settings() {
     `)}
 
     ${typeof learningView==='function'?settingsSheet('learning','学习记录与复习','',learningView()):''}
-    ${settingsSheet('ocr', '图片文字识别', '框选题目后先识别原文，人工校对后再交给设置中的文字模型分析。', bSettings)}
-
-    ${settingsSheet('deepseek', '文字分析与练习', '选择用于题目分析、AI 判题和出题的服务。', `
-      <label class="field"><span>文字模型服务</span><select id="text-provider">
-        <option value="deepseek" ${cfg.textProvider !== 'qwen' ? 'selected' : ''}>DeepSeek</option>
-        <option value="qwen" ${cfg.textProvider === 'qwen' ? 'selected' : ''}>千问（阿里云百炼）</option>
-      </select></label>
-      ${field('DeepSeek API 地址', 'endpoint', cfg.endpoint || 'https://api.deepseek.com')}
-      ${field('DeepSeek 模型', 'model', cfg.model || 'deepseek-chat')}
+    ${settingsSheet('baidu', '百度 OCR', '', bSettings)}
+    ${settingsSheet('deepseek', 'DeepSeek', '', `
+      <p class="hint">在这里填写一次，录题识图、批改解题、文字分析和练习共用。</p>
       ${field('DeepSeek API Key', 'api-key', getStoredKey('shiti-key'), 'password', 'sk-…')}
-      ${field('千问 Base URL（与 API Key 地域匹配）', 'qwen-endpoint', cfg.qwenEndpoint || 'https://dashscope.aliyuncs.com/compatible-mode/v1', 'url')}
-      ${field('千问模型（需支持非思考模式 JSON 输出）', 'qwen-model', cfg.qwenModel || 'qwen-plus')}
-      ${field('百炼 API Key', 'qwen-key', getStoredKey('shiti-qwen-key'), 'password', 'sk-…')}
-      <label class="verify"><input type="checkbox" id="qwen-via-proxy" ${cfg.qwenViaProxy ? 'checked' : ''}>通过已配置的代理调用千问（使用代理端的百炼凭据）</label>
-      <p class="result-note">本机千问调用记录 · ${esc(qwenUsageText())}</p>
-      <p class="notice">账号剩余免费额度按模型计算，可在百炼控制台查看，分钟级更新。可在控制台开启「用完即停」。</p>
-      <a href="https://bailian.console.aliyun.com/cn-beijing/costing-balance/free-quota" target="_blank" rel="noopener">打开百炼免费额度页面</a>
-      <div class="actions"><button class="primary" id="save-settings">保存设置</button></div>
+      <details class="ai-settings-advanced"><summary>高级设置</summary>
+        ${field('API 地址', 'endpoint', cfg.endpoint || 'https://api.deepseek.com', 'url')}
+        ${field('文本模型', 'model', cfg.model || 'deepseek-chat')}
+        ${field('视觉模型', 'ocr-vision-model', cfg.ocrVisionModel || '', 'text', '留空则按 API 地址使用默认模型')}
+      </details>
     `)}
-    ${typeof baiduGradingSettings === 'function' ? settingsSheet('homework-grading', '百度智能作业批改', '', baiduGradingSettings()) : ''}
-    ${typeof eduTutorSettings === 'function' ? settingsSheet('edututor', '通义拍照解题', '', eduTutorSettings()) : ''}
+    ${settingsSheet('qwen', '千问', '', `
+      <p class="hint">文字、识图、批改解题和练习共用这里的千问 API Key。</p>
+      <div id="qwen-direct-key" ${cfg.qwenViaProxy ? 'hidden' : ''}>${field('千问 API Key', 'qwen-key', getStoredKey('shiti-qwen-key'), 'password', 'sk-…')}</div>
+      <details class="ai-settings-advanced" ${cfg.qwenViaProxy ? 'open' : ''}><summary>高级设置</summary>
+        <label class="verify"><input type="checkbox" id="qwen-via-proxy" ${cfg.qwenViaProxy ? 'checked' : ''}>通过代理调用千问</label>
+        <p class="hint" id="qwen-proxy-note" ${cfg.qwenViaProxy ? '' : 'hidden'}>使用代理端的千问密钥。代理地址和口令在「百度 OCR」设置中共用。</p>
+        ${field('Base URL（需匹配 API Key 地域）', 'qwen-endpoint', cfg.qwenEndpoint || 'https://dashscope.aliyuncs.com/compatible-mode/v1', 'url')}
+        ${field('文本模型', 'qwen-model', cfg.qwenModel || 'qwen-plus')}
+        ${field('视觉模型', 'qwen-vision-model', cfg.qwenVisionModel || '', 'text', '留空使用 qwen3-vl-plus')}
+      </details>
+      <p class="result-note">本机用量 · ${esc(qwenUsageText())}</p>
+      <a href="https://bailian.console.aliyun.com/cn-beijing/costing-balance/free-quota" target="_blank" rel="noopener">查看千问账户剩余免费额度</a>
+    `)}
+    ${settingsSheet('ai-defaults', '默认使用的服务', '', `
+      <label class="field"><span>录题图片识别</span><select id="ocr-provider">
+        ${[['baidu','百度 OCR'],['deepseek','DeepSeek'],['qwen','千问视觉']].map(([key,label]) => `<option value="${key}" ${(cfg.ocrProvider || 'baidu') === key ? 'selected' : ''}>${label}</option>`).join('')}
+      </select></label>
+      <label class="field"><span>文字分析与练习</span><select id="text-provider">
+        <option value="deepseek" ${cfg.textProvider !== 'qwen' ? 'selected' : ''}>DeepSeek</option>
+        <option value="qwen" ${cfg.textProvider === 'qwen' ? 'selected' : ''}>千问</option>
+      </select></label>
+    `)}
 
     ${settingsSheet('cloud', '私人云端同步', '同步错题、练习和学情档案到自己的云端。首次使用请先导出 JSON 备份，再登录并同步。原图保留本机，云端题图会压缩。', typeof cloudSettings === 'function' ? cloudSettings() : '')}
 
@@ -1036,7 +1050,7 @@ async function ai(prompt, img, options = {}) {
     stream: false
   };
   const proxyToken = viaProxy ? getOcrToken() : '';
-  if (viaProxy && proxyToken.length < 24) throw Error('请先在「图片文字识别」中配置代理访问口令');
+  if (viaProxy && proxyToken.length < 24) throw Error('请先在设置的「百度 OCR」中配置共用代理访问口令');
   const url = viaProxy ? cfg.ocrProxy || defaultOCRProxy() : endpoint.replace(/\/+$/, '').replace(/\/chat\/completions$/, '') + '/chat/completions';
   const timeout = AbortSignal.timeout(180000);
   const response = await fetch(url, {
@@ -1686,36 +1700,37 @@ function openExamSheet(record) {
   $('#exam-area')?.scrollIntoView({ behavior: 'smooth' });
 }
 
-function saveConfig() {
+function saveConfig(scope) {
+  const get = selector => scope ? scope.querySelector(selector) : $(selector);
   cfg = {
     ...cfg,
     stage: cfg.stage || 'primary',
-    grade: $('#student-grade') ? $('#student-grade').value : (cfg.grade || '四年级'),
-    term:$('#student-term')?.value||getStudentProfile().term,
-    region: $('#student-region') ? $('#student-region').value : (cfg.region || '江苏（苏教版 / 译林版 / 人教版）'),
-    teachingStyle:$('#teaching-style')?.value||cfg.teachingStyle||'step',
-    teachingFocus:$('#teaching-focus')?.value||cfg.teachingFocus||'understanding',
-    endpoint: $('#endpoint') ? $('#endpoint').value.trim() : cfg.endpoint,
-    model: $('#model') ? $('#model').value.trim() : cfg.model,
-    textProvider: $('#text-provider')?.value || cfg.textProvider,
-    qwenEndpoint: $('#qwen-endpoint') ? $('#qwen-endpoint').value.trim() : cfg.qwenEndpoint,
-    qwenModel: $('#qwen-model') ? $('#qwen-model').value.trim() : cfg.qwenModel,
-    qwenViaProxy: $('#qwen-via-proxy')?.checked ?? cfg.qwenViaProxy,
-    owner: $('#owner') ? $('#owner').value.trim() : cfg.owner,
-    repo: $('#repo') ? $('#repo').value.trim() : cfg.repo,
-    path: $('#path') ? $('#path').value.trim() : cfg.path,
-    branch: $('#branch') ? $('#branch').value.trim() : cfg.branch,
-    ocrProvider: $('#ocr-provider') ? $('#ocr-provider').value : cfg.ocrProvider,
-    ocrVisionModel:$('#ocr-vision-model')?$('#ocr-vision-model').value.trim():(cfg.ocrVisionModel||''),
-    qwenVisionModel: $('#qwen-vision-model') ? $('#qwen-vision-model').value.trim() : cfg.qwenVisionModel,
-    ocrMode: $('#ocr-mode') ? $('#ocr-mode').value : (cfg.ocrMode || 'accurate'),
-    ocrProxy: $('#ocr-proxy') ? $('#ocr-proxy').value.trim() : cfg.ocrProxy
+    grade: get('#student-grade') ? get('#student-grade').value : (cfg.grade || '四年级'),
+    term:get('#student-term')?.value||getStudentProfile().term,
+    region: get('#student-region') ? get('#student-region').value : (cfg.region || '江苏（苏教版 / 译林版 / 人教版）'),
+    teachingStyle:get('#teaching-style')?.value||cfg.teachingStyle||'step',
+    teachingFocus:get('#teaching-focus')?.value||cfg.teachingFocus||'understanding',
+    endpoint: get('#endpoint') ? get('#endpoint').value.trim() : cfg.endpoint,
+    model: get('#model') ? get('#model').value.trim() : cfg.model,
+    textProvider: get('#text-provider')?.value || cfg.textProvider,
+    qwenEndpoint: get('#qwen-endpoint') ? get('#qwen-endpoint').value.trim() : cfg.qwenEndpoint,
+    qwenModel: get('#qwen-model') ? get('#qwen-model').value.trim() : cfg.qwenModel,
+    qwenViaProxy: get('#qwen-via-proxy')?.checked ?? cfg.qwenViaProxy,
+    owner: get('#owner') ? get('#owner').value.trim() : cfg.owner,
+    repo: get('#repo') ? get('#repo').value.trim() : cfg.repo,
+    path: get('#path') ? get('#path').value.trim() : cfg.path,
+    branch: get('#branch') ? get('#branch').value.trim() : cfg.branch,
+    ocrProvider: get('#ocr-provider') ? get('#ocr-provider').value : cfg.ocrProvider,
+    ocrVisionModel:get('#ocr-vision-model')?get('#ocr-vision-model').value.trim():(cfg.ocrVisionModel||''),
+    qwenVisionModel: get('#qwen-vision-model') ? get('#qwen-vision-model').value.trim() : cfg.qwenVisionModel,
+    ocrMode: get('#ocr-mode') ? get('#ocr-mode').value : (cfg.ocrMode || 'accurate'),
+    ocrProxy: get('#ocr-proxy') ? get('#ocr-proxy').value.trim() : cfg.ocrProxy
   };
-  if ($('#ocr-token')) setStoredKey('shiti-ocr-token', $('#ocr-token').value.trim());
+  if (get('#ocr-token')) setStoredKey('shiti-ocr-token', get('#ocr-token').value.trim());
   saveLocalConfig();
-  if ($('#api-key')) setStoredKey('shiti-key', $('#api-key').value.trim());
-  if ($('#qwen-key')) setStoredKey('shiti-qwen-key', $('#qwen-key').value.trim());
-  if ($('#github-token')) setStoredKey('shiti-gh', $('#github-token').value.trim());
+  if (get('#api-key')) setStoredKey('shiti-key', get('#api-key').value.trim());
+  if (get('#qwen-key')) setStoredKey('shiti-qwen-key', get('#qwen-key').value.trim());
+  if (get('#github-token')) setStoredKey('shiti-gh', get('#github-token').value.trim());
 }
 
 function validate(d) {
@@ -1756,7 +1771,6 @@ function merge(a, b) {
 function bindSettings() {
   if(typeof bindUnifiedProfile==='function')bindUnifiedProfile();
   if (typeof bindCloudSettings === 'function') bindCloudSettings();
-  if (typeof bindEduTutorSettings === 'function') bindEduTutorSettings();
   document.querySelectorAll('[data-open-sheet]').forEach(btn => {
     btn.onclick = () => {
       openSheet = btn.dataset.openSheet;
@@ -1785,16 +1799,27 @@ function bindSettings() {
   if ($('#student-term')) $('#student-term').onchange=e=>{cfg.term=e.target.value;saveLocalConfig();render()};
   if ($('#student-region')) $('#student-region').onchange = e => { cfg.region = e.target.value; saveLocalConfig(); render(); };
   if ($('#save-profile')) $('#save-profile').onclick = () => {
-    saveConfig();
+    saveConfig($('#sheet-profile'));
     openSheet = null;
     render();
     toast('✓ 学情档案已保存，后续 AI 分析与出题将使用这些偏好');
   };
 
-  if ($('#save-settings')) $('#save-settings').onclick = () => { saveConfig(); closeSettingsSheet(); toast('✓ 配置与密钥已持久保存在此设备'); };
-  if ($('#save-github')) $('#save-github').onclick = () => { saveConfig(); closeSettingsSheet(); toast('✓ 配置与密钥已持久保存在此设备'); };
-  if ($('#save-ocr')) $('#save-ocr').onclick = () => { saveConfig(); closeSettingsSheet(); toast('✓ 配置与密钥已持久保存在此设备'); };
-  if ($('#test-ocr')) $('#test-ocr').onclick = () => { saveConfig(); if (typeof testOCRConnection === 'function') testOCRConnection(); };
+  document.querySelectorAll('[data-save-ai-settings]').forEach(button => {
+    button.onclick = () => {
+      saveConfig(button.closest('dialog'));
+      closeSettingsSheet();
+      render();
+      toast('设置已保存在此设备');
+    };
+  });
+  const proxy = $('#qwen-via-proxy');
+  if (proxy) proxy.onchange = () => {
+    $('#qwen-direct-key').hidden = proxy.checked;
+    $('#qwen-proxy-note').hidden = !proxy.checked;
+  };
+  if ($('#save-github')) $('#save-github').onclick = () => { saveConfig($('#sheet-github')); closeSettingsSheet(); toast('✓ 配置与密钥已持久保存在此设备'); };
+  if ($('#test-ocr')) $('#test-ocr').onclick = () => testOCRConnection();
   if ($('#export')) $('#export').onclick = () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a');
@@ -1814,7 +1839,7 @@ function bindSettings() {
     render();
   });
   if ($('#sync')) $('#sync').onclick = e => run(e.target, async () => {
-    saveConfig();
+    saveConfig($('#sheet-github'));
     await sync();
     toast('私有仓库已同步');
     if ($('#save-status')) $('#save-status').textContent = '已同步到私有仓库';

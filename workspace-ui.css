@@ -1076,3 +1076,9 @@ dialog.homework-analysis-sheet[open] { position:fixed; inset:auto 0 0; margin:0 
 .solution-section[data-solution-section="stem"] > .prose { font-size:16px; line-height:1.65; }
 .solution-section .homework-sheet-crop:empty { display:none; }
 .solution-section .homework-sheet-crop img { margin:8px auto 0; }
+
+.ai-settings-advanced { margin:12px 0; padding:10px 12px; border:1px solid var(--line); border-radius:10px; }
+.ai-settings-advanced summary { cursor:pointer; color:var(--text); font-size:14px; font-weight:600; }
+.ai-settings-advanced[open] > summary { margin-bottom:10px; }
+#qwen-direct-key[hidden], #qwen-proxy-note[hidden] { display:none; }
+#ocr-test-result:empty { display:none; }
